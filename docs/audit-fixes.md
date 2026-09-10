@@ -95,3 +95,25 @@ The audit's sharpest point: several "resolved" decisions were made **for** the p
 - **R-4** — the working-hours conversation above. A settings edit, not a code change, but it must happen before launch content goes live.
 - **R-6** — no service names, prices, durations, photo counts or image URLs exist. All 25 tasks can pass with nothing sellable on the site.
 - **C-1** — confirm the removal of approve/decline directly with the photographer.
+
+---
+
+## 8. Addendum — revision 2.2: two deployables, reinstated
+
+This does not rewrite §4's "Two deployables → one" row above — that row is an
+accurate record of what revision 2.1 decided and why it seemed right at the
+time. It is superseded by `specs_v2.md` revision 2.2: the frontend and backend
+are two separately-deployed apps on two separate domains again — not
+subdomains of one registrable domain, so this is cross-site, not merely
+cross-origin.
+
+- **R-7 is reopened, not solved** (`specs_v2.md` §8.2). Public-page SEO is an
+  open question again; this change adds no SSR or prerendering.
+- **CORS is reinstated**: the API allowlists `WEB_ORIGIN` with credentials
+  enabled, echoing that single origin — never a wildcard.
+- **The admin session cookie (Task 7, not yet built) becomes
+  `SameSite=None; Secure`**, which needs a CSRF token flow that `SameSite=Lax`
+  was previously providing for free — see `plan.md` Task 7.
+- `backend/` no longer serves the built frontend at all; it is API-only. The
+  static-serving block that was in `backend/src/app.ts` and its unused imports
+  have been removed, not toggled behind an environment check.

@@ -9,10 +9,12 @@ export class EnvValidationError extends Error {
   }
 }
 
-// Same origin in every environment (spec §7), so the default is a bare path and
-// nothing here needs a host. Vite proxies it to Express in development.
+// Dev default is a bare path, proxied to Express by Vite on localhost. Every
+// deployed environment is cross-origin now — frontend and backend are two
+// separately-deployed apps on separate domains (spec §7, revision 2.2) — so
+// production must set an absolute http(s) URL instead.
 const schema = z.object({
-  VITE_API_BASE_URL: z.string().startsWith('/').default('/api'),
+  VITE_API_BASE_URL: z.union([z.string().startsWith('/'), z.url()]).default('/api'),
 })
 
 export type Env = z.infer<typeof schema>

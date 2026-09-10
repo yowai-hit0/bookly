@@ -3,9 +3,11 @@ import react from '@vitejs/plugin-react'
 import path from 'node:path'
 import { defineConfig } from 'vite'
 
-// Two projects, one deployable (spec §7): in development Vite proxies /api to
-// Express; in production Express serves this build. Nothing is cross-origin,
-// so there is no CORS configuration on either side.
+// Two separately-deployed apps on separate domains (spec §7, revision 2.2):
+// in production the frontend is static-hosted and calls the API cross-origin
+// via VITE_API_BASE_URL, with CORS handled on the backend (WEB_ORIGIN). This
+// dev proxy stays as a convenience — it keeps `npm run dev` single-command and
+// same-origin on localhost — but it's not the deployed topology.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {

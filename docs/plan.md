@@ -6,7 +6,7 @@
 | **Tasks** | 25, sequential. Each is one focused work session. |
 | **Frontend** | React + TypeScript via Vite · shadcn/ui · Tailwind for custom styling |
 | **Backend** | Express + Prisma · TypeScript · PostgreSQL 15+ (local instance) |
-| **Layout** | `backend/` · `frontend/` · `docs/` — two projects, **one deployable**: Vite proxies to Express in dev, Express serves the built bundle in production |
+| **Layout** | `backend/` · `frontend/` · `docs/` — **two separately-deployed apps** on two separate domains: Vite still proxies `/api` to Express in dev for a single-command inner loop; in production the frontend is static-hosted and the backend is an API-only process at `/api/*` on its own host |
 | **Launch blocker outside this plan** | **R-6** — no service names, prices, durations, photo counts or images exist yet. Tasks 1–25 can all complete without them; the site cannot go live without them. |
 
 ## How to read a task
@@ -33,13 +33,13 @@ Applies to every task; not repeated below.
 | Migrations | Prisma migrations, SQL hand-edited before applying | The exclusion constraint, partial indexes, CHECKs and the view are not expressible in Prisma's DSL |
 | Booking totals | One exported `bookingTotals()` function, status-aware | A view could not express "nothing is owed on a no-show" and would sit outside Prisma's types |
 | Admin session | Signed `HttpOnly` cookie, 8 h. No TOTP, no session-epoch column | One user. A changed password already invalidates the cookie; "log out everywhere" is closing a browser |
-| Auth transport | Same origin. `SameSite=Lax`, no CORS allowlist, no CSRF token flow | One deployable means there is no cross-origin request to defend against |
+| Auth transport | Cross-site. `SameSite=None; Secure` session cookie, a CORS allowlist scoped to `WEB_ORIGIN` (credentials enabled, origin echoed, never `*`), and a CSRF token flow on state-changing admin requests | Frontend and backend are two separately-deployed apps on two separate domains — `SameSite=Lax` can't apply, so the cookie needs a CSRF defence to replace what it used to provide for free |
 | Tests | Vitest against the local PostgreSQL instance · Playwright for E2E | The critical logic is database behaviour; mocking the database would test nothing |
 | Background work | `node-cron` inside the API process, single worker loop | One instance. Multi-worker claiming solves concurrency this deployment does not have |
 | Email provider | Resend behind a `MailProvider` interface | Not named in the spec. Swappable in one file |
 | Images | **No blob store, no uploads.** `cover_image_url` is a URL the admin pastes | The brief describes a service as "name, description, and price". An upload pipeline is a dependency bought for a field nobody specified |
 | Shared code | **None.** No workspace package. The zod schemas, the quote function and the formatters exist twice — once per project | Chosen deliberately (no monorepo tooling). Contained by making the **server authoritative**: it recomputes every amount and revalidates every payload, and a fixture file at `docs/fixtures/` is asserted by both test suites so a divergence fails a test rather than reaching a client |
-| Public page rendering | **R-7 is closed.** Express serves the SPA; prerender later only if search traffic matters | The single deployable removed the problem rather than solving it |
+| Public page rendering | **R-7 is reopened** (`specs_v2.md` §8.2) — the SPA is client-rendered from a separately-hosted frontend again. Ship as-is; add prerendering/SSR only if search traffic starts to matter | The single deployable that had removed the problem is gone; solving it is out of scope for this change |
 
 ---
 
@@ -50,12 +50,12 @@ Applies to every task; not repeated below.
 **Dependencies.** None.
 
 **Verification.**
-- `npm run dev` starts Vite on 5173 and Express on 4000; Vite proxies `/api` to Express, so `fetch('/api/health')` from the browser returns `{"ok":true}` **with no CORS header involved** — asserted by the absence of `Access-Control-Allow-Origin` on the response.
-- `npm run build` in `frontend/` then starting Express alone serves the app and the API from one origin on one port.
+- `npm run dev` starts Vite on 5173 and Express on 4000; Vite proxies `/api` to Express, so `fetch('/api/health')` from the browser returns `{"ok":true}` without the browser making a cross-origin request at all — the dev proxy keeps the inner loop single-command even though the two apps deploy separately.
+- `npm run build` in `frontend/` produces a static bundle deployable to any static host, with no Express involved; `npm run build` in `backend/` produces an API-only server with no reference to `frontend/dist`.
 - `backend/` and `frontend/` each install, lint, typecheck and test independently — neither has a dependency on the other's build.
 - `npx shadcn@latest add button` installs into `frontend/src/components/ui` and the button renders.
 - Both `env.ts` files validate required variables at boot with zod: removing `DATABASE_URL` makes the API exit with a named error, not a later runtime crash.
-- CORS is configured from `WEB_ORIGIN`: a request from an unlisted origin is refused.
+- CORS is configured from `WEB_ORIGIN`: a request from the allowed origin gets `Access-Control-Allow-Origin` echoing it plus `Access-Control-Allow-Credentials: true`; a request from an unlisted origin gets neither header — it's the browser, not the server, that refuses it from there.
 
 **Assumptions.** `PAYMENT_PROVIDER` is an environment variable on the API, never a database row (`data-model_v2.md` §5.2). Added to `.env.example` now as `mtn_momo_direct`.
 
@@ -151,15 +151,15 @@ Applies to every task; not repeated below.
 **Dependencies.** Task 4.
 
 **Verification.**
-- Correct credentials set a session cookie with `HttpOnly`, `Secure`, `SameSite=Lax` — asserted on the `Set-Cookie` header.
+- Correct credentials set a session cookie with `HttpOnly`, `Secure`, `SameSite=None` — asserted on the `Set-Cookie` header. `SameSite=None` is mandatory here: the admin UI and the API are cross-site (separate domains), and `Secure` was already required, so this costs nothing extra.
 - Wrong password increments `failed_login_count`; past the threshold `locked_until` is set and correct credentials are still refused until it passes.
 - Changing the password invalidates any already-issued cookie on the next request, because the signature covers the password hash.
 - `GET /api/admin/*` unauthenticated returns 401 with no redirect.
-- The session cookie is `SameSite=Lax`, so a cross-site form post carries no credentials — asserted with a request bearing a foreign `Origin` header.
+- Because the cookie is `SameSite=None`, it rides along with cross-site requests, so CSRF protection is an explicit token, not a `SameSite` side effect: a state-changing admin request with a valid session cookie but a missing or invalid CSRF token is rejected (403) before it touches business logic — asserted directly, plus a request bearing a foreign `Origin` header and no token.
 - Password reset stores only a hash; the emailed token works once and is rejected on reuse and after expiry.
 - `password_hash` appears in no API response — asserted by serialising the admin user through the public mapper.
 
-**Assumptions.** Argon2id via `@node-rs/argon2`. Lockout escalates 1 → 5 → 15 minutes; the spec says "rising interval" without values. No TOTP — removed in revision 2.1 as untraceable to any client requirement.
+**Assumptions.** Argon2id via `@node-rs/argon2`. Lockout escalates 1 → 5 → 15 minutes; the spec says "rising interval" without values. No TOTP — removed in revision 2.1 as untraceable to any client requirement. CSRF defence is a double-submit cookie token (implementer's choice vs. a synchronizer token) issued alongside the session and checked on every non-GET `/api/admin/*` route — reinstated in revision 2.2, since cross-site cookies need it now that `SameSite=Lax` can't provide it for free. Every admin-authenticated `fetch` from the frontend must also send `credentials: 'include'`, starting with whichever task builds the admin login screen — flagged here, not built here.
 
 ---
 
@@ -452,7 +452,7 @@ Applies to every task; not repeated below.
 - One axe scan across the booking flow: zero critical violations, and the flow completes by keyboard alone. Checked once here rather than gated per screen in Tasks 11 and 12.
 - Lighthouse mobile on the two heaviest public pages: LCP under 2.5 s, initial payload under 500 KB excluding images.
 - An induced exception is logged as structured JSON to stdout; an induced payment-webhook failure raises an admin email alert. No third-party error-tracking vendor — none was budgeted, and one alert address covers a business with one operator.
-- **Deployment:** the app runs from a single process on the host, serving the API and the built bundle over HTTPS on one origin.
+- **Deployment:** the backend runs as its own API-only process on its host, reachable over HTTPS at its own domain; the frontend build deploys separately to a static host on a different domain. `WEB_ORIGIN` on the backend matches the frontend's deployed URL exactly — the CORS allowlist and every emailed link depend on it.
 - **Backups:** a daily database dump with 7-day retention, and a restore **performed at least once** into a scratch database with the schema test suite passing against it. An untested backup is not a backup, and no task previously owned this.
 
 ---
