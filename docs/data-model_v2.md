@@ -7,7 +7,8 @@
 | **Target engine** | PostgreSQL 15+ (GiST exclusion constraints — §9.1) |
 | **Access layer** | Prisma. Tables and relations live in `schema.prisma`; every constraint Prisma's DSL cannot express lives in hand-edited migration SQL (§2.1). |
 | **Conventions** | UTC `timestamptz` · whole-RWF integers · UUID v4 primary keys |
-| **Status** | **13 tables**, down from 15, while adding two correctness tables. No production data exists, so this replaces v1 outright rather than migrating to it. |
+| **Status** | **13 tables**. No production data exists, so this replaces v1 outright rather than migrating to it. |
+| **Revision** | 2.1 — audit fixes: three NOT NULL/erasure conflicts, the totals bug, the payment-state contradiction, consent storage, and six simplifications (§14). |
 
 ---
 
@@ -15,10 +16,10 @@
 
 | # | v1 defect | v2 fix |
 |---|---|---|
-| 1 | `total_rwf` excluded post-shoot add-ons, so no column held what a booking was actually worth | Totals are **never stored**. The `booking_totals` view (§6.1) derives quoted total, grand total, outstanding, and paid from immutable parts. |
+| 1 | `total_rwf` excluded post-shoot add-ons, so no column held what a booking was actually worth | Totals are **never stored**. `bookingTotals()` (§6.1) computes quoted total, grand total, collected, refund-due and outstanding from immutable parts. |
 | 2 | `session_fee_rwf` was mutable money guarded only by application code | Column removed. What is owed is derived; what was contracted is frozen on `payment.amount_rwf` at initiation. |
 | 3 | `provider_ref NOT NULL UNIQUE` cannot hold MTN's `X-Reference-Id`, which **we** generate before the provider replies | Split into `our_ref` (uuid, ours, `NOT NULL UNIQUE`) and `provider_ref` (theirs, nullable, partial unique). |
-| 4 | "Unique `provider_ref` makes webhooks idempotent" was wrong — providers send many events per transaction, retried and out of order | New `webhook_event` table keyed on `(provider, event_id)`, plus a forward-only transition rank (§7.3). |
+| 4 | "Unique `provider_ref` makes webhooks idempotent" was wrong — providers send many events per transaction, retried and out of order | New `webhook_event` table keyed on `(provider, event_id)`, plus a terminal-status guard (§7.3). |
 | 5 | Two successful booking-fee payments were representable | Partial unique index on `(booking_id) WHERE kind = 'booking_fee' AND status = 'succeeded'`. Session fees stay many-per-booking, as spec §6.15 requires. |
 | 6 | No way to open a single Saturday — `availability_block` only subtracts | `working_hours` gains `effective_date`: a dated row overrides the weekly rule for one date, in either direction (§5.2). |
 | 7 | `setting.payment_provider` was editable from the admin UI | Removed from the database. Provider selection is deploy configuration (§4.2). |
@@ -41,7 +42,7 @@
 | **Money** | `integer`, whole RWF. No `float`, no `numeric` amounts, no `money` type. |
 | **Rates** | `numeric(4,3)`, `CHECK (>= 0 AND <= 1)`. |
 | **Enumerations** | `text` + `CHECK`, not native `enum`. Adding `offline_momo` under **R-1** is then one line, not an `ALTER TYPE` that locks and will not roll back in a transaction. |
-| **Derived money** | Never stored. Amounts are either **immutable facts** (`package_price_rwf`, `payment.amount_rwf`) or **views over facts** (§6.1). Nothing recomputes a historic amount from a live catalogue row. |
+| **Derived money** | Never stored. Amounts are either **immutable facts** (`package_price_rwf`, `payment.amount_rwf`) or **computed from facts** by one function (§6.1). Nothing recomputes a historic amount from a live catalogue row. |
 | **Deletion** | Catalogue rows soft-delete via `is_active`. Bookings, payments and outbox rows are never deleted. Personal data is erased by anonymisation (§10.3). |
 | **1:1 folding** | Where a relationship is strictly one-to-one and lifecycle-bound (delivery, access token), the columns live on `booking`. A join that can never return more than one row is not worth a table. `booking` is therefore wide and flat — a deliberate trade (§5.9). |
 
@@ -53,10 +54,9 @@ Prisma owns the tables, columns and relations. It owns none of the guarantees. E
 |---|---|
 | Tables, columns, types, relations, plain indexes, plain unique constraints | `schema.prisma` |
 | `EXCLUDE USING gist` overlap constraint (§9.1) | Migration SQL |
-| Partial unique indexes — one succeeded booking fee, live outbox queue, non-null `provider_ref` (§9.3) | Migration SQL |
+| The **four** partial unique indexes (§9.3) | Migration SQL |
 | `CHECK` constraints — every enumeration, every non-negative amount, `id = 1`, `amount_rwf = unit_price_rwf * quantity` | Migration SQL |
 | Functional unique index on `lower(email)` | Migration SQL |
-| `booking_totals` view (§6.1) | Migration SQL; read through `$queryRaw` with a hand-written row type |
 | GiST index on `availability_block` ranges | Migration SQL |
 
 Three operating rules follow, and they are not optional:
@@ -86,9 +86,6 @@ Two type mappings worth naming: `numeric(4,3)` rate columns are `Decimal @db.Dec
 
 ```mermaid
 erDiagram
-    ADMIN_USER ||--o{ WORKING_HOURS : "defines"
-    ADMIN_USER ||--o{ AVAILABILITY_BLOCK : "declares"
-
     SERVICE ||--o{ PACKAGE : "offers"
     SERVICE ||--o{ ADDON : "offers"
     SERVICE ||--o{ BOOKING : "booked as"
@@ -106,13 +103,10 @@ erDiagram
         uuid id PK
         text email UK
         text password_hash
-        text totp_secret
-        bool is_totp_enabled
         int failed_login_count
         timestamptz locked_until
         text password_reset_token_hash
         timestamptz password_reset_expires_at
-        int session_epoch
         timestamptz last_login_at
         timestamptz created_at
         timestamptz updated_at
@@ -124,16 +118,12 @@ erDiagram
         int min_lead_time_minutes
         int hold_minutes
         int buffer_minutes
-        int slot_granularity_minutes
         int delivery_expiry_days
-        int access_token_lifetime_days
-        int invite_lifetime_days
         timestamptz updated_at
     }
 
     WORKING_HOURS {
         uuid id PK
-        uuid admin_user_id FK
         int weekday
         date effective_date
         int opens_minute
@@ -146,7 +136,6 @@ erDiagram
 
     AVAILABILITY_BLOCK {
         uuid id PK
-        uuid admin_user_id FK
         timestamptz starts_at
         timestamptz ends_at
         bool is_all_day
@@ -228,6 +217,7 @@ erDiagram
         text location_text
         int party_size
         text special_requests
+        timestamptz consent_at
         text service_name_snapshot
         text package_name_snapshot
         int package_price_rwf
@@ -316,7 +306,7 @@ erDiagram
     }
 ```
 
-`SETTING` carries no foreign keys — it is one configuration row, not a per-user record. `WEBHOOK_EVENT` is matched to `PAYMENT` on `our_ref`/`provider_ref` in application code, **not** by a foreign key: an event can arrive that matches no payment (a stray callback, a spoofed post, a transaction from another environment), and that event must still be stored and inspectable rather than rejected at the database.
+`SETTING`, `WORKING_HOURS` and `AVAILABILITY_BLOCK` carry no foreign keys. There is exactly one admin (spec §2.1), so an `admin_user_id` on availability rows would model a second photographer the spec forbids, at the cost of a join predicate in every availability query. `WEBHOOK_EVENT` is matched to `PAYMENT` on `our_ref`/`provider_ref` in application code, **not** by a foreign key: an event can arrive that matches no payment (a stray callback, a spoofed post, a transaction from another environment), and that event must still be stored and inspectable rather than rejected at the database.
 
 ---
 
@@ -326,18 +316,17 @@ erDiagram
 
 One row. The photographer.
 
+**No TOTP, no `session_epoch`.** Both were invented — neither the brief nor the client's answers mention admin security at all. For a single user, "log out everywhere" is closing one browser, and a changed password already invalidates the cookie because the signature covers the password hash. Argon2id plus the lockout in §5.1 is proportionate.
+
 | Column | Type | Null | Default | Notes |
 |---|---|:---:|---|---|
 | `id` | uuid | no | `gen_random_uuid()` | |
 | `email` | text | no | | Unique on `lower(email)` |
 | `password_hash` | text | no | | Argon2id. Never logged, never serialised by any endpoint. |
-| `totp_secret` | text | yes | `null` | Encrypted at rest; present once enrolment begins |
-| `is_totp_enabled` | bool | no | `false` | True only after a first valid code is verified |
 | `failed_login_count` | int | no | `0` | Zeroed on success |
 | `locked_until` | timestamptz | yes | `null` | Rising lockout (spec §6.23) |
 | `password_reset_token_hash` | text | yes | `null` | Single-use, hashed, cleared on use |
 | `password_reset_expires_at` | timestamptz | yes | `null` | |
-| `session_epoch` | int | no | `0` | Incremented to invalidate every issued session at once. The API carries sessions in a signed cookie rather than a database table; this column is what makes "log out everywhere" and a post-password-change cutover possible without one. |
 | `last_login_at` | timestamptz | yes | `null` | |
 
 ### 5.2 `setting`
@@ -351,10 +340,9 @@ One row, `CHECK (id = 1)`. Typed columns, not key/value text — these values dr
 | `min_lead_time_minutes` | int | `120` | `>= 0` |
 | `hold_minutes` | int | `30` | `> 0` |
 | `buffer_minutes` | int | `30` | `>= 0` |
-| `slot_granularity_minutes` | int | `30` | `IN (15, 30, 60)` |
 | `delivery_expiry_days` | int | `90` | `> 0` |
-| `access_token_lifetime_days` | int | `365` | `> 0` |
-| `invite_lifetime_days` | int | `14` | `> 0` — lifetime signed into an offline booking link (§11) |
+
+Five values, all reachable from the admin settings screen (spec P-30). `slot_granularity_minutes` (30) and `access_token_lifetime_days` (365) are **application constants**, not rows: nothing asks for them to be changeable, and a setting with no screen behind it is a column that drifts from the code that reads it.
 
 **`payment_provider` is not here.** Provider selection is an environment variable read at boot. A dropdown that switches payment gateways mid-flight, reachable by permission P-30, would orphan in-flight payments to the wrong webhook handler. The cutover is a deploy, not a setting.
 
@@ -365,7 +353,6 @@ Both the recurring weekly rule and dated overrides — the fix for v1 defect #6.
 | Column | Type | Null | Default | Notes |
 |---|---|:---:|---|---|
 | `id` | uuid | no | | |
-| `admin_user_id` | uuid | no | | FK → `admin_user`, `ON DELETE CASCADE` |
 | `weekday` | int | yes | `null` | `0` = Sunday … `6` = Saturday. Set for a recurring rule. |
 | `effective_date` | date | yes | `null` | Set for a one-off override of a single date. |
 | `opens_minute` | int | yes | `null` | Minutes since midnight, Kigali wall time. `CHECK (BETWEEN 0 AND 1440)`. 09:00 = `540`. |
@@ -377,8 +364,8 @@ Constraints:
 
 - `CHECK ((weekday IS NOT NULL) <> (effective_date IS NOT NULL))` — a row is recurring or dated, never both.
 - `CHECK (is_open = false OR (opens_minute IS NOT NULL AND closes_minute IS NOT NULL AND closes_minute > opens_minute))`
-- Unique `(admin_user_id, weekday) WHERE effective_date IS NULL`
-- Unique `(admin_user_id, effective_date) WHERE weekday IS NULL`
+- Unique `(weekday) WHERE effective_date IS NULL`
+- Unique `(effective_date) WHERE weekday IS NULL`
 
 **Resolution for a given date:** if a dated row exists it wins outright; otherwise the weekday row applies; otherwise the day is closed. One dated row opens a Saturday that has no weekly rule, and one dated row with `is_open = false` closes a Tuesday that does — both directions, one mechanism.
 
@@ -391,7 +378,6 @@ Subtractive, arbitrary ranges. Blocks may overlap each other and may overlap boo
 | Column | Type | Null | Default | Notes |
 |---|---|:---:|---|---|
 | `id` | uuid | no | | |
-| `admin_user_id` | uuid | no | | FK → `admin_user` |
 | `starts_at` | timestamptz | no | | |
 | `ends_at` | timestamptz | no | | `CHECK (ends_at > starts_at)` |
 | `is_all_day` | bool | no | `false` | Presentation only. The stored range is absolute, so availability logic never special-cases it. |
@@ -451,7 +437,7 @@ A dedupe and linking record. **Not** an account: it holds no credential and gran
 | `id` | uuid | no | | |
 | `full_name` | text | no | | Latest known name |
 | `email` | text | no | | Unique on `lower(email)` |
-| `phone` | text | no | | Latest known number, E.164 where parseable |
+| `phone` | text | yes | | Latest known number, E.164 where parseable. **Nullable** because erasure nulls it (§10.2); as `NOT NULL` the erasure routine raised `23502`. |
 | `anonymized_at` | timestamptz | yes | `null` | Set by the erasure routine (§10.3) |
 
 These three fields are *current* values, used to prefill a returning client's form. What a given booking was made with lives on the booking (§5.9) — changing a phone number here never rewrites history.
@@ -491,7 +477,7 @@ Wide and flat by design: it absorbs the delivery record and the access token, bo
 | `status` | text | no | §7.1. Default `pending_payment`. |
 | `starts_at` | timestamptz | no | |
 | `ends_at` | timestamptz | no | `= starts_at + package_duration_minutes`. `CHECK (ends_at > starts_at)` |
-| `buffer_ends_at` | timestamptz | no | `= ends_at + setting.buffer_minutes` **at creation**. `CHECK (>= ends_at)`. Snapshotted so changing the setting never moves existing reservations. This is the column the exclusion constraint ranges over. |
+| `buffer_ends_at` | timestamptz | no | `= ends_at + setting.buffer_minutes` **at creation**. `CHECK (>= ends_at)`. Snapshotted so changing the setting never moves existing reservations. This is the column the exclusion constraint ranges over. **On reschedule it is recomputed** from the new `ends_at` and the buffer in force at that moment — leaving it stale would either hold time the booking no longer occupies or violate its own CHECK. |
 | `hold_expires_at` | timestamptz | yes | `now() + hold_minutes` at creation; nulled on confirmation |
 | `original_starts_at` | timestamptz | yes | Written on the **first** reschedule only, so the originally agreed time survives repeated moves |
 | `rescheduled_at` | timestamptz | yes | Most recent move |
@@ -503,6 +489,7 @@ Wide and flat by design: it absorbs the delivery record and the access token, bo
 | `location_text` | text | no | |
 | `party_size` | int | yes | `CHECK (> 0)`. Null is legitimate for a product shoot. |
 | `special_requests` | text | yes | |
+| `consent_at` | timestamptz | no | When the client ticked the consent box. Law N° 058/2021 requires consent to be **demonstrable**, not merely collected; without this column the checkbox proves nothing. |
 | `booking_fee_rate` | numeric(4,3) | no | Resolved at creation: service override, else global |
 | `booking_fee_rwf` | int | no | `round(quoted_total × booking_fee_rate)`, frozen at creation. The quote the client accepted. `CHECK (>= 0)` |
 | `confirmed_at`, `completed_at`, `cancelled_at` | timestamptz | yes | |
@@ -590,7 +577,7 @@ Every inbound provider callback, stored before it is interpreted. The fix for v1
 | `provider_ref` | text | yes | `null` | Secondary match key |
 | `reported_status` | text | yes | `null` | The payment status this event asserts, normalised to our vocabulary |
 | `signature_valid` | bool | no | | Stored, not assumed. Events failing verification are **recorded and not applied**. |
-| `payload` | jsonb | no | | Verbatim body, for dispute evidence. Purged after 12 months (§10.2). |
+| `payload` | jsonb | yes | | Verbatim body, for dispute evidence. **Nullable** because erasure nulls it (§10.2). |
 | `status` | text | no | `'received'` | `IN ('received','applied','ignored','failed')` |
 | `processing_error` | text | yes | `null` | |
 | `received_at` | timestamptz | no | `now()` | |
@@ -608,9 +595,9 @@ One queue and one audit trail for everything the system sends. Replaces v1's `no
 | `kind` | text | no | | `IN ('email','gcal_create','gcal_update','gcal_delete')`. `sms` and `whatsapp` are addable without migration when A-12 phase 2 arrives. |
 | `booking_id` | uuid | yes | `null` | FK → `booking`, `ON DELETE RESTRICT`. Null for admin alerts and offline booking-link invites. |
 | `dedupe_key` | text | no | | **Unique.** e.g. `email:booking_confirmation:<booking_id>`. Makes "send exactly once" a database guarantee rather than a hope. |
-| `template` | text | yes | `null` | `booking_confirmation`, `admin_new_booking`, `session_fee_request`, `payment_receipt`, `photo_delivery`, `cancellation`, `reschedule`, `booking_invite`, `access_link_resend`, `admin_alert`. Null for calendar jobs. |
+| `template` | text | yes | `null` | `booking_confirmation`, `admin_new_booking`, `session_fee_request`, `payment_receipt`, `photo_delivery`, `cancellation`, `reschedule`, `access_link_resend`, `admin_alert`. Null for calendar jobs. `admin_alert` is the catch-all for everything addressed to the photographer — a new booking's payment received, an exhausted retry, a login lockout, a payment needing a refund. |
 | `recipient` | text | yes | `null` | Null for calendar jobs |
-| `payload` | jsonb | no | | Everything the worker needs, resolved at enqueue time |
+| `payload` | jsonb | yes | | Everything the worker needs, resolved at enqueue time. **Nullable** because erasure nulls it (§10.2). |
 | `status` | text | no | `'pending'` | `IN ('pending','processing','done','failed','cancelled')` |
 | `attempts` | int | no | `0` | |
 | `next_attempt_at` | timestamptz | no | `now()` | Exponential backoff. The worker claims rows where `status = 'pending' AND next_attempt_at <= now()`. |
@@ -624,48 +611,40 @@ The admin's per-booking message history is `SELECT … WHERE booking_id = $1 AND
 
 ## 6. Derived money
 
-### 6.1 `booking_totals` view
+### 6.1 Booking totals — one function, not a view
 
-The single definition of what a booking is worth and what is outstanding. Nothing else computes these numbers.
+There is no `booking_totals` view. Totals are computed by a single exported function and by nothing else:
 
-```sql
-CREATE VIEW booking_totals AS
-SELECT
-  b.id AS booking_id,
-  b.package_price_rwf
-    + COALESCE(a.at_booking_rwf, 0)                          AS quoted_total_rwf,
-  b.package_price_rwf
-    + COALESCE(a.at_booking_rwf, 0)
-    + COALESCE(a.post_shoot_rwf, 0)                          AS grand_total_rwf,
-  b.booking_fee_rwf,
-  b.package_price_rwf
-    + COALESCE(a.at_booking_rwf, 0)
-    + COALESCE(a.post_shoot_rwf, 0)
-    - b.booking_fee_rwf                                      AS session_fee_rwf,
-  COALESCE(p.collected_rwf, 0)                               AS collected_rwf,
-  b.package_price_rwf
-    + COALESCE(a.at_booking_rwf, 0)
-    + COALESCE(a.post_shoot_rwf, 0)
-    - COALESCE(p.collected_rwf, 0)                           AS outstanding_rwf
-FROM booking b
-LEFT JOIN (
-  SELECT booking_id,
-         SUM(amount_rwf) FILTER (WHERE stage = 'at_booking') AS at_booking_rwf,
-         SUM(amount_rwf) FILTER (WHERE stage = 'post_shoot')  AS post_shoot_rwf
-  FROM booking_addon GROUP BY booking_id
-) a ON a.booking_id = b.id
-LEFT JOIN (
-  SELECT booking_id, SUM(amount_rwf) AS collected_rwf
-  FROM payment WHERE status = 'succeeded'
-  GROUP BY booking_id
-) p ON p.booking_id = b.id;
 ```
+bookingTotals(booking, addons, payments) -> {
+  quotedTotalRwf, grandTotalRwf, collectedRwf, refundDueRwf, outstandingRwf
+}
+```
+
+| Value | Rule |
+|---|---|
+| `quotedTotalRwf` | `package_price_rwf` + Σ addons where `stage = 'at_booking'` |
+| `grandTotalRwf` | `quotedTotalRwf` + Σ addons where `stage = 'post_shoot'` |
+| `collectedRwf` | Σ payments where `status = 'succeeded'` |
+| `refundDueRwf` | Σ payments where `status = 'refund_due'` — money held that is owed **back** |
+| `outstandingRwf` | **Depends on booking status** (below) |
+
+**Outstanding is status-aware.** The v2.0 view computed `grand_total − collected` unconditionally, which reported the session fee as outstanding on a `no_show` — contradicting spec §6.12, which says no session fee is owed — and made `outstanding` *jump* the moment a payment moved to `refund_due`, because that status leaves `collected`. Both were wrong:
+
+| Booking status | `outstandingRwf` |
+|---|---|
+| `pending_payment`, `confirmed`, `completed` | `grandTotalRwf − collectedRwf` |
+| `no_show`, `cancelled_by_client` | **0** — the fee is forfeited and nothing further is owed (spec §6.10, §6.12) |
+| `cancelled_by_admin` | **0** owed by the client. `refundDueRwf` is what is owed **to** them (spec §6.11) |
+| `expired` | **0** — no booking exists to owe against |
 
 Three properties worth naming:
 
-- **`grand_total_rwf` includes post-shoot add-ons.** Revenue reporting sums this, and it cannot silently under-report the way v1's `total_rwf` did.
-- **`collected_rwf` counts only `succeeded`.** A `refunded` payment leaves `collected_rwf` — refunds reduce revenue automatically instead of requiring every report to remember a status filter.
+- **`grandTotalRwf` includes post-shoot add-ons.** Revenue reporting sums this and cannot silently under-report.
+- **`collectedRwf` counts only `succeeded`**, and `refundDueRwf` is reported separately rather than being netted off — a refund owed is not the same fact as a refund made.
 - **`booking_fee_rwf` stays a stored column**, because it is the quote the client accepted before any payment row existed. It is a fact, not a derivation.
+
+A function rather than a view because the status logic above is conditional, the numbers are needed in TypeScript on every page that shows them, and a view would have to be read through `$queryRaw` with a hand-maintained row type sitting outside Prisma's type system. Spec §4.2 excludes the revenue dashboard that would have justified SQL-level reporting.
 
 ### 6.2 Money invariants
 
@@ -730,26 +709,17 @@ stateDiagram-v2
     refunded --> [*]
 ```
 
-### 7.3 Forward-only webhook application
+### 7.3 Applying a webhook
 
-Providers retry events and deliver them out of order. Each status carries a rank; an event is applied only when it raises the rank.
+Providers retry events and deliver them out of order. One rule handles both, and it is stated as a rule about **terminal statuses**, not a rank ladder:
 
-| Status | Rank |
-|---|:---:|
-| `initiated` | 0 |
-| `pending` | 1 |
-| `failed` | 2 |
-| `succeeded` | 3 |
+1. **Verify the signature.** Invalid → store with `signature_valid = false`, status `ignored`, apply nothing, return 200.
+2. **`INSERT` the `webhook_event`.** A unique violation on `(provider, event_id)` is a duplicate delivery → `ignored`, stop.
+3. **Match a payment** on `our_ref`, else `provider_ref`. No match → `ignored`, stop; the row stays for inspection.
+4. **If the payment is already terminal — `succeeded`, `failed` or `refunded` — ignore the event.** This single guard replaces the four-rank ladder v2.0 carried. That ladder ranked `failed` below `succeeded`, which contradicted §7.2 making `failed` terminal and would have let a stray event resurrect a dead payment. A failed MoMo attempt is its own transaction with its own `our_ref`; it never becomes a success.
+5. **Otherwise apply** the reported transition inside a transaction with the booking-state change it implies, and mark `applied`.
 
-Applying an event:
-
-1. Reject and store with `signature_valid = false` if verification fails. Nothing is applied.
-2. `INSERT` the `webhook_event`. A unique violation on `(provider, event_id)` means it is a duplicate delivery — mark `ignored`, stop.
-3. Match a `payment` on `our_ref`, else `provider_ref`. No match → `ignored`, stop; the row remains for inspection.
-4. Compare ranks. `reported_status` rank ≤ current rank → `ignored`, stop. This is what stops a retried `pending` from walking a `succeeded` payment backwards.
-5. Apply the transition inside a transaction with the booking-state change it implies, mark `applied`.
-
-`refund_due` and `refunded` are outside this ladder: they are admin-driven (spec §6.16), never provider-driven, and a webhook never sets them.
+`refund_due` and `refunded` are admin-driven (spec §6.16), never provider-driven. A webhook never sets them.
 
 ---
 
@@ -805,13 +775,15 @@ The sweeper job still runs every minute for tidiness. Correctness does not depen
 | unique `(access_token_hash)` | `booking` | Every client page load |
 | unique `lower(email)` | `client` | Deduplication at booking |
 | unique `(our_ref)` | `payment` | Our idempotency key; the provider callback's match key |
-| unique `(provider_ref) WHERE provider_ref IS NOT NULL` | `payment` | Their id, once it exists |
-| unique `(booking_id) WHERE kind = 'booking_fee' AND status = 'succeeded'` | `payment` | **No double-charging the deposit** (fix #5) |
+| unique `(provider_ref) WHERE provider_ref IS NOT NULL` | `payment` | **Partial unique 1 of 4.** Their id, once it exists |
+| unique `(booking_id) WHERE kind = 'booking_fee' AND status = 'succeeded'` | `payment` | **Partial unique 2 of 4.** No double-charging the deposit |
+| unique `(weekday) WHERE effective_date IS NULL` | `working_hours` | **Partial unique 3 of 4.** One recurring rule per weekday |
+| unique `(effective_date) WHERE weekday IS NULL` | `working_hours` | **Partial unique 4 of 4.** One override per date |
 | `(booking_id, kind, status)` | `payment` | "What is still owed" |
 | unique `(provider, event_id)` | `webhook_event` | Delivery idempotency (fix #4) |
 | `(our_ref)` | `webhook_event` | Matching an event to its payment |
 | unique `(dedupe_key)` | `outbox` | Send-exactly-once |
-| `(status, next_attempt_at) WHERE status IN ('pending','processing')` | `outbox` | Keeps the queue scan small as the audit history grows |
+| `(status, next_attempt_at) WHERE status IN ('pending','processing')` | `outbox` | Keeps the queue scan small as history grows. Partial, **not** unique |
 | `(booking_id, created_at)` | `outbox` | Per-booking message history |
 | `gist (tstzrange(starts_at, ends_at))` | `availability_block` | Subtracting blocks |
 
@@ -824,7 +796,6 @@ The sweeper job still runs every minute for tidiness. Correctness does not depen
 | `booking` → `client` | `RESTRICT` | Clients are anonymised, not deleted |
 | `booking_addon` → `booking` | `CASCADE` | Dependent detail with no standalone meaning |
 | `payment`, `outbox` → `booking` | `RESTRICT` | Audit outlives everything |
-| `working_hours`, `availability_block` → `admin_user` | `CASCADE` | Meaningless without their owner |
 
 ### 9.5 Derived values computed at write time
 
@@ -835,7 +806,7 @@ The sweeper job still runs every minute for tidiness. Correctness does not depen
 | `booking_fee_rate` | `service.booking_fee_rate_override` if set, else `setting.booking_fee_rate` |
 | `booking_fee_rwf` | `round(quoted_total × booking_fee_rate)`, half-up, whole RWF |
 | `booking_addon.amount_rwf` | `unit_price_rwf × quantity`, `CHECK`-enforced |
-| Everything else about money | Derived by `booking_totals` (§6.1), never stored |
+| Everything else about money | Computed by `bookingTotals()` (§6.1), never stored |
 
 ---
 
@@ -843,27 +814,23 @@ The sweeper job still runs every minute for tidiness. Correctness does not depen
 
 ### 10.1 What is never deleted
 
-`booking`, `payment`, `webhook_event` and `outbox` rows are permanent records. Status carries meaning that deletion would destroy.
+`booking`, `payment`, `webhook_event` and `outbox` rows are permanent. Status carries meaning that deletion would destroy.
 
-### 10.2 Scheduled purges
+### 10.2 Personal data erasure
 
-| Data | Retention | Reason |
-|---|---|---|
-| `webhook_event.payload` | 12 months, then set to `null` | Provider payloads can carry payer phone numbers; a dispute window plausibly runs a year |
-| `outbox` rows in `done`/`failed` | 24 months, then deleted | Long enough to answer a dispute, short enough to bound growth |
-| `outbox.payload` | 90 days | Rendered message content; the row's `template` and `recipient` are the durable audit |
+There are **no scheduled purge jobs.** v2.0 specified three retention windows (12 months, 24 months, 90 days) with boundary tests, against a database that holds a few thousand rows after five years. Scheduled purging is not a legal obligation; erasure on request is, and it is built. Bounded growth can be revisited if the row count ever justifies a cron job.
 
-### 10.3 Personal data erasure
-
-Law N° 058/2021 obliges deletion on request (spec §7); financial records must survive. Erasure is anonymisation:
+Law N° 058/2021 obliges deletion on request (spec §7); financial records must survive. Erasure is therefore anonymisation, and every column it touches is nullable **because** it touches it (§5.8, §5.12, §5.13):
 
 1. `client` — `full_name` → `'Erased client'`, `email` → `erased+<uuid>@bookly.invalid`, `phone` → `null`, `anonymized_at` → `now()`.
-2. `booking` — `contact_name`, `contact_email`, `contact_phone` → `'[erased]'`; `location_text` → `'[erased]'`; `special_requests` → `null`; `access_token_hash` → `null` (every link dies); `delivery_url` → `null`.
+2. `booking` — `contact_name`, `contact_email`, `contact_phone`, `location_text` → `'[erased]'`; `special_requests` → `null`; `access_token_hash` → `null` (every link dies); `delivery_url` → `null`. `consent_at` is **kept** — it is the record that consent was given, and erasing it would destroy the evidence the law asks you to hold.
 3. `payment` — untouched. It holds no personal data by design.
 4. `webhook_event.payload` → `null` for that client's payments.
 5. `outbox` — `recipient` → `'[erased]'`, `payload` → `null` for their rows.
 
-Amounts, dates, statuses and snapshots survive, so revenue history and the audit trail stay intact. **Deleting the photos themselves is manual work on the external host** — the site can only stop pointing at them. That belongs in the privacy notice rather than being implied away.
+Runs in a single transaction: a partial erasure is not a possible outcome. Amounts, dates, statuses and snapshots survive, so revenue history and the audit trail stay intact.
+
+**Deleting the photos themselves is manual work on the external host** — the site can only stop pointing at them. That belongs in the privacy notice rather than being implied away.
 
 ---
 
@@ -871,7 +838,7 @@ Amounts, dates, statuses and snapshots survive, so revenue history and the audit
 
 | Removed | What is lost | Why it goes |
 |---|---|---|
-| `booking_invite` table | Funnel tracking: who opened an invite, which converted | The offline booking link becomes a **stateless signed URL** carrying service, package, suggested date and expiry in its signature. The send is recorded in `outbox`. Nobody asked for funnel metrics, and R-1 has not confirmed anyone will use the flow at all. |
+| `booking_invite` table | Funnel tracking: who opened an invite, which converted | v2.0 replaced the table with a stateless signed URL; revision 2.1 removed that too (§11.1). An offline enquiry is answered by sending the public booking URL by hand — WhatsApp already does this, and R-1 never confirmed anyone would follow such a link at all. |
 | `delivery` table | Nothing | Strictly 1:1 with `booking`. Four columns replace a table and a join. |
 | `booking_access_token` table | History of superseded tokens | Strictly 1:1 in practice. Three columns replace a table, a partial unique index and a `revoked_at` lifecycle. |
 | `notification_log` table | Nothing | `outbox` is the same rows with retry state attached (fix #8). |
@@ -880,14 +847,28 @@ Amounts, dates, statuses and snapshots survive, so revenue history and the audit
 
 **Net:** 15 tables → 13, with `webhook_event` and `outbox` added. Four tables folded or dropped, two added for correctness.
 
+### 11.1 Removed in revision 2.1
+
+No tables were added or removed. What went was machinery inside them.
+
+| Removed | What is lost | Why it goes |
+|---|---|---|
+| `booking_totals` view | SQL-level reporting | Replaced by one function (§6.1) that can express the status-aware rules a view could not, and that lives inside Prisma's type system |
+| The four-rank webhook ladder | Nothing | One terminal-status guard covers every case and does not contradict §7.2 (§7.3) |
+| Scheduled purge jobs and three retention windows | Bounded growth on a table that grows a few thousand rows a decade | §10.2 |
+| `admin_user.totp_secret`, `is_totp_enabled`, `session_epoch` | Two-factor; "log out everywhere" | One user, one browser. Untraceable to anything the client said |
+| `working_hours.admin_user_id`, `availability_block.admin_user_id` | A second photographer | Spec §4.2 forbids one. Two FKs and a join predicate in every availability query for a role that cannot exist |
+| `setting.slot_granularity_minutes`, `access_token_lifetime_days`, `invite_lifetime_days` | Configurability nobody asked for | Now constants, or gone with the invite flow. A setting with no screen behind it drifts from the code that reads it |
+| The offline booking-invite link | Funnel tracking; a pre-filled URL | Sending the service page URL over WhatsApp does the same job in zero lines. R-1 was never confirmed as needed at all |
+
 ---
 
 ## 12. Open items that touch the schema
 
 | Ref | If it changes | Impact |
 |---|---|---|
-| **R-1** — admin-created bookings | Option B chosen | `payment.method` gains `offline_cash`/`offline_momo`; `payment.provider` gains `offline`; `booking` gains `created_by_admin_user_id`. `CHECK`-based enums make this one line each. |
-| **R-2** — French launch | French ships | No migration. `_fr` columns exist and are nullable. |
+| **R-1** — admin-created bookings | Option B chosen | `payment.method` gains `offline_cash`/`offline_momo`; `payment.provider` gains `offline`; `booking` gains `created_by_admin`. `CHECK`-based enums make this one line each. With the invite flow removed, an offline enquiry is now handled by sending the client the public booking URL by hand — so if that proves insufficient, this is the only remaining option. |
+| **R-2** — French launch | French ships | No migration. `_fr` columns exist and are nullable, and the translation layer is in place. What was dropped in 2.1 is locale-prefixed routing and the no-hardcoded-strings rule, so enabling French means adding routes and filling files rather than a rebuild. |
 | **R-3** — payment credentials | Flutterwave cutover | No migration. An environment variable changes; historic rows keep their own `provider`, and both webhook handlers stay mounted (spec §6.18). |
 | **R-4** — weekday-only hours | Saturday work appears | **No migration.** One `working_hours` row with `effective_date` opens a single Saturday; a row with `weekday = 6` opens all of them. This is what v1 could not do. |
 | **R-5** — refund execution | Flutterwave refund API used | `payment` gains `refund_provider_ref` beside the manual `refund_reference`. |
@@ -900,7 +881,7 @@ Amounts, dates, statuses and snapshots survive, so revenue history and the audit
 
 | Table | Rows |
 |---|---|
-| `admin_user` | 1 — created by the deploy script, forced password change on first login |
-| `setting` | 1 — the defaults in §5.2 |
-| `working_hours` | 5 — `weekday` 1–5, `opens_minute = 540`, `closes_minute = 1020` (09:00–17:00), `is_open = true`. Saturday and Sunday have no rows, which closes them; **R-4** is answered by inserting rows, not by changing code. |
+| `admin_user` | 1 — created by the deploy script, forced password change on first login. No TOTP enrolment step. |
+| `setting` | 1 — the five defaults in §5.2 |
+| `working_hours` | 5 — `weekday` 1–5, `opens_minute = 540`, `closes_minute = 1020` (09:00–17:00), `is_open = true`. Saturday and Sunday have no rows, which closes them. **These hours were chosen by the developer, not stated by the photographer** — see spec R-4, and confirm before launch: the brief sells event coverage, and Kigali events fall on weekends. |
 | `service`, `package`, `addon` | **None.** Blocked on **R-6**. The availability engine cannot be tested meaningfully without at least three packages of differing durations. |

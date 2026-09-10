@@ -6,7 +6,8 @@
 | **Client** | Bookly (single-photographer studio, Kigali, Rwanda) |
 | **Source inputs** | `brief.md`, `clien-answers.md`, `spec.md` (v1), decision session 2026-09-08 |
 | **Supersedes** | `spec.md` (v1). Where the two differ, this document wins. |
-| **Status** | All 16 v1 ambiguities resolved (§8.1). Seven residual items remain open (§8.2) — none block the start of development. |
+| **Status** | All 16 v1 ambiguities resolved (§8.1). Six residual items remain open (§8.2) — none block the start of development. |
+| **Revision** | 2.1 — audit fixes. §5 gutted in favour of `data-model_v2.md`; seven cross-reference and consistency errors corrected; TOTP, the invite flow, scheduled purges and locale routing removed; R-7 closed. |
 | **Launch target** | No fixed date. Build to this spec; §4.2 is a quality boundary, not a deadline defence. |
 | **Currency / timezone / language** | RWF only · Africa/Kigali (UTC+2, no DST) · **English at launch, French-ready architecture** |
 
@@ -38,7 +39,7 @@ Bookly is a public booking website plus a private admin panel for a professional
 |---|---|---|---|
 | **Visitor** | None (anonymous) | Service list, service detail, packages, add-ons and prices, available dates and time slots, static pages, privacy notice | Browse services, check availability, start a booking, pay a booking fee |
 | **Booking client** | A secure per-booking link (unguessable token, emailed at confirmation) — **one booking per link** | That one booking only: status, date/time, service and package, amounts due and paid, delivery link and its expiry date | Reopen that booking, download delivered photos, cancel it, pay its session fee |
-| **Admin (photographer)** | Email + password, optional TOTP two-factor | Everything: full calendar, all bookings, all client contact details, all payments, all deliveries, notification log, settings | Manage availability and blocks, cancel/reschedule/complete bookings, mark no-shows, send a booking link to an offline enquiry, create and edit services, packages and add-ons, adjust prices and per-service booking-fee rates, record payments and refunds, send session-fee requests, attach delivery links, resend emails |
+| **Admin (photographer)** | Email + password | Everything: full calendar, all bookings, all client contact details, all payments, all deliveries, notification log, settings | Manage availability and blocks, cancel/reschedule/complete bookings, mark no-shows, create and edit services, packages and add-ons, adjust prices and per-service booking-fee rates, record payments and refunds, send session-fee requests, attach delivery links, resend emails |
 
 **Constraints on roles:** exactly one admin account. No staff/second-photographer role, no permission tiers, no client-to-client visibility. A client holds one token per booking and never sees another booking, another client, or a block reason — blocked time is rendered simply as unavailable.
 
@@ -55,7 +56,6 @@ Bookly is a public booking website plus a private admin panel for a professional
 | | **Booking** | | | |
 | P-04 | Create a booking and place a 30-minute slot hold | ✓ | ✓ | — <sup>1</sup> |
 | P-05 | Pay the booking fee | ✓ | ✓ | — |
-| P-06 | Send a booking link to an offline enquiry | — | — | ✓ |
 | P-07 | View a booking's details, status, and amounts | — | ● | ✓ |
 | P-08 | Pay the session fee | — | ● | — |
 | P-09 | Cancel a booking | — | ● | ✓ |
@@ -64,7 +64,7 @@ Bookly is a public booking website plus a private admin panel for a professional
 | P-12 | Open the delivery link and download photos | — | ● | ✓ |
 | | **Client data** | | | |
 | P-13 | View client name, email, phone | — | ● | ✓ |
-| P-14 | Request erasure of own personal data (§7) | — | ● | ✓ |
+| P-14 | Request erasure of own personal data (§7) | — | by email | ✓ |
 | | **Availability** | | | |
 | P-15 | Set weekly working hours and buffer | — | — | ✓ |
 | P-16 | Create, edit, or delete availability blocks | — | — | ✓ |
@@ -87,10 +87,10 @@ Bookly is a public booking website plus a private admin panel for a professional
 | P-29 | Resend any transactional email | — | — | ✓ |
 | P-30 | Edit settings (fee rate, lead time, hold, buffer, expiry) | — | — | ✓ |
 
-<sup>1</sup> There is no admin-side "book on behalf of a client" form in v1. An offline enquiry is handled with P-06: the admin sends the client a booking link and the client completes and pays through the normal flow (§3.8). Admin-created bookings remain deferred — **R-1**.
-<sup>2</sup> A client who needs a different date either cancels (forfeiting the booking fee, §6.8) and books again, or contacts the photographer, who reschedules on their behalf (§3.6).
+<sup>1</sup> There is no admin-side "book on behalf of a client" form in v1, and no in-product invite mechanism either. An offline enquiry is handled by sending the client the public booking URL by whatever channel the conversation is already happening on — usually WhatsApp — and letting them book and pay normally (§3.8). Admin-created bookings remain deferred: **R-1**. P-06 is withdrawn; permission ids are stable, so the gap is intentional.
+<sup>2</sup> A client who needs a different date either cancels (forfeiting the booking fee, §6.10) and books again, or contacts the photographer, who reschedules on their behalf (§3.6).
 
-**Enforcement.** Every permission above is checked server-side on the route and API handler; none is enforced by hiding UI alone. The booking client's scope is derived from the token in their return link and never from a booking id, reference, or email address supplied in the request. Admin routes are gated by the admin session. Three rules bind all roles including the admin: rows referenced by a booking cannot be hard-deleted (§5.3 rule 6); `payment` and `notification_log` rows cannot be edited or deleted at all — they are the audit trail; and no role can move money, only record that money moved (§6.16).
+**Enforcement.** Every permission above is checked server-side on the route and API handler; none is enforced by hiding UI alone. The booking client's scope is derived from the token in their return link and never from a booking id, reference, or email address supplied in the request. Admin routes are gated by the admin session. Erasure is requested by emailing the photographer and carried out by him — there is no client-facing erasure control, and no table records a request. Three rules bind all roles including the admin: rows referenced by a booking cannot be hard-deleted; `payment`, `webhook_event` and `outbox` rows are never edited or deleted — they are the audit trail; and no role can move money, only record that money moved (§6.16).
 
 ---
 
@@ -101,27 +101,28 @@ Bookly is a public booking website plus a private admin panel for a professional
 1. Visitor opens the site in English and browses the service list.
 2. Visitor opens a service (e.g. *Personal photoshoot*, *Corporate*) and sees its packages: price in RWF, number of photos, session duration.
 3. Visitor selects one package and any add-ons offered for that service. The running total updates as selections change.
-4. Visitor opens the calendar. The system offers a slot only when **all** of these hold: it falls Mon–Fri inside 09:00–17:00; the whole session duration fits before 17:00; it does not overlap an availability block; it does not overlap a `confirmed` or live `pending_payment` booking **or that booking's 30-minute buffer**; and its start is at least 120 minutes from now. Start times sit on a 30-minute grid.
+4. Visitor opens the calendar. The system offers a slot only when **all** of these hold: it falls Mon–Fri inside 09:00–17:00; the whole session duration fits before 17:00; it does not overlap an availability block; it does not overlap any booking that occupies time — `pending_payment` (while its hold is live), `confirmed`, `completed` or `no_show` — **or that booking's 30-minute buffer**; and its start is at least 120 minutes from now. Start times sit on a 30-minute grid.
 5. Visitor picks a date and start time. The slot length equals the selected package's duration.
 6. Visitor fills the booking form: full name, email, phone, shoot location, number of people, special requests, and a consent checkbox.
 7. The system shows a summary: service, package, add-ons, total price, **booking fee** (40% of total, or the service's own rate), and the remaining session fee due after the shoot. The advertised price is what the client pays — gateway fees are absorbed by the photographer and never appear at checkout. The summary states plainly that the booking fee is **non-refundable if the client cancels**.
 8. Visitor confirms. The system creates the booking as `pending_payment` and holds the slot for **30 minutes**.
 9. Visitor is redirected to the payment provider's hosted checkout and pays the booking fee. **Available methods depend on the active provider** — MTN MoMo only during the direct-API phase; MTN MoMo, Airtel Money, and cards after the Flutterwave cutover (§4.3).
-10. On a signature-verified `succeeded` webhook, the system moves the booking to `confirmed`, records the payment, generates the client's access token, and permanently removes the slot from public availability.
-11. The system sends the client a confirmation email containing the booking reference, date/time, location, amounts paid and outstanding, and their return link; and sends the admin a "new booking" alert.
-12. The system pushes the booking to the photographer's Google Calendar as a one-way mirror (§3.7) and it appears on the admin calendar. No admin approval step exists — see **C-1**.
+10. The provider returns the visitor to a **confirmation page**, which shows the booking as pending and polls for its status. Mobile Money settlement routinely takes 30 seconds or more, so this screen is the client's whole experience of the wait: it states what is happening, never claims success before the webhook arrives, and tells them the confirmation email is coming if they leave.
+11. On a signature-verified `succeeded` webhook, the system moves the booking to `confirmed`, records the payment, generates the client's access token, and permanently removes the slot from public availability.
+12. The system sends the client a confirmation email containing the booking reference, date/time, location, amounts paid and outstanding, and their return link; and sends the admin a "new booking" alert.
+13. The system pushes the booking to the photographer's Google Calendar as a one-way mirror (§3.7) and it appears on the admin calendar. No admin approval step exists — see **C-1**.
 
 ### 3.2 Payment abandoned or failed
 
 1. Visitor reaches the hosted checkout and abandons it, or the payment fails.
 2. The hold expires 30 minutes after the booking was created. A scheduled job moves the booking to `expired` and returns the slot to public availability.
 3. No email is sent to the client, and no admin alert is raised. The record is retained for reporting.
-4. A late `succeeded` webhook for an already-expired booking is handled per **§6.7**.
+4. A late `succeeded` webhook for an already-expired booking is handled per **§6.9**.
 
 ### 3.3 Admin manages availability
 
-1. Admin signs in with email and password (plus TOTP if enabled) and opens the calendar in month, week, or day view.
-2. Admin adjusts the weekly working hours (seeded Mon–Fri 09:00–17:00) and the inter-shoot buffer (seeded 30 minutes) in settings.
+1. Admin signs in with email and password and opens the calendar in month, week, or day view.
+2. Admin adjusts the weekly working hours (seeded Mon–Fri 09:00–17:00) and, on the settings screen, the five operating values: booking-fee rate, minimum notice, hold duration, inter-shoot buffer, and delivery-link lifetime.
 3. Admin blocks time as unavailable, choosing either a **full day** (or a range of days) or a **specific time range within a day**, with an optional private reason.
 4. Blocked and booked time disappears from the public calendar immediately on save.
 5. If a new block overlaps an existing confirmed booking, the system warns and requires explicit confirmation — see **§6.4**.
@@ -160,11 +161,9 @@ One-way, site → Google. On confirm the system creates an event in the photogra
 
 ### 3.8 Offline enquiry (WhatsApp, phone, walk-in)
 
-1. Photographer receives an enquiry outside the site.
-2. Admin opens "Send booking link", selects the service (and optionally a package and a target date), enters the client's email, and sends.
-3. The system emails the client a branded link that opens the normal booking flow, pre-filled with those selections.
-4. The client picks their slot and pays exactly as in §3.1. The slot is not held before they do.
-5. Nothing else is built for offline bookings in v1: there is no admin-entered booking and no offline payment record — see **R-1**.
+The photographer sends the enquirer the public booking URL — or the URL of the relevant service page — through whatever channel the conversation is already in. They book and pay exactly as in §3.1.
+
+**Nothing is built for this.** v2.0 specified a signed, expiring, pre-filled invite link with its own settings value and its own email template. Pasting a URL into WhatsApp does the same job in zero lines of code, and **R-1** has never established that anyone will follow such a link rather than expecting the photographer to book for them. If it turns out they will not, the answer is an admin-side booking form (R-1 option B), not a fancier link.
 
 ### 3.9 Returning client access
 
@@ -176,19 +175,19 @@ The confirmation email contains a unique long-lived link. Opening it shows that 
 
 ### 4.1 In scope (v1)
 
-- Public site in **English**, built on a translation layer with locale-prefixed routing so French can be enabled later without refactoring (§7, **R-2**).
-- Service list, service detail with packages and add-ons, availability calendar, booking form, hosted-checkout payment, confirmation page.
+- Public site in **English**, built on a translation layer so French is a content task later rather than a rebuild (§7, **R-2**).
+- Service list, service detail with packages and add-ons, availability calendar, booking form, hosted-checkout payment, and the post-checkout confirmation page that polls while the webhook settles (§3.1 step 10).
 - Availability engine: weekly working hours (Mon–Fri 09:00–17:00), 30-minute slot grid, 30-minute inter-shoot buffer, 120-minute minimum notice, full-day and partial-day blocks, and overlap prevention enforced at the database level.
 - Booking lifecycle: `pending_payment` → `confirmed` → `completed`, plus `cancelled_by_client`, `cancelled_by_admin`, `no_show`, `expired`.
 - Pricing: services → packages (price, photo count, duration) → optional add-ons, all admin-editable; global 40% booking-fee rate with a per-service override.
 - Payments through a **provider adapter with two implementations**: MTN MoMo Collections API direct (development), Flutterwave (production cutover, adding Airtel Money and cards). Booking fee at booking time, session fee after the shoot.
 - Non-refundable booking fee on client cancellation; full refund on photographer cancellation, executed manually and recorded in the system.
 - Post-shoot workflow: mark complete, add add-ons, request session fee, record payment, attach an external delivery link with a 90-day default expiry, send and resend the branded delivery email.
-- Admin panel: email/password login with optional TOTP, calendar (month/week/day), booking list and detail, block management, service/package/add-on CMS, settings, notification log, "send booking link" action.
+- Admin panel: email/password login, calendar (month/week/day), booking list and detail, block management, service/package/add-on CMS, a settings screen for the five operating values, and the message history for each booking.
 - One-way Google Calendar push for confirmed bookings.
-- Transactional email: booking confirmation, new-booking admin alert, session-fee request, payment receipt, photo delivery, cancellation, reschedule, booking link. All sends logged.
+- Transactional email, nine templates: booking confirmation, new-booking admin alert, session-fee request, payment receipt, photo delivery, cancellation, reschedule, access-link resend, and a catch-all admin alert covering payment received, exhausted retries, login lockout and refunds due. All sends logged.
 - Prices in RWF only; all times displayed in Africa/Kigali.
-- Privacy notice page and consent checkbox at booking.
+- Privacy notice page, a consent checkbox at booking, and a stored `consent_at` so consent is demonstrable and not merely collected.
 
 ### 4.2 Out of scope (v1)
 
@@ -197,7 +196,7 @@ The confirmation email contains a unique long-lived link. Opening it shows that 
 - **SMS notifications** and **WhatsApp / WhatsApp Business API notifications.** Email only in v1.
 - **Built-in photo hosting, upload, galleries, or proofing.** The site stores a link, never the files.
 - **Two-way Google Calendar sync.** The push is one-way and nothing flows back from Google.
-- **Admin-created bookings and offline payment records.** Offline enquiries are handled by sending a booking link (§3.8) — **R-1**.
+- **Admin-created bookings, offline payment records, and any in-product invite link.** Offline enquiries are handled by sending the public URL by hand (§3.8) — **R-1**.
 - **Automated refunds.** The system flags and records refunds; the photographer moves the money.
 - **Client-initiated rescheduling.** Clients cancel and rebook, or ask the photographer.
 - **Per-service custom booking form fields.** The field set is fixed (§3.1 step 6).
@@ -206,6 +205,9 @@ The confirmation email contains a unique long-lived link. Opening it shows that 
 - **Recurring or multi-day bookings**, group/multi-slot bookings, and waiting lists.
 - **Invoicing, accounting exports, tax documents, or a revenue dashboard** beyond a bookings and payments list.
 - **Native mobile apps.** The site is mobile-first and responsive.
+- **Two-factor authentication on the admin account.** Password, Argon2id and lockout only.
+- **Scheduled data purging.** Erasure on request is built; time-based deletion is not.
+- **Uploads of any kind.** Service cover images are a URL the admin pastes, not a file the site stores.
 - **Contracts, model releases, or e-signature.**
 
 ### 4.3 Payment provider phasing
@@ -221,202 +223,20 @@ Both are implemented behind one `PaymentProvider` interface (initiate, verify, h
 
 ## 5. Data Model
 
-A dedicated `data-model.md` will expand this. What follows is the authoritative entity set, the fields carrying business rules, and the relationships.
+**The authoritative data model is [`data-model_v2.md`](data-model_v2.md).** This section deliberately holds no entity list, no column list and no ER diagram.
 
-### 5.1 Entities
+It used to. The result was a section describing fourteen entities against a model that has thirteen — still listing `delivery`, `notification_log` and `booking_access_token` as tables months after they were folded into `booking` and `outbox`, still asserting that a unique `provider_ref` makes webhook handling idempotent when the data model calls that claim a defect, and still giving `working_hours` a shape that cannot express the dated overrides the whole "open a Saturday without a migration" argument rests on. A duplicated schema is a schema that drifts, and this one had.
 
-| Entity | Purpose | Notable fields |
-|---|---|---|
-| `client` | A person who has booked at least once. Deduplicated on lowercased email. | `full_name`, `email`, `phone`, `locale` |
-| `service` | A bookable offering, admin-managed. | `name_en`, `name_fr` (nullable, unused in v1), `description_en`, `description_fr`, `cover_image`, `booking_fee_rate_override` (nullable), `is_active`, `sort_order` |
-| `package` | A priced tier of a service: price, photo count, duration. | `service_id`, `name_en`, `name_fr`, `price_rwf`, `photo_count`, `duration_minutes`, `is_active` |
-| `addon` | Optional priced extra, attachable at booking or after the shoot. | `service_id` (null = available on all services), `name_en`, `name_fr`, `price_rwf`, `is_active` |
-| `booking` | One reserved slot and its commercial state. Holds **price snapshots**, not live prices. | `reference`, `status`, `starts_at`, `ends_at`, `buffer_ends_at` (all UTC), `location_text`, `party_size`, `special_requests`, `locale`, `service_name_snapshot`, `package_name_snapshot`, `package_price_rwf`, `booking_fee_rate`, `booking_fee_rwf`, `session_fee_rwf`, `total_rwf`, `hold_expires_at`, `confirmed_at`, `completed_at`, `original_starts_at`, `rescheduled_at`, `cancelled_at`, `cancellation_reason`, `gcal_event_id` |
-| `booking_addon` | Add-ons on a booking, priced at the time of attachment. | `booking_id`, `addon_id`, `name_snapshot`, `price_rwf_snapshot`, `quantity`, `added_stage` (`at_booking` \| `post_shoot`) |
-| `payment` | One attempt to collect money against a booking. | `booking_id`, `kind` (`booking_fee` \| `session_fee`), `provider` (`mtn_momo_direct` \| `flutterwave`), `provider_ref` (unique), `method` (`momo_mtn` \| `momo_airtel` \| `card`), `amount_rwf`, `status` (`initiated` \| `pending` \| `succeeded` \| `failed` \| `refund_due` \| `refunded`), `initiated_at`, `settled_at`, `refunded_at`, `refund_reference`, `raw_payload` |
-| `availability_block` | Admin-declared unavailable time. | `starts_at`, `ends_at`, `is_all_day`, `reason` (private) |
-| `working_hours` | Recurring weekly bookable window. Seeded Mon–Fri 09:00–17:00. | `weekday` (0–6), `opens_at`, `closes_at`, `is_active` |
-| `delivery` | The photo handoff for a completed booking. | `booking_id` (unique), `external_url`, `host_label`, `expires_on`, `sent_at`, `note` |
-| `notification_log` | Every message the system sent, for audit and resend. | `booking_id`, `template`, `channel`, `recipient`, `status`, `provider_message_id`, `sent_at` |
-| `booking_access_token` | The client's return path to one booking. Stored hashed. | `booking_id`, `token_hash`, `expires_at`, `last_used_at` |
-| `admin_user` | The photographer's login. | `email`, `password_hash`, `totp_secret` (nullable), `failed_login_count`, `locked_until`, `last_login_at` |
-| `setting` | Admin-editable operational values. | `booking_fee_rate` (0.40), `min_lead_time_minutes` (120), `hold_minutes` (30), `buffer_minutes` (30), `slot_granularity_minutes` (30), `delivery_expiry_days` (90) |
+What the reader needs from this section is the shape of the thing, not its columns:
 
-### 5.2 ER diagram
+- **Thirteen tables**, in six groups: identity and configuration, availability, catalogue, booking, money, and the work queue.
+- **A booking is a snapshot.** Every name, price, duration and contact detail a client was shown is copied onto the booking at write time. Editing a service, a package or a price never changes a booking that already exists.
+- **Money is whole RWF integers**, never floating point, and totals are computed by one function rather than stored — so a post-shoot add-on cannot silently fail to appear in what a booking is worth.
+- **Occupancy is enforced by the database, not the application.** A range-exclusion constraint over each booking's time *plus its buffer* makes two overlapping bookings impossible whatever the code does. This is the single mechanism that fixes the problem in `brief.md` §1.
+- **Every inbound provider callback is stored before it is interpreted**, keyed so a duplicate delivery is a no-op and a settled payment cannot be walked backwards.
+- **Everything the system sends** — email and calendar pushes alike — goes through one queue that is also the audit trail.
 
-```mermaid
-erDiagram
-    CLIENT ||--o{ BOOKING : places
-    SERVICE ||--o{ PACKAGE : offers
-    SERVICE ||--o{ ADDON : offers
-    SERVICE ||--o{ BOOKING : booked_as
-    PACKAGE ||--o{ BOOKING : priced_by
-    BOOKING ||--o{ BOOKING_ADDON : includes
-    ADDON ||--o{ BOOKING_ADDON : selected_as
-    BOOKING ||--o{ PAYMENT : paid_by
-    BOOKING ||--o| DELIVERY : delivered_via
-    BOOKING ||--o{ NOTIFICATION_LOG : triggers
-    BOOKING ||--o| BOOKING_ACCESS_TOKEN : opened_by
-    ADMIN_USER ||--o{ AVAILABILITY_BLOCK : declares
-    ADMIN_USER ||--o{ WORKING_HOURS : defines
-
-    CLIENT {
-        uuid id PK
-        string full_name
-        string email
-        string phone
-        string locale
-        datetime created_at
-    }
-    SERVICE {
-        uuid id PK
-        string slug
-        string name_en
-        string name_fr
-        text description_en
-        text description_fr
-        string cover_image
-        decimal booking_fee_rate_override
-        bool is_active
-        int sort_order
-    }
-    PACKAGE {
-        uuid id PK
-        uuid service_id FK
-        string name_en
-        string name_fr
-        int price_rwf
-        int photo_count
-        int duration_minutes
-        bool is_active
-    }
-    ADDON {
-        uuid id PK
-        uuid service_id FK
-        string name_en
-        string name_fr
-        int price_rwf
-        bool is_active
-    }
-    BOOKING {
-        uuid id PK
-        string reference
-        uuid client_id FK
-        uuid service_id FK
-        uuid package_id FK
-        string status
-        datetime starts_at
-        datetime ends_at
-        datetime buffer_ends_at
-        string location_text
-        int party_size
-        text special_requests
-        string locale
-        string service_name_snapshot
-        string package_name_snapshot
-        int package_price_rwf
-        decimal booking_fee_rate
-        int booking_fee_rwf
-        int session_fee_rwf
-        int total_rwf
-        datetime hold_expires_at
-        datetime confirmed_at
-        datetime completed_at
-        datetime original_starts_at
-        datetime rescheduled_at
-        datetime cancelled_at
-        text cancellation_reason
-        string gcal_event_id
-        datetime created_at
-    }
-    BOOKING_ADDON {
-        uuid id PK
-        uuid booking_id FK
-        uuid addon_id FK
-        string name_snapshot
-        int price_rwf_snapshot
-        int quantity
-        string added_stage
-    }
-    PAYMENT {
-        uuid id PK
-        uuid booking_id FK
-        string kind
-        string provider
-        string provider_ref
-        string method
-        int amount_rwf
-        string status
-        datetime initiated_at
-        datetime settled_at
-        datetime refunded_at
-        string refund_reference
-        json raw_payload
-    }
-    AVAILABILITY_BLOCK {
-        uuid id PK
-        uuid admin_user_id FK
-        datetime starts_at
-        datetime ends_at
-        bool is_all_day
-        string reason
-    }
-    WORKING_HOURS {
-        uuid id PK
-        uuid admin_user_id FK
-        int weekday
-        time opens_at
-        time closes_at
-        bool is_active
-    }
-    DELIVERY {
-        uuid id PK
-        uuid booking_id FK
-        string external_url
-        string host_label
-        date expires_on
-        datetime sent_at
-        text note
-    }
-    NOTIFICATION_LOG {
-        uuid id PK
-        uuid booking_id FK
-        string template
-        string channel
-        string recipient
-        string status
-        string provider_message_id
-        datetime sent_at
-    }
-    BOOKING_ACCESS_TOKEN {
-        uuid id PK
-        uuid booking_id FK
-        string token_hash
-        datetime expires_at
-        datetime last_used_at
-    }
-    ADMIN_USER {
-        uuid id PK
-        string email
-        string password_hash
-        string totp_secret
-        int failed_login_count
-        datetime locked_until
-        datetime last_login_at
-    }
-```
-
-### 5.3 Rules the schema must enforce
-
-1. **No overlapping occupancy.** A database-level exclusion constraint over `[starts_at, buffer_ends_at)` rejects any second `confirmed` or live `pending_payment` booking on overlapping time. The buffer is part of the reserved range, so it is enforced by the same constraint. Application-level checks are advisory only — see **§6.1**.
-2. **Money is stored as whole RWF integers.** RWF has no minor unit. No floating-point money.
-3. **All timestamps are stored in UTC** and rendered in Africa/Kigali.
-4. **Snapshots are immutable.** `booking` and `booking_addon` copy names and prices at write time. Editing a `service`, `package`, or `addon` never alters an existing booking.
-5. **`payment.provider_ref` is unique**, making webhook processing idempotent. `provider` is stored per payment so records survive the Flutterwave cutover.
-6. **Soft deletion only** for `service`, `package`, and `addon` via `is_active`. Rows referenced by a booking are never hard-deleted.
-7. **Fee arithmetic:** `total_rwf` = package price + add-ons chosen at booking. `booking_fee_rate` = the service's override, or the global rate. `booking_fee_rwf` = round(`total_rwf` × `booking_fee_rate`). `session_fee_rwf` = `total_rwf` − `booking_fee_rwf` + post-shoot add-ons. Gateway fees are absorbed by the photographer and never enter this arithmetic.
-8. **French columns exist and stay empty in v1.** `name_fr` and `description_fr` are nullable, written by no v1 screen, and read by no v1 page. They exist so enabling French is a content task, not a migration.
-9. **One live token per booking.** `booking_access_token` is 1:1 with `booking` in practice; resending regenerates the token and invalidates the previous hash.
+Rules that constrain behaviour rather than storage stay here, in §6.
 
 ---
 
@@ -432,9 +252,9 @@ erDiagram
 | 6.6 | **Minimum lead time and same-day booking** | Slots starting sooner than 120 minutes from now are not offered and are rejected server-side if submitted. Same-day booking is permitted when the slot clears that threshold and falls inside Mon–Fri 09:00–17:00. |
 | 6.7 | **Buffer between shoots** | Each confirmed booking reserves its duration **plus 30 minutes**. The next bookable start is the buffer end rounded up to the 30-minute grid. The buffer may extend past 17:00 — it blocks nothing after closing and is never shown to clients as a bookable or occupied slot, only omitted from availability. |
 | 6.8 | **Session longer than the working window** | A package whose duration plus the closing boundary cannot fit inside 09:00–17:00 produces no availability at all. The admin sees a warning on the package when this is true, rather than clients meeting an empty calendar with no explanation — see **R-4**. |
-| 6.9 | **Duplicate, out-of-order, or late payment webhook** | Webhook handling is idempotent on `payment.provider_ref` and signature-verified. A repeated webhook is a no-op. A `succeeded` webhook arriving after the hold expired reinstates the booking to `confirmed` **only if** the slot is still free; otherwise the payment is recorded `succeeded` against an `expired` booking, set to `refund_due`, and the admin is emailed immediately. |
+| 6.9 | **Duplicate, out-of-order, or late payment webhook** | Every callback is stored before it is interpreted, keyed on the provider's own event id so a repeated delivery is a no-op, and an event for a payment already settled — succeeded, failed or refunded — is recorded and ignored rather than applied. A `succeeded` webhook arriving after the hold expired reinstates the booking to `confirmed` **only if** the slot is still free; otherwise the payment is recorded `succeeded` against an `expired` booking, set to `refund_due`, and the admin is emailed immediately. |
 | 6.10 | **Client cancellation** | Available any time before the shoot. The booking fee is **not refunded** — displayed before payment and repeated in the cancellation confirmation. The slot and buffer return to availability immediately and the calendar event is deleted. Both parties are emailed. Any session fee already paid is marked `refund_due`. |
-| 6.11 | **Photographer cancels or reschedules** | Reschedule keeps the booking, its reference, token, and payments, moves the slot and the calendar event, records `original_starts_at`, and emails the client. Cancel releases the slot, deletes the calendar event, emails the client, and marks the booking-fee payment `refund_due` for a **full refund**. |
+| 6.11 | **Photographer cancels or reschedules** | Reschedule keeps the booking, its reference, token, and payments, moves the slot **and its buffer**, moves the calendar event, records `original_starts_at`, and emails the client. Cancel releases the slot, deletes the calendar event, emails the client, and marks the booking-fee payment `refund_due` for a **full refund**. |
 | 6.12 | **Client no-show** | The admin marks the booking `no_show`. The slot is not returned to availability — the time was consumed. The **booking fee is forfeited, no session fee is owed, and the booking closes.** No further email is sent beyond the admin's own record. |
 | 6.13 | **Price, package, or fee rate changed after a booking exists** | Bookings are unaffected. Amounts are read from the booking's snapshot columns, including `booking_fee_rate`, never from live rows. Edits apply to new bookings only. |
 | 6.14 | **Service or package deactivated with live bookings** | Deactivation removes it from the public site and keeps every existing booking intact and readable via its snapshots. Hard deletion of a referenced row is blocked. |
@@ -452,21 +272,23 @@ erDiagram
 
 ## 7. Non-Functional Requirements
 
-**Performance.** Mobile-first and built for Rwandan mobile networks: Largest Contentful Paint under 2.5 s on 4G for service and calendar pages; initial payload under 500 KB excluding images; images served responsively in WebP/AVIF. A month of availability resolves in under 500 ms at the 95th percentile, backed by an index on `starts_at`. The public service pages must render their content without a visitor waiting on a JavaScript bundle to fetch it first, and must be indexable by search engines — the mechanism is **R-7**.
+**Performance.** Mobile-first and built for Rwandan mobile networks: Largest Contentful Paint under 2.5 s on 4G for service and calendar pages; initial payload under 500 KB excluding images; images served responsively in WebP/AVIF. A month of availability resolves in under 500 ms at the 95th percentile, backed by an index on `starts_at`. The API also serves the built React application, so the pages come from the same origin that answers their data.
 
-**Availability.** Target 99.5% monthly uptime on managed hosting. Daily automated database backups, 7-day retention, documented restore. No 24/7 on-call commitment in v1.
+**Availability.** Target 99.5% monthly uptime on managed hosting. Daily automated database backups with 7-day retention and a restore procedure that has been executed at least once against a scratch database — an untested backup is not a backup. No 24/7 on-call commitment in v1.
 
-**Security.** HTTPS everywhere with HSTS. No card number, CVV, or Mobile Money PIN ever reaches the application — payment completes on the provider's hosted checkout, keeping the project in PCI DSS SAQ-A scope. Webhook endpoints verify provider signatures and reject unsigned or replayed calls. Admin passwords are hashed with Argon2id; TOTP two-factor is supported and off by default; login is rate-limited and lockable (§6.23). Admin session cookies are `HttpOnly`, `Secure`, `SameSite=Lax`, with server-side authorization on every admin route and API handler. Because the web app and the API are separate deployables, both are served from one registrable domain (app at the apex, API at `api.`) so the session cookie stays `SameSite=Lax`; CORS admits exactly the web app's origin with credentials, and every state-changing request carries a CSRF token — a cookie-authenticated API has no implicit cross-origin protection. Client access tokens are at least 128 bits of entropy, stored hashed, single-purpose, and scoped to one booking. Secrets live in environment variables, never in the repository. Rate limiting on booking creation, payment initiation, token use, and admin login. Known critical CVEs in dependencies patched before launch.
+**Security.** HTTPS everywhere with HSTS. No card number, CVV, or Mobile Money PIN ever reaches the application — payment completes on the provider's hosted checkout, keeping the project in PCI DSS SAQ-A scope. Webhook endpoints verify provider signatures and reject unsigned or replayed calls. Admin passwords are hashed with Argon2id; login is rate-limited and lockable (§6.23). There is no two-factor: one user, and nothing in the brief or the client's answers raises admin security at all. Admin session cookies are `HttpOnly`, `Secure`, `SameSite=Lax`, with server-side authorization on every admin route and API handler. **One deployable serves both the API and the built React app**, so every request is same-origin: `SameSite=Lax` alone stops cross-site form posts, there is no CORS allowlist to maintain and no CSRF token flow to get wrong. Responses carry HSTS, `X-Content-Type-Options`, a restrictive `Referrer-Policy` and a CSP that blocks inline script — all of it default output from one middleware. Client access tokens are at least 128 bits of entropy, stored hashed, single-purpose, and scoped to one booking. Secrets live in environment variables, never in the repository. Rate limiting on booking creation, payment initiation, token use, and admin login. Known critical CVEs in dependencies patched before launch.
 
 **Privacy and compliance.** Personal data collected is limited to name, email, phone, shoot location, party size, and special requests. Rwanda's Law N° 058/2021 on the protection of personal data and privacy applies: a privacy notice page, an explicit consent checkbox at booking, a stated retention period, and deletion on request are in scope. Registration of the data controller with the National Cyber Security Authority is the photographer's own obligation and is named here so it is not missed.
 
-**Internationalization readiness.** English ships; French does not. Every user-facing string — pages, emails, validation messages, dates, currency — resolves through the translation layer with no copy hardcoded in components. Routing is locale-prefixed from day one, with `en` as the only enabled locale. Admin-authored content carries `_en` and `_fr` columns, with the FR side present and unwritten. Enabling French means adding a locale, filling translation files, and populating the FR columns — no schema change and no component rewrite (**R-2**).
+**Internationalization readiness.** English ships; French does not. Page and email copy resolves through a translation layer, and admin-authored content carries `_en` and `_fr` columns with the FR side present and unwritten — both cost close to nothing and keep French a content task. What is **not** built: locale-prefixed routing, a second enabled locale, and a project-wide rule that no string may be written in a component. That rule is a tax on every component for a deliverable **R-2** concedes may never arrive; adding French later means adding routes and filling files, which is work, not a rebuild.
 
-**Accessibility and compatibility.** WCAG 2.1 AA contrast and full keyboard operability through the booking flow, including the date picker. Supported: current and previous major versions of Chrome, Safari, Firefox, and Edge, with Android Chrome as the priority target.
+**Accessibility and compatibility.** The booking flow — service, slot picker, form, payment — is fully operable by keyboard, and colour contrast meets WCAG 2.1 AA. Checked once, at the end, on the booking flow rather than as a gate on every screen. Supported: current and previous major versions of Chrome, Safari, Firefox and Edge, with Android Chrome as the priority target.
 
-**Observability.** Application errors, failed payment webhooks, and exhausted Google Calendar retries are captured by an error-tracking service and raise an email alert to the admin. Every outbound message is written to `notification_log` and visible in the admin panel.
+**Observability.** Application errors, failed payment webhooks and exhausted retries are logged as structured JSON to stdout and raise an email alert to the photographer. No third-party error-tracking vendor: none was budgeted, and one alert address covers a business with one operator. Every outbound message is recorded in the work queue and visible per booking in the admin panel.
 
-**Implementation stack.** React + TypeScript built with Vite, styled with Tailwind and shadcn/ui. Express + Prisma over managed PostgreSQL 15+ — Postgres is a requirement rather than a preference, because the range-exclusion constraint in §6.1 is what makes double booking impossible. The web app and the API are two deployables in one repository, sharing a single package of validation schemas so the booking form and the endpoint that accepts it cannot drift apart. No client-imposed technology constraint; this is the delivery team's stack.
+**Implementation stack.** React + TypeScript built with Vite, styled with Tailwind and shadcn/ui. Express + Prisma over PostgreSQL 15+ — Postgres is a requirement rather than a preference, because the range-exclusion constraint that makes double booking impossible exists in no other engine the project would plausibly use.
+
+Two folders, `frontend/` and `backend/`, but **one deployable**: in development Vite proxies API calls to Express; in production Express serves the built bundle. That single decision removes CORS configuration, the CSRF token flow, a cross-origin cookie argument, and the whole question of how public pages get rendered. There is no shared package and no monorepo tooling — the server is authoritative for every amount and revalidates every payload, so the two projects can hold their own copies of a schema without a client ever being trusted. No client-imposed technology constraint; this is the delivery team's stack.
 
 ---
 
@@ -476,23 +298,23 @@ erDiagram
 
 | ID | Question | Decision | Where it lands |
 |---|---|---|---|
-| A-1 | Pricing model | **Packages + add-ons.** Service → 2–3 packages (price, photo count, duration) + optional add-ons, all admin-editable. | §3.4, §5.1 |
-| A-2 | Client identity | **Guest booking + secure per-booking link.** No accounts, no passwords for clients. One link per booking. | §2.1, §3.9, §5.1 |
+| A-1 | Pricing model | **Packages + add-ons.** Service → 2–3 packages (price, photo count, duration) + optional add-ons, all admin-editable. | §3.4, `data-model_v2.md` §5.5–5.7 |
+| A-2 | Client identity | **Guest booking + secure per-booking link.** No accounts, no passwords for clients. One link per booking. | §2.1, §3.9, `data-model_v2.md` §5.9 |
 | A-3 | Payment gateway | **MTN MoMo Collections API direct for development, migrating to Flutterwave for production.** Both behind one provider adapter. | §4.3, §6.18, §6.19 |
-| A-4 | Booking-fee rate | **Global 40% with a per-service override.** | §5.1, §5.3 rule 7 |
+| A-4 | Booking-fee rate | **Global 40% with a per-service override.** | `data-model_v2.md` §5.5, §9.5 |
 | A-4b | Gateway transaction fees | **Absorbed by the photographer.** The client pays the advertised price; no processing-fee line at checkout. | §3.1 step 7 |
 | A-5 | Photographer cancels/reschedules | **Reschedule first; full refund of the booking fee if no date suits.** | §3.6, §6.11 |
 | A-6 | Client no-show | **Booking fee forfeited, no session fee owed, booking closed.** | §6.12 |
-| A-7 | Photo delivery | **Hybrid.** Files on an external host; the site holds the link and sends the branded delivery email. | §3.5, §5.1 |
-| A-8 | Retention / link expiry | **90 days**, expiry date shown to the client at delivery. | §3.5, §6.20 |
+| A-7 | Photo delivery | **Hybrid.** Files on an external host; the site holds the link and sends the branded delivery email. | §3.5, `data-model_v2.md` §5.9 |
+| A-8 | Retention / link expiry | **90 days**, expiry date shown to the client at delivery. ⚠ **Developer default, not a client answer** — the client left this question blank. Confirm before launch. | §3.5, §6.20 |
 | A-9 | Google Calendar | **One-way push, site → Google, bookings only.** A read-only mirror for glancing at his phone; everything else lives on the site. | §3.7, §6.17 |
-| A-10 | Slots and hours | **Mon–Fri 09:00–17:00, 30-minute start grid, 30-minute buffer between shoots, 120-minute minimum notice.** | §3.1 step 4, §6.6, §6.7 |
-| A-11 | Admin authentication | **Email + password, optional TOTP two-factor**, with lockout and emailed reset. | §2.1, §6.23, §7 |
+| A-10 | Slots and hours | **Mon–Fri 09:00–17:00, 30-minute start grid, 30-minute buffer between shoots, 120-minute minimum notice.** ⚠ Only the 120 minutes traces to the client ("maybe 2 hours before when it's working hours"); the weekday 9-to-5 window was chosen by the developer. See **R-4**. | §3.1 step 4, §6.6, §6.7 |
+| A-11 | Admin authentication | **Email + password**, Argon2id, with lockout and emailed reset. TOTP was specified in v2.0 and removed — untraceable to anything the client said, for a single-user panel. | §2.1, §6.23, §7 |
 | A-12 | SMS / WhatsApp | **Email only in v1.** Both deferred to a costed phase 2. | §4.2 |
 | A-13 | Booking form fields | **Fixed set:** name, email, phone, location, party size, special requests, consent. | §3.1 step 6 |
-| A-14 | French content | **English only at launch**, with the translation layer, locale routing, and FR columns built in so French is a content drop, not a rebuild. | §4.2, §5.3 rule 8, §7 |
+| A-14 | French content | **English only at launch**, with the translation layer and FR columns in place. Locale-prefixed routing and the no-hardcoded-strings rule were dropped as too expensive for a deliverable that may never ship — see **R-2**. | §4.2, §7 |
 | A-15 | Timeline and budget | **No fixed launch date. Build to this spec.** §4.2 is a quality boundary. | Header |
-| A-16 | Offline bookings | **Send the client a booking link** (§3.8); nothing else built. Admin-created bookings deferred. | §3.8, **R-1** |
+| A-16 | Offline bookings | **Send the client the public booking URL by hand** (§3.8). The in-product signed invite link specified in v2.0 is withdrawn — it was code for something WhatsApp already does. Admin-created bookings stay deferred. | §3.8, **R-1** |
 
 ### 8.2 Residual open items
 
@@ -500,13 +322,14 @@ None of these blocks the start of development. Each names what would settle it.
 
 | ID | Item | Severity | Options | Position |
 |---|---|---|---|---|
-| **R-1** | Admin-created bookings for offline jobs | Medium | **A.** Booking link only (v1 as built). **B.** Admin creates a full booking with an offline payment record. **C.** Offline jobs stay as blocks. | Building A now, per decision. Confirm with the photographer whether clients who book by WhatsApp will actually follow a link and pay online — if a meaningful share will not, B is needed, which adds an admin booking form and an `offline_cash`/`offline_momo` payment method. Cheaper to decide before the payment adapter is finished than after. |
-| **R-2** | French launch | Medium | **A.** We translate the launch content in a later phase. **B.** He writes the French himself. **C.** French never ships. | Deferred by decision. §7 keeps the cost of choosing later near zero. Needs an answer only when French is actually scheduled. |
-| **R-3** | Payment credentials and cutover | **High** | Not a choice — missing facts. | Three things are needed before production: whose MTN MoMo API/collection account is used and its onboarding status; whose Flutterwave account settles the money and in whose name; and when the cutover happens. Card and Airtel Money paths cannot be tested at all before cutover, so their acceptance testing sits at the end of the schedule, not alongside MTN. |
-| **R-4** | Weekday-only hours vs. event work | **High** | **A.** Keep Mon–Fri 09:00–17:00. **B.** Add Saturday. **C.** Add weekend hours on request via manual availability. | Mon–Fri 09:00–17:00 was the selected answer and is what the system seeds. Flagging it because the brief sells **event coverage**, and events in Kigali land overwhelmingly on weekends: as configured, no client can book a Saturday wedding, and any package longer than 8 hours produces an empty calendar (§6.8). The admin can change hours in settings without a code change, so this is a configuration conversation, not a build risk — but it should be confirmed with the photographer before launch content goes live. |
-| **R-5** | Refund execution channel | Low | **A.** Manual MoMo transfer, recorded in the system (current). **B.** Provider-initiated refund API once on Flutterwave. | A is built. B becomes available after the Flutterwave cutover and would remove a manual step; it is not worth building against MTN direct. |
-| **R-7** | Public-page rendering | **High** | **A.** Prerender the public pages to static HTML at build time. **B.** Add server-side rendering to the Express app for those routes. **C.** Accept client-side rendering. | A single-page React app renders nothing until its bundle loads and fetches, which works against the LCP target in §7 and leaves the service pages weakly indexed — for a business whose clients find him by searching, that matters. **Recommend A:** the service list and detail pages change only when the admin edits the catalogue, so build-time prerendering with a rebuild hook costs little and needs no server rendering path. Choose B only if the catalogue must be editable and live within seconds. C is defensible only if every client arrives from a link he sends personally. |
-| **R-6** | Launch content | **High** | Not a choice — missing material. | The service list, package names, photo counts, durations, prices in RWF, and cover images do not exist yet. The Q&A named "personal, corporate and so on" without prices. Nothing can go live without them, and the availability engine cannot be realistically tested without at least three packages of differing durations. |
+| **R-1** | Admin-created bookings for offline jobs | Medium | **A.** Send the public URL by hand (v1 as built). **B.** Admin creates a full booking with an offline payment record. **C.** Offline jobs stay as blocks. | Building A, which is now zero code (§3.8). The question the photographer must answer is whether clients who reach him on WhatsApp will actually open a link and pay online, or will expect him to book for them. If a meaningful share will not, B is needed — an admin booking form plus an `offline_cash`/`offline_momo` payment method. Cheaper to decide before the payment adapter is finished than after. |
+| **R-2** | French launch | Medium | **A.** Translate the launch content in a later phase. **B.** He writes the French himself. **C.** French never ships. | Deferred. Note the client asked for French outright ("English and French"); shipping English is the developer's sequencing choice, not his. v2.1 stopped paying the expensive half of the readiness cost (§7) while keeping the cheap half, so choosing later stays inexpensive. |
+| **R-3** | Payment credentials and cutover | **High** | Not a choice — missing facts. | Three things are needed before production: whose MTN MoMo API/collection account is used and its onboarding status; whose Flutterwave account settles the money and in whose name; and when the cutover happens. Card and Airtel Money paths cannot be tested at all before cutover, so their acceptance testing sits at the end of the schedule. |
+| **R-4** | Weekday-only hours vs. event work | **High** | **A.** Keep Mon–Fri 09:00–17:00. **B.** Add Saturday. **C.** Open individual weekend dates as they are booked. | **The photographer has not been asked.** His only statement about when he works is "as long as a day is available, or maybe 2 hours before when it's working hours" — which sets the notice period and nothing else. Mon–Fri 09:00–17:00 was chosen by the developer, and `brief.md` sells **event coverage**, which in Kigali is overwhelmingly weekend work. As seeded, nobody can book a Saturday wedding and any package over 8 hours yields an empty calendar (§6.8). Changing it is a settings edit, not a code change — but it must be settled before launch content goes live. |
+| **R-5** | Refund execution channel | Low | **A.** Manual MoMo transfer, recorded in the system (current). **B.** Provider-initiated refund API once on Flutterwave. | A is built. B becomes available after the Flutterwave cutover and would remove a manual step; not worth building against MTN direct. |
+| **R-6** | Launch content | **High** | Not a choice — missing material. | The service list, package names, photo counts, durations, prices in RWF and cover-image URLs do not exist yet. The client's answer was "does it matter? ... we can start with photoshoots." Nothing can go live without them, and the availability engine cannot be realistically exercised without at least three packages of differing durations. |
+
+**R-7 (public-page rendering) is closed.** It existed only because the web app and the API were two deployables. With Express serving the built bundle (§7), the pages come from the origin that answers their data, and prerendering becomes an optimisation to reach for if search traffic ever matters — not an architectural decision blocking the first tasks.
 
 ### 8.3 Contradictions between the source documents
 
@@ -514,7 +337,7 @@ Logged so the resolution can be corrected if it is wrong.
 
 | ID | `brief.md` says | `clien-answers.md` says | Resolution |
 |---|---|---|---|
-| C-1 | §4.1 / §4.2: booking requests go to the admin, who confirms or declines each one | Bookings auto-confirm on payment; the admin is notified by email and the calendar updates automatically | **Auto-confirm on successful booking-fee payment.** No approval queue and no `declined` status. The admin retains cancel and reschedule after the fact (§3.6). |
+| C-1 | §4.1 / §4.2: booking requests go to the admin, who confirms or declines each one | Bookings auto-confirm on payment; the admin is notified by email and the calendar updates automatically | **Auto-confirm on successful booking-fee payment.** No approval queue, no `declined` status; the admin retains cancel and reschedule after the fact (§3.6). ⚠ **Ask the photographer directly.** The brief names "confirm or decline booking requests" as a core feature twice, and we removed it on the strength of a "yes" to an either/or question — the weakest answer in the document. A paid deposit is a strong argument for auto-confirming, but it is our argument, not his. |
 | C-2 | §6: multi-language support is out of scope | "English and French" | **Superseded by the A-14 decision: English at launch, French later.** The brief and the Q&A are reconciled by shipping one language while building for two. |
 | C-3 | §6: SMS and WhatsApp integration is out of scope | "both would be ideal" | **Out of scope for v1** (A-12). Read as a preference, not a launch requirement. |
 | C-4 | §4.4: card payments are an open question | "yes" | **Cards are in scope**, arriving with the Flutterwave cutover (§4.3). They do not exist during the MTN-direct phase. |
@@ -524,7 +347,9 @@ Logged so the resolution can be corrected if it is wrong.
 
 ## Sign-off
 
-Approving this document confirms §1–§7 as the agreed build. The sixteen v1 ambiguities are resolved (§8.1). Seven residual items remain (§8.2); **R-3** (payment credentials), **R-4** (weekday-only hours vs. event work), **R-6** (launch content), and **R-7** (public-page rendering) need answers before launch. Only R-7 affects how the first tasks are built.
+Approving this document confirms §1–§7 as the agreed build. The sixteen v1 ambiguities are resolved (§8.1). Six residual items remain (§8.2); **R-3** (payment credentials), **R-4** (working hours) and **R-6** (launch content) need answers before launch, and none of them blocks the first tasks.
+
+Three decisions in §8.1 are marked ⚠ because they were made **for** the photographer rather than **by** him — A-8 (90-day link expiry, his answer was blank), A-10/R-4 (weekday-only hours), and C-1 (removing the approve/decline step the brief names twice). Approving this document approves those three as well, so they are worth a direct conversation first.
 
 | | Name | Date |
 |---|---|---|

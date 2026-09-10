@@ -6,7 +6,7 @@
 | **Tasks** | 25, sequential. Each is one focused work session. |
 | **Frontend** | React + TypeScript via Vite · shadcn/ui · Tailwind for custom styling |
 | **Backend** | Express + Prisma · TypeScript · PostgreSQL 15+ (local instance) |
-| **Layout** | `backend/` · `frontend/` · `docs/` — two independent projects, no monorepo tooling |
+| **Layout** | `backend/` · `frontend/` · `docs/` — two projects, **one deployable**: Vite proxies to Express in dev, Express serves the built bundle in production |
 | **Launch blocker outside this plan** | **R-6** — no service names, prices, durations, photo counts or images exist yet. Tasks 1–25 can all complete without them; the site cannot go live without them. |
 
 ## How to read a task
@@ -22,9 +22,8 @@ File paths are deliberately absent. They churn as the project evolves and would 
 Applies to every task; not repeated below.
 
 - `npm run lint`, `npm run typecheck`, `npm test` pass in **both** `backend/` and `frontend/`.
-- No user-facing string is hardcoded in a component — every one resolves through i18next (spec §7).
 - Every new Express route enforces its permission from spec §2.2 in middleware, and a test asserts the denial case, not only the allow case.
-- No money is computed anywhere except at write time per `data-model_v2.md` §9.5, or read from the `booking_totals` view.
+- No money is computed anywhere except at write time per `data-model_v2.md` §9.5, or by `bookingTotals()` (§6.1). Nothing recomputes an amount from a live catalogue row.
 - Any schema change goes through `prisma migrate dev --create-only` + hand-edited SQL. **`prisma db push` is never run** — it would drop the exclusion constraint (`data-model_v2.md` §2.1).
 
 ## Stack decisions (override before Task 1 if you disagree)
@@ -32,15 +31,15 @@ Applies to every task; not repeated below.
 | Choice | Decision | Why |
 |---|---|---|
 | Migrations | Prisma migrations, SQL hand-edited before applying | The exclusion constraint, partial indexes, CHECKs and the view are not expressible in Prisma's DSL |
-| Reading `booking_totals` | `prisma.$queryRaw` with a hand-written row type | Avoids Prisma's `views` preview feature |
-| Admin session | Signed `HttpOnly` cookie (JWT, 8 h) + `admin_user.session_epoch` for global revocation | One admin. A session table would be a 14th table to invalidate one user's cookies |
-| Auth transport | App and API on one registrable domain, `SameSite=Lax`, CORS with credentials for exactly the web origin, CSRF token on every state-changing request | Cookie-authenticated APIs have no implicit cross-origin protection |
+| Booking totals | One exported `bookingTotals()` function, status-aware | A view could not express "nothing is owed on a no-show" and would sit outside Prisma's types |
+| Admin session | Signed `HttpOnly` cookie, 8 h. No TOTP, no session-epoch column | One user. A changed password already invalidates the cookie; "log out everywhere" is closing a browser |
+| Auth transport | Same origin. `SameSite=Lax`, no CORS allowlist, no CSRF token flow | One deployable means there is no cross-origin request to defend against |
 | Tests | Vitest against the local PostgreSQL instance · Playwright for E2E | The critical logic is database behaviour; mocking the database would test nothing |
-| Background work | `node-cron` inside the API process, claiming rows with `FOR UPDATE SKIP LOCKED` | Safe to run on multiple instances without a distributed lock |
+| Background work | `node-cron` inside the API process, single worker loop | One instance. Multi-worker claiming solves concurrency this deployment does not have |
 | Email provider | Resend behind a `MailProvider` interface | Not named in the spec. Swappable in one file |
-| Blob storage | Managed blob store for **service cover images only**, ≤2 MB | Spec §4.2 excludes built-in photo *delivery* hosting; marketing images are a different thing |
+| Images | **No blob store, no uploads.** `cover_image_url` is a URL the admin pastes | The brief describes a service as "name, description, and price". An upload pipeline is a dependency bought for a field nobody specified |
 | Shared code | **None.** No workspace package. The zod schemas, the quote function and the formatters exist twice — once per project | Chosen deliberately (no monorepo tooling). Contained by making the **server authoritative**: it recomputes every amount and revalidates every payload, and a fixture file at `docs/fixtures/` is asserted by both test suites so a divergence fails a test rather than reaching a client |
-| Public page rendering | **R-7 is open.** Build assuming prerendering (option A) — Task 11 verifies it | A pure SPA renders nothing until its bundle fetches, which fights the LCP target and search indexing |
+| Public page rendering | **R-7 is closed.** Express serves the SPA; prerender later only if search traffic matters | The single deployable removed the problem rather than solving it |
 
 ---
 
@@ -51,7 +50,8 @@ Applies to every task; not repeated below.
 **Dependencies.** None.
 
 **Verification.**
-- `npm run dev` starts Vite on 5173 and Express on 4000 concurrently; `GET http://localhost:4000/health` returns `{"ok":true}` and the Vite page returns 200.
+- `npm run dev` starts Vite on 5173 and Express on 4000; Vite proxies `/api` to Express, so `fetch('/api/health')` from the browser returns `{"ok":true}` **with no CORS header involved** — asserted by the absence of `Access-Control-Allow-Origin` on the response.
+- `npm run build` in `frontend/` then starting Express alone serves the app and the API from one origin on one port.
 - `backend/` and `frontend/` each install, lint, typecheck and test independently — neither has a dependency on the other's build.
 - `npx shadcn@latest add button` installs into `frontend/src/components/ui` and the button renders.
 - Both `env.ts` files validate required variables at boot with zod: removing `DATABASE_URL` makes the API exit with a named error, not a later runtime crash.
@@ -68,11 +68,9 @@ Applies to every task; not repeated below.
 **Dependencies.** Task 1.
 
 **Verification.**
-- `/` redirects to `/en`; every route is mounted under `/:locale`.
-- `/fr/...` renders a not-found page while `fr` is absent from the enabled-locales list; adding `'fr'` to that list makes it render without touching any component.
+- Page and email copy resolves through i18next with `en` as the only locale. **No locale-prefixed routing** — routes are plain paths; adding French later means adding routes, which is work rather than a rebuild (spec §7, R-2).
 - Unit tests: `formatDateTime('2026-07-01T06:00:00Z')` returns `1 Jul 2026, 08:00` (Kigali, UTC+2, spec §6.5); `formatMoney(45000)` returns `45,000 RWF`; `formatMoney(45000.5)` throws — money is integer RWF only.
 - The frontend and backend each hold a copy of the formatters, and both test suites assert against the **same** fixture file in `docs/fixtures/format.json` — a divergence between the two copies fails a test in both projects.
-- A test asserts every key referenced by `t()` exists in `en.json`.
 
 ---
 
@@ -84,13 +82,13 @@ Applies to every task; not repeated below.
 
 **Verification.**
 - `npx prisma migrate reset --force` rebuilds from zero and applies cleanly; `npx prisma migrate deploy` on a fresh database produces an identical schema.
-- `\dt` lists exactly 13 tables; `\dv` lists `booking_totals`.
-- **Constraint existence test:** a query against `pg_constraint` and `pg_indexes` asserts `booking_no_overlap` and all four partial unique indexes exist by name. Prisma cannot report this; the test must.
+- `\dt` lists 14 tables — the 13 application tables plus Prisma's `_prisma_migrations`. `\dv` lists none: there is no view.
+- **Constraint existence test:** a query against `pg_constraint` and `pg_indexes` asserts `booking_no_overlap` and all four partial unique indexes exist by name — `payment.provider_ref`, the succeeded booking fee, and the two on `working_hours` (`data-model_v2.md` §9.3). Prisma cannot report this; the test must.
 - **Overlap test:** insert a `confirmed` booking 09:00–10:00 with `buffer_ends_at` 10:30; a second booking 10:00–11:00 fails with SQLSTATE `23P01`; one at 10:30–11:30 succeeds.
 - **Buffer release test:** setting the first to `cancelled_by_client` then inserting 10:00–11:00 succeeds.
 - **Double-deposit test:** two `payment` rows with `kind='booking_fee'`, `status='succeeded'` on one booking fail with `23505`.
 - **Webhook idempotency test:** two `webhook_event` rows sharing `(provider, event_id)` fail with `23505`.
-- **Totals test:** a 40,000 package + 10,000 `at_booking` add-on + 5,000 `post_shoot` add-on returns `quoted_total_rwf = 50000`, `grand_total_rwf = 55000` from `booking_totals` via `$queryRaw`.
+- **Nullability test:** `client.phone`, `webhook_event.payload` and `outbox.payload` all accept `null` — the erasure routine in Task 23 sets all three, and as `NOT NULL` every erasure raised `23502`.
 - A test asserts the exclusion constraint's status list equals the occupying statuses in `data-model_v2.md` §7.1 — the guard against silently freeing occupied time when a status is added later.
 - `npx prisma migrate diff` reports no drift after the constraint migration — the hand-written SQL is in migration history, not applied out of band.
 
@@ -105,9 +103,9 @@ Applies to every task; not repeated below.
 **Verification.**
 - `npx prisma db seed` creates 1 `admin_user`, 1 `setting`, 5 `working_hours` rows (weekday 1–5, `opens_minute = 540`, `closes_minute = 1020`, `is_open = true`).
 - Running the seed twice leaves the same row counts — it is idempotent.
-- `getSettings()` returns `{ bookingFeeRate: 0.4, minLeadTimeMinutes: 120, holdMinutes: 30, bufferMinutes: 30, slotGranularityMinutes: 30, deliveryExpiryDays: 90, accessTokenLifetimeDays: 365, inviteLifetimeDays: 14 }`, with `bookingFeeRate` converted from Prisma's `Decimal` at the boundary so no caller ever handles a `Decimal`.
+- `getSettings()` returns the five editable values `{ bookingFeeRate: 0.4, minLeadTimeMinutes: 120, holdMinutes: 30, bufferMinutes: 30, deliveryExpiryDays: 90 }`, with `bookingFeeRate` converted from Prisma's `Decimal` at the boundary so no caller ever handles a `Decimal`. Slot granularity (30) and access-token lifetime (365 days) are exported constants, not rows.
 - Inserting a second `setting` row fails on `CHECK (id = 1)`.
-- Grep proves no literal `0.4`, `120`, `30`, `90`, `540` or `1020` appears in business logic outside `settings.ts`, the seed, and the migration.
+- No business-logic module reads a fee rate, notice period, hold duration, buffer or expiry from anywhere but `getSettings()` — asserted by the settings module being the only importer of the `setting` table's repository.
 
 ---
 
@@ -122,7 +120,7 @@ Applies to every task; not repeated below.
 - **Dated override, additive:** a `working_hours` row with `effective_date` on one Saturday and `is_open = true` returns slots for that Saturday only — the R-4 fix, and it must be proven.
 - **Dated override, subtractive:** a row with `effective_date` on a Wednesday and `is_open = false` closes that day while other Wednesdays are unaffected.
 - **Block:** a block 11:00–13:00 removes those starts; a multi-day block removes every covered day.
-- **Occupancy and buffer:** a confirmed 09:00–10:00 booking makes 10:00 and 10:15 unavailable and 10:30 the first free start.
+- **Occupancy and buffer:** a confirmed 09:00–10:00 booking reserves through 10:30, so on the 30-minute grid 09:30 and 10:00 are unavailable and **10:30 is the first free start**. (v2.0 asserted 10:15, a time the grid never produces.)
 - **Lead time:** with `now` at 14:00, no start before 16:00 is returned.
 - **Fit:** a 120-minute package returns no start after 15:00 on a day closing at 17:00 (`closes_minute = 1020`).
 - **Impossible package:** a 600-minute package on an 8-hour day returns zero slots (spec §6.8).
@@ -148,28 +146,26 @@ Applies to every task; not repeated below.
 
 ## Task 7 — Admin authentication and API session layer
 
-**Goal.** Email/password login with optional TOTP, lockout and emailed reset, plus the cookie/CORS/CSRF machinery every later admin endpoint depends on (spec §2.1, §6.23, A-11).
+**Goal.** Email/password login with lockout and emailed reset, plus the session cookie every later admin endpoint depends on (spec §2.1, §6.23, A-11).
 
 **Dependencies.** Task 4.
 
 **Verification.**
 - Correct credentials set a session cookie with `HttpOnly`, `Secure`, `SameSite=Lax` — asserted on the `Set-Cookie` header.
 - Wrong password increments `failed_login_count`; past the threshold `locked_until` is set and correct credentials are still refused until it passes.
-- With TOTP enabled, a valid password alone creates no session; a valid code completes it; a reused code within its window is rejected.
-- Incrementing `admin_user.session_epoch` invalidates an already-issued cookie on the next request — "log out everywhere" without a session table.
+- Changing the password invalidates any already-issued cookie on the next request, because the signature covers the password hash.
 - `GET /api/admin/*` unauthenticated returns 401 with no redirect.
-- A state-changing request with a valid session cookie but no CSRF token returns 403.
-- A cross-origin request from an origin outside `WEB_ORIGIN` is refused by CORS before reaching a handler.
+- The session cookie is `SameSite=Lax`, so a cross-site form post carries no credentials — asserted with a request bearing a foreign `Origin` header.
 - Password reset stores only a hash; the emailed token works once and is rejected on reuse and after expiry.
-- `password_hash`, `totp_secret` and `session_epoch` appear in no API response — asserted by serialising the admin user through the public mapper.
+- `password_hash` appears in no API response — asserted by serialising the admin user through the public mapper.
 
-**Assumptions.** Argon2id via `@node-rs/argon2`. Lockout escalates 1 → 5 → 15 minutes; the spec says "rising interval" without values.
+**Assumptions.** Argon2id via `@node-rs/argon2`. Lockout escalates 1 → 5 → 15 minutes; the spec says "rising interval" without values. No TOTP — removed in revision 2.1 as untraceable to any client requirement.
 
 ---
 
-## Task 8 — Admin availability management
+## Task 8 — Admin availability and settings
 
-**Goal.** Let the photographer set weekly hours, open or close individual dates, and create blocks — the admin half of the availability engine (spec §3.3, §6.3, §6.4).
+**Goal.** Let the photographer set weekly hours, open or close individual dates, create blocks, and edit the five operating values — the admin half of the availability engine, plus the settings screen that P-15, P-24 and P-30 require and that no task previously owned (spec §3.3, §6.3, §6.4).
 
 **Dependencies.** Tasks 5, 7.
 
@@ -181,6 +177,8 @@ Applies to every task; not repeated below.
 - A full-day block and a 14:00–16:00 partial block remove exactly the expected slots.
 - **Conflict warning (spec §6.4):** saving a block overlapping a `confirmed` booking returns 409 naming that booking and requires `confirm: true` to proceed; the booking is **not** cancelled and remains `confirmed`.
 - `reason` never appears in the public availability response — asserted against the raw JSON.
+- **Settings screen:** the booking-fee rate, minimum notice, hold duration, buffer and delivery-link lifetime are all editable and persist; each is range-validated server-side (a rate above 1 returns 422, not a `23514` from the database).
+- Changing the buffer does **not** move an existing booking's `buffer_ends_at` — asserted against a booking created before the edit.
 
 ---
 
@@ -213,7 +211,7 @@ Applies to every task; not repeated below.
 - **Impossible package warning (spec §6.8):** saving a package whose `duration_minutes` exceeds `max(closes_minute − opens_minute)` across open days returns a warning naming the longest window. Saving is still permitted; the warning is not a block.
 - FR name fields exist in the zod schema as optional and are not rendered in the v1 UI.
 
-**Assumptions.** Cover images upload to the blob store with a 2 MB limit; `cover_image_url` stores the resulting URL.
+**Assumptions.** `cover_image_url` is a URL the admin pastes. No upload pipeline and no blob store — the brief specifies a service as "name, description, and price", and an upload dependency was bought for a field nobody asked for.
 
 ---
 
@@ -230,7 +228,7 @@ Applies to every task; not repeated below.
 - No processing-fee line appears anywhere (spec §3.1 step 7, A-4b).
 - The non-refundable notice is present on the summary before any payment control is reachable.
 - Only `is_active` services and packages render; a deactivated slug returns not-found.
-- **R-7 (prerender):** `npm run build` emits static HTML for `/en` and each service route with the service name present in the HTML source — `curl` the built file and grep for it, with JavaScript never executed. Lighthouse mobile LCP under 2.5 s on service detail.
+- Lighthouse mobile LCP under 2.5 s on service detail, served by Express from the built bundle.
 
 ---
 
@@ -245,8 +243,8 @@ Applies to every task; not repeated below.
 - The response contains no block reasons, client names or booking ids — asserted against the raw JSON.
 - Selecting a longer package re-queries and returns fewer starts on the same day.
 - A slot confirmed between page load and click produces a clear "just taken" state with a refreshed calendar rather than a failed submit (spec §6.1, client half).
-- The picker is fully keyboard-operable and passes an axe scan with zero critical violations (spec §7).
-- The endpoint is cacheable for a short TTL and the cache is bypassed after any booking confirms — a stale calendar must not outlive a confirmation.
+- The picker is fully keyboard-operable. (Accessibility is verified once, on the whole flow, in Task 24 — not re-checked per screen.)
+- No caching layer. v2.0 required a cacheable availability endpoint with invalidation on confirmation: a second source of truth for availability, in a project whose entire premise is having one.
 
 ---
 
@@ -264,7 +262,7 @@ Applies to every task; not repeated below.
 - `ends_at = starts_at + package_duration_minutes`; `buffer_ends_at = ends_at + 30 min`.
 - `reference` matches `/^BKY-\d{4}-[0-9A-HJKMNP-TV-Z]{5}$/` and a forced collision retries rather than failing.
 - The API validates with its own zod schema and trusts nothing from the client; a request bypassing the UI with an out-of-hours or inside-lead-time slot is rejected 422. The frontend's schema is a UX convenience with no authority.
-- The consent checkbox is required; omitting it returns 422.
+- The consent checkbox is required; omitting it returns 422, and a successful booking writes `consent_at`. Law N° 058/2021 requires consent to be **demonstrable** — a checkbox that persists nothing proves nothing.
 
 ---
 
@@ -278,8 +276,7 @@ Applies to every task; not repeated below.
 - Enqueuing twice with one `dedupe_key` inserts one row (`P2002` on the second) and the caller treats it as success.
 - A throwing handler leaves the row `pending` with `attempts` incremented and `next_attempt_at` pushed out exponentially.
 - Past the attempt ceiling the row becomes `failed` **and** an `admin_alert` row is enqueued carrying `last_error`.
-- **Atomic claiming:** two worker loops run in parallel against 50 pending rows via `FOR UPDATE SKIP LOCKED` and each row is processed exactly once.
-- The queue query uses the partial index — `EXPLAIN` shows an index scan against a table seeded with 100,000 `done` rows.
+- The queue query uses the partial index — `EXPLAIN` shows an index scan, not a sequential scan. (v2.0 tested this against 100,000 rows and tested two parallel workers; one Node process and a few thousand rows a decade justify neither.)
 - The worker starts with the API process and stops cleanly on `SIGTERM` without abandoning a claimed row in `processing`.
 
 ---
@@ -291,11 +288,11 @@ Applies to every task; not repeated below.
 **Dependencies.** Task 14.
 
 **Verification.**
-- All ten render from fixture payloads without error: `booking_confirmation`, `admin_new_booking`, `session_fee_request`, `payment_receipt`, `photo_delivery`, `cancellation`, `reschedule`, `booking_invite`, `access_link_resend`, `admin_alert`.
+- All nine render from fixture payloads without error: `booking_confirmation`, `admin_new_booking`, `session_fee_request`, `payment_receipt`, `photo_delivery`, `cancellation`, `reschedule`, `access_link_resend`, `admin_alert`. (`booking_invite` is gone with the invite flow.)
+- `admin_alert` covers every message addressed to the photographer that is not a new booking: payment received, retries exhausted, login lockout, refund due. Each variant renders from its own fixture.
 - Every rendered email shows times in Africa/Kigali and integer RWF, asserted against the same `docs/fixtures/format.json` the frontend uses — snapshot-tested.
 - `booking_confirmation` contains the reference, date/time, location, amount paid, amount outstanding and the access link, and contains the raw token nowhere except inside that link.
-- Rendering with `locale: 'fr'` falls back to English without throwing.
-- A test asserts every `template` value in the `outbox` CHECK constraint has a matching template file.
+- A test asserts every `template` value in the `outbox` CHECK constraint has a matching template file, and vice versa.
 - Links point at `WEB_ORIGIN`, never at the API host.
 
 ---
@@ -313,6 +310,7 @@ Applies to every task; not repeated below.
 - `amount_rwf` equals `booking_fee_rwf` exactly and is never updated afterwards.
 - **Method gating (spec §6.19):** with `PAYMENT_PROVIDER=mtn_momo_direct` the pay page offers MTN MoMo only; Airtel and card controls are absent from the DOM, not disabled. The web app reads the available methods from an API capability endpoint rather than hardcoding them.
 - A second initiate for a booking with a succeeded booking fee returns 409.
+- **Confirmation page (spec §3.1 step 10):** the provider's return URL lands on a page that shows the booking as pending and polls its status. It never claims success before the webhook has confirmed one, states that MoMo settlement can take a minute, and tells the client the confirmation email is coming if they close the tab. Verified by holding the webhook back and asserting the page stays pending rather than showing a booking as confirmed.
 
 **Assumptions.** MTN sandbox credentials via environment variables. Production MTN access depends on **R-3** and is not required here.
 
@@ -327,7 +325,7 @@ Applies to every task; not repeated below.
 **Verification.**
 - A valid `succeeded` event moves the booking to `confirmed`, nulls `hold_expires_at`, sets `confirmed_at`, writes `access_token_hash` and `access_token_expires_at`, and enqueues `booking_confirmation` and `admin_new_booking`.
 - **Duplicate delivery:** the same `(provider, event_id)` twice yields one `applied` and one `ignored` row, and one `booking_confirmation` outbox row.
-- **Out of order:** a `pending` event after a `succeeded` event is stored `ignored` and changes nothing (rank rule, §7.3).
+- **Out of order and terminal statuses:** an event arriving for a payment already `succeeded`, `failed` or `refunded` is stored `ignored` and changes nothing (`data-model_v2.md` §7.3). Tested for all three, including the `failed → succeeded` case that v2.0's rank ladder would have wrongly applied.
 - **Bad signature:** stored with `signature_valid = false`, status `ignored`, nothing applied, 200 returned so the provider stops retrying.
 - **Unmatched event:** an event whose `our_ref` matches no payment is stored `ignored` and remains inspectable.
 - **Late webhook, slot free (spec §6.9):** a `succeeded` event for an `expired` booking whose slot is still free re-confirms it.
@@ -350,24 +348,24 @@ Applies to every task; not repeated below.
 - The token travels in the URL path and is never sent to any analytics or error-tracking service — asserted by a scrubbing test on the error reporter.
 - **Client cancel (spec §6.10):** confirming sets `cancelled_by_client`, releases the slot (verified by it reappearing in availability), enqueues both cancellation emails, and does **not** refund — the payment stays `succeeded`.
 - The non-refundable warning appears in the cancel confirmation.
+- **Cancelling with a session fee already paid (spec §6.10):** the booking fee stays `succeeded` and forfeited, while the paid session fee is marked `refund_due` and an `admin_alert` is enqueued. This case existed in the spec and was verified by no task.
 - A booking with an outstanding session fee shows a payment control; a fully paid one does not.
-- Amounts come from `booking_totals`, never recomputed in the browser.
+- Amounts come from `bookingTotals()` on the server, never recomputed in the browser. A cancelled or no-show booking shows **nothing outstanding** — the bug v2.0's view would have produced.
 
 ---
 
 ## Task 19 — Admin bookings list, detail and lifecycle actions
 
-**Goal.** Everything the photographer does to a booking after it exists: reschedule, cancel with refund flagging, complete, mark no-show, resend the access link, and send a booking link to an offline enquiry (spec §3.6, §3.8, §6.11, §6.12, §6.16, §6.21).
+**Goal.** Everything the photographer does to a booking after it exists: reschedule, cancel with refund flagging, complete, mark no-show, and resend the access link (spec §3.6, §6.11, §6.12, §6.16, §6.21).
 
 **Dependencies.** Task 18.
 
 **Verification.**
-- **Reschedule:** a free slot keeps `id`, `reference`, `access_token_hash` and all payments; writes `original_starts_at` on the **first** move only and `rescheduled_at` on every move; releases the old slot; enqueues `reschedule`. An occupied slot returns 409 from the surfaced `23P01`.
+- **Reschedule:** a free slot keeps `id`, `reference`, `access_token_hash` and all payments; writes `original_starts_at` on the **first** move only and `rescheduled_at` on every move; **recomputes `buffer_ends_at` from the new `ends_at`**; releases the old slot; enqueues `reschedule`. A reschedule that moved the booking without moving the buffer would either hold time the booking no longer occupies or violate its own CHECK — undefined in v2.0. An occupied slot returns 409 from the surfaced `23P01`.
 - **Admin cancel (spec §6.11):** sets `cancelled_by_admin`, releases the slot, enqueues `cancellation`, sets the booking-fee payment `refund_due` — the full-refund policy from A-5.
 - **Record refund (spec §6.16):** entering a reference moves the payment to `refunded`, sets `refunded_at`, and `collected_rwf` drops accordingly. No provider API is called — asserted by a stub that fails the test if invoked.
 - **No-show (spec §6.12):** sets `no_show`, the slot stays occupied (still absent from availability), the booking fee stays `succeeded`, no session fee is owed, no client email is enqueued.
 - **Resend access link:** issues a new token, invalidates the old one (old URL now 404s), enqueues `access_link_resend`.
-- **Offline booking link (spec §3.8):** sending enqueues `booking_invite` with an HMAC-signed URL; opening it prefills service and package; it is rejected after `invite_lifetime_days`; **no booking and no hold are created by the invite itself**; tampering with any query parameter invalidates the signature.
 - The list filters by status and date range and paginates with a stable cursor.
 
 ---
@@ -380,11 +378,11 @@ Applies to every task; not repeated below.
 
 **Verification.**
 - Marking `completed` sets `completed_at` and unlocks the post-shoot add-on editor.
-- Adding a 15,000 add-on with `stage='post_shoot'` raises `grand_total_rwf` by 15,000 and `session_fee_rwf` by the same — the v1 under-reporting bug is proven absent.
+- Adding a 15,000 add-on with `stage='post_shoot'` raises `grandTotalRwf` and `outstandingRwf` by 15,000 — the v1 under-reporting bug is proven absent.
 - "Request session fee" creates a `payment` with `kind='session_fee'` and `amount_rwf` equal to the then-outstanding amount, and enqueues `session_fee_request`.
 - **Frozen amount:** adding another add-on after initiation does **not** change that payment's `amount_rwf`.
 - **Second request (spec §6.15):** after the first session fee succeeds, adding an add-on and requesting again creates a **second** `session_fee` payment rather than editing the settled one, and both succeed without violating the booking-fee partial unique index.
-- Paying enqueues `payment_receipt` and leaves `outstanding_rwf` at 0.
+- Paying enqueues `payment_receipt` and leaves `outstandingRwf` at 0.
 
 ---
 
@@ -416,43 +414,46 @@ Applies to every task; not repeated below.
 - The event body carries client name, service, package, location and reference, with times in Africa/Kigali.
 - **Failure isolation (spec §6.17):** with the Google client stubbed to fail, the booking still confirms, the client still gets their confirmation email, the outbox row retries then fails, and an `admin_alert` is enqueued carrying the error.
 - **No inbound path:** grep proves no code reads Google events; a test asserts availability output is identical with the calendar stub returning a conflicting event.
-- Disconnecting leaves bookings unaffected and future pushes are skipped, not failed.
+- With the credential absent from the environment, pushes are **skipped** rather than failed, and nothing else in the system changes behaviour — the calendar is a mirror, and its absence is not an error. (v2.0 verified "disconnecting", which no UI offers, because the credential lives in configuration.)
 
-**Assumptions.** The Google refresh token is stored encrypted in API environment configuration, not in the database — one admin, one calendar.
+**Assumptions.** One admin, one calendar. **This task includes obtaining the credential**, which no task previously owned: creating the Google Cloud project, enabling the Calendar API, completing the OAuth consent screen, and running a one-off local script that exchanges an authorisation code for a refresh token, which is then stored encrypted in API environment configuration. Budget for the consent screen being the slow part.
 
 ---
 
 ## Task 23 — Privacy, consent, erasure and retention
 
-**Goal.** Meet Law N° 058/2021 obligations concretely: the notice, the consent record, the erasure routine and the scheduled purges (spec §7, `data-model_v2.md` §10).
+**Goal.** Meet Law N° 058/2021 obligations concretely: the notice, the consent record and the erasure routine (spec §7, `data-model_v2.md` §10).
 
 **Dependencies.** Task 21.
 
 **Verification.**
 - The privacy page states what is collected, the retention periods, and that photo files live with a third-party host the site cannot delete from.
 - **Erasure:** running it on a client with two bookings and three payments anonymises `client`, sets both bookings' `contact_*` and `location_text` to `[erased]`, nulls `special_requests`, `access_token_hash` and `delivery_url`, nulls matching `webhook_event.payload` and `outbox.payload`, and sets `recipient` to `[erased]`.
-- After erasure, `booking_totals` returns identical amounts — financial history survives (`data-model_v2.md` §10.3).
+- After erasure, `bookingTotals()` returns identical amounts — financial history survives (`data-model_v2.md` §10.2).
 - Both access links 404 after erasure.
-- **Purges:** the job nulls `webhook_event.payload` older than 12 months, deletes `done`/`failed` outbox rows older than 24 months, and nulls `outbox.payload` older than 90 days. A test seeds rows either side of each boundary and asserts only the older ones change.
-- Erasure runs in a single `prisma.$transaction` — a partial erasure is not a possible outcome.
+- **No purge job exists.** v2.0 specified three retention windows with boundary tests, on a database that holds a few thousand rows after five years. Scheduled deletion is not a legal obligation; erasure on request is, and it is built.
+- `consent_at` **survives** erasure — it is the evidence that consent was given, and destroying it would defeat the obligation the checkbox exists to satisfy.
+- There is no client-facing erasure control. P-14 is exercised by emailing the photographer, who runs the admin routine — matching spec §2.2, which v2.0 marked as a client capability that no task built.- Erasure runs in a single `prisma.$transaction` — a partial erasure is not a possible outcome.
 
 ---
 
-## Task 24 — Security, rate limiting, accessibility and observability
+## Task 24 — Security, accessibility, observability, and going live
 
-**Goal.** Close out the non-functional requirements as testable behaviour rather than intentions (spec §7, §6.22, §2.2 enforcement).
+**Goal.** Close out the non-functional requirements as testable behaviour rather than intentions, and put the thing on a server with a backup that has actually been restored (spec §7, §6.22, §2.2 enforcement).
 
 **Dependencies.** Task 23.
 
 **Verification.**
-- **Permission matrix coverage:** a table-driven test walks every row of spec §2.2 and asserts the denial case for visitor, client-token and admin across every route. Missing coverage fails the test.
-- **Rate limits (spec §6.22):** exceeding the booking-creation limit per IP and per email returns 429; a fourth live `pending_payment` booking for one email is refused.
-- API responses carry HSTS, `X-Content-Type-Options`, a restrictive `Referrer-Policy`; the web app is served with a CSP that blocks inline script.
+- **Three access modes, three tests:** every `/api/admin/*` route returns 401 unauthenticated; every client-token route returns 404 for an unknown, expired or superseded token; every public route is reachable anonymously. v2.0 required a table-driven test enumerating 30 permission rows × 3 roles — a permanent tax on adding an endpoint, for a system with exactly three access modes.
+- **Rate limits (spec §6.22):** exceeding the booking-creation limit per IP and per email returns 429, and payment initiation and admin login are limited too. A public endpoint that creates rows and calls a payment provider needs this; the specific ceilings are developer defaults, not client requirements.
+- Responses carry HSTS, `X-Content-Type-Options`, a restrictive `Referrer-Policy` and a CSP blocking inline script — default output from one middleware, and now required by spec §7 rather than appearing only here.
 - Webhook and internal job endpoints reject unsigned or unauthenticated calls with no side effects.
 - No stack trace, Prisma error text or SQL reaches a client response — the error middleware maps everything to a code and a message.
-- axe scan on service list, service detail, slot picker, booking form and client booking page: zero critical violations; the full booking flow completes by keyboard alone.
+- One axe scan across the booking flow: zero critical violations, and the flow completes by keyboard alone. Checked once here rather than gated per screen in Tasks 11 and 12.
 - Lighthouse mobile on the two heaviest public pages: LCP under 2.5 s, initial payload under 500 KB excluding images.
-- An induced exception reaches the error tracker; an induced payment-webhook failure raises an admin email alert.
+- An induced exception is logged as structured JSON to stdout; an induced payment-webhook failure raises an admin email alert. No third-party error-tracking vendor — none was budgeted, and one alert address covers a business with one operator.
+- **Deployment:** the app runs from a single process on the host, serving the API and the built bundle over HTTPS on one origin.
+- **Backups:** a daily database dump with 7-day retention, and a restore **performed at least once** into a scratch database with the schema test suite passing against it. An untested backup is not a backup, and no task previously owned this.
 
 ---
 
@@ -464,7 +465,7 @@ Applies to every task; not repeated below.
 
 **Verification.**
 - With `PAYMENT_PROVIDER=flutterwave`, the capability endpoint reports MTN MoMo, Airtel Money and card, and the pay page renders all three; `our_ref` is sent as `tx_ref` and the returned id lands in `provider_ref`.
-- **Cutover integrity (spec §6.18):** a database holding succeeded `mtn_momo_direct` payments still returns correct `booking_totals` after the switch, and an in-flight MTN webhook arriving post-switch is still accepted by the MTN handler — both routes stay mounted.
+- **Cutover integrity (spec §6.18):** a database holding succeeded `mtn_momo_direct` payments still returns correct totals after the switch, and an in-flight MTN webhook arriving post-switch is still accepted by the MTN handler — both routes stay mounted.
 - Refund flagging resolves against the payment's own `provider`, not the configured one.
 - The Flutterwave webhook verifies its signature against the raw body; a forged payload is stored `signature_valid = false` and applies nothing.
 - The runbook documents the switch, the rollback, and that card and Airtel acceptance testing is only possible after cutover (**R-3**).
@@ -475,7 +476,7 @@ Applies to every task; not repeated below.
 
 ## Coverage map
 
-Every spec §6 edge case has an owning task; none is owned twice.
+Every spec §6 edge case has an owning task. Four are split across two tasks — the mechanism in one, the failure behaviour in the other — and are marked below.
 
 | Spec ref | Task |
 |---|---|
@@ -489,11 +490,14 @@ Every spec §6 edge case has an owning task; none is owned twice.
 | §6.11 admin cancel/reschedule · §6.12 no-show · §6.16 refunds | 19 |
 | §6.13 price change after booking | 13 |
 | §6.15 post-shoot add-ons | 20 |
-| §6.17 calendar push failure | 14 (retry) + 22 (isolation) |
-| §6.18 provider cutover · §6.19 method gating | 25 (16 for the MTN half) |
+| §6.17 calendar push failure | 14 retry · 22 isolation — **split** |
+| §6.18 provider cutover · §6.19 method gating | 16 MTN half · 25 Flutterwave half — **split** |
 | §6.20 delivery expiry | 21 |
-| §6.22 spam · §6.23 login attack | 24 (7 for lockout) |
+| §6.22 spam | 24 |
+| §6.23 login attack | 7 lockout · 24 rate limit — **split** |
 
 ## Not in this plan, deliberately
 
 Out of scope per spec §4.2 and therefore absent by design: French content, SMS and WhatsApp, built-in photo hosting, two-way calendar sync, admin-created bookings with offline payment records (**R-1**), automated refunds, client-initiated rescheduling, custom booking form fields, reviews, discounts, multi-day bookings, accounting exports, native apps.
+
+Removed in revision 2.1 after the documentation audit, each because nothing in `brief.md` or `clien-answers.md` asked for it: TOTP two-factor and session-epoch revocation, the in-product offline invite link, scheduled data purging, uploads and blob storage, locale-prefixed routing and the no-hardcoded-strings rule, the `booking_totals` view, the four-rank webhook ladder, multi-worker outbox claiming, the availability response cache, the 30-row permission-matrix test, and a third-party error-tracking vendor. The exclusion constraint, the claim transaction, the price snapshots and Task 3's constraint tests were explicitly **not** cut — they cost about one task between them and they are the reason the client is paying for this.
