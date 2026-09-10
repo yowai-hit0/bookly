@@ -1,0 +1,15 @@
+{
+  "common": {
+    "appName": "Bookly"
+  },
+  "home": {
+    "apiStatus": "API: {{status}}",
+    "checking": "checking…",
+    "reachable": "reachable",
+    "recheck": "Check again"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "body": "That page does not exist."
+  }
+}
