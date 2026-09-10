@@ -13,7 +13,7 @@ function boot(): void {
     throw err;
   }
 
-  createApp().listen(env.PORT, () => {
+  createApp({ corsOrigin: env.WEB_ORIGIN }).listen(env.PORT, () => {
     console.log(`api listening on http://localhost:${env.PORT}`);
   });
 }
