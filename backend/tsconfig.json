@@ -15,5 +15,5 @@
     "skipLibCheck": true,
     "sourceMap": true
   },
-  "include": ["src", "eslint.config.js", "vitest.config.ts"]
+  "include": ["src", "eslint.config.js", "vitest.config.ts", "prisma.config.ts", "prisma/seed.ts"]
 }
