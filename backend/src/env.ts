@@ -18,6 +18,10 @@ const schema = z.object({
   WEB_ORIGIN: z.url(),
   /** Deploy configuration, never a database row (data-model_v2.md §5.2). */
   PAYMENT_PROVIDER: z.enum(['mtn_momo_direct', 'flutterwave']).default('mtn_momo_direct'),
+  /** HS256 key that signs admin bearer tokens (plan.md Task 7). jose enforces no
+   *  minimum key length, so this floor is the only one. Rotating it invalidates
+   *  every issued token -- the only "revoke everything" there is. */
+  SESSION_SECRET: z.string().min(32),
 });
 
 export type Env = z.infer<typeof schema>;

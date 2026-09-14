@@ -24,12 +24,14 @@ describe('the API', () => {
   describe('CORS', () => {
     const corsOrigin = 'https://bookly.example';
 
-    it('echoes the allowed origin and allows credentials', async () => {
+    it('echoes the allowed origin and allows no credentials', async () => {
       const res = await request(createApp({ corsOrigin }))
         .get('/api/health')
         .set('Origin', corsOrigin);
       expect(res.headers['access-control-allow-origin']).toBe(corsOrigin);
-      expect(res.headers['access-control-allow-credentials']).toBe('true');
+      // Admin auth is a bearer token, not a cookie (plan.md Task 7, rev 2.3), so
+      // nothing needs the browser to attach credentials.
+      expect(res.headers['access-control-allow-credentials']).toBeUndefined();
     });
 
     it('sends no Allow-Origin header to an unlisted origin', async () => {

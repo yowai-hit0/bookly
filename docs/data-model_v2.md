@@ -316,7 +316,7 @@ erDiagram
 
 One row. The photographer.
 
-**No TOTP, no `session_epoch`.** Both were invented — neither the brief nor the client's answers mention admin security at all. For a single user, "log out everywhere" is closing one browser, and a changed password already invalidates the cookie because the signature covers the password hash. Argon2id plus the lockout in §5.1 is proportionate.
+**No TOTP, no `session_epoch`.** Both were invented — neither the brief nor the client's answers mention admin security at all. For a single user, "log out everywhere" is closing one browser, and a changed password already invalidates every admin token, because each carries an HMAC fingerprint of the password hash (spec §7). Argon2id plus the lockout in §5.1 is proportionate.
 
 | Column | Type | Null | Default | Notes |
 |---|---|:---:|---|---|

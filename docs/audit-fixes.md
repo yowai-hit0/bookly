@@ -117,3 +117,39 @@ cross-origin.
 - `backend/` no longer serves the built frontend at all; it is API-only. The
   static-serving block that was in `backend/src/app.ts` and its unused imports
   have been removed, not toggled behind an environment check.
+
+---
+
+## 9. Addendum — revision 2.3: bearer tokens replace the session cookie
+
+This does not rewrite §8 above. §8 is an accurate record of what revision 2.2
+decided: a `SameSite=None; Secure` admin session cookie, with a double-submit
+CSRF token to replace what `SameSite=Lax` had provided for free. That design
+was built as Task 7 and is superseded by `specs_v2.md` revision 2.3.
+
+- **Admin auth is a JWT in `Authorization: Bearer`.** HS256 via `jose`, 8 hours,
+  issuer- and audience-scoped, algorithm pinned on verification. It is returned
+  in the login response body, never set as a cookie. No cookie is involved in
+  admin auth at all.
+- **The CSRF token flow is removed, not moved.** A browser never attaches a
+  header the client sets in code, so a forged cross-site request arrives with no
+  credential and is a 401. There is nothing left for a CSRF token to protect.
+- **CORS stays allowlisted to `WEB_ORIGIN`, without credentials.** §8's
+  "credentials enabled" existed only for the cookie.
+- **Password-change revocation is kept.** The cookie's signature covered the
+  password hash; the token instead carries an HMAC fingerprint of it, checked
+  against the current hash on every request. A password change still revokes
+  every issued token on the next request.
+- **Logout is gone as an endpoint.** It only ever cleared cookies. A stateless
+  token cannot be revoked server-side, so signing out is the client discarding
+  it; revocation is a password change or rotating `SESSION_SECRET`.
+- **Two consequences worth naming.** The third-party-cookie blocking that would
+  have broken the admin session in Safari on a cross-site deployment no longer
+  applies, whatever the two domains are. In exchange, script on the admin UI can
+  read the token, so XSS matters more: the CSP in `specs_v2.md` §7 is now
+  load-bearing, and the admin UI keeps the token in memory or `sessionStorage`,
+  never `localStorage`.
+
+Updated to match: `specs_v2.md` revision row, §2.2 enforcement and §7 (Security,
+Implementation stack); `plan.md` Stack decisions (Admin session, Auth transport)
+and Task 7; `data-model_v2.md` §5.1.

@@ -15,7 +15,17 @@ function boot(): void {
     throw err;
   }
 
-  const server = createApp({ corsOrigin: env.WEB_ORIGIN }).listen(env.PORT, () => {
+  const app = createApp({
+    corsOrigin: env.WEB_ORIGIN,
+    admin: {
+      prisma,
+      sessionSecret: env.SESSION_SECRET,
+      webOrigin: env.WEB_ORIGIN,
+      now: () => new Date(),
+    },
+  });
+
+  const server = app.listen(env.PORT, () => {
     console.log(`api listening on http://localhost:${env.PORT}`);
   });
 

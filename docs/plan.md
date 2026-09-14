@@ -32,8 +32,8 @@ Applies to every task; not repeated below.
 |---|---|---|
 | Migrations | Prisma migrations, SQL hand-edited before applying | The exclusion constraint, partial indexes, CHECKs and the view are not expressible in Prisma's DSL |
 | Booking totals | One exported `bookingTotals()` function, status-aware | A view could not express "nothing is owed on a no-show" and would sit outside Prisma's types |
-| Admin session | Signed `HttpOnly` cookie, 8 h. No TOTP, no session-epoch column | One user. A changed password already invalidates the cookie; "log out everywhere" is closing a browser |
-| Auth transport | Cross-site. `SameSite=None; Secure` session cookie, a CORS allowlist scoped to `WEB_ORIGIN` (credentials enabled, origin echoed, never `*`), and a CSRF token flow on state-changing admin requests | Frontend and backend are two separately-deployed apps on two separate domains — `SameSite=Lax` can't apply, so the cookie needs a CSRF defence to replace what it used to provide for free |
+| Admin session | JWT (HS256, signed with `SESSION_SECRET`), 8 h, sent as `Authorization: Bearer`. Stateless: no session table, no TOTP, no session-epoch column. Carries an HMAC fingerprint of the password hash | One user. A changed password invalidates every issued token (its fingerprint stops matching); rotating `SESSION_SECRET` invalidates all of them. No server-side logout — signing out is the client discarding its token |
+| Auth transport | Cross-site. Bearer token in the `Authorization` header — no cookie is involved in admin auth, so there is no CSRF token flow. A CORS allowlist scoped to `WEB_ORIGIN` (origin echoed, never `*`, credentials **not** enabled) | Frontend and backend are two separately-deployed apps on two separate domains. A header the client attaches in code is never sent by the browser on its own, so a forged cross-site request carries no credential: CSRF is removed rather than defended against, and browsers' third-party-cookie blocking no longer applies. The cost moves to XSS — script on the admin UI can read the token — so the CSP (Task 24) carries more weight |
 | Tests | Vitest against the local PostgreSQL instance · Playwright for E2E | The critical logic is database behaviour; mocking the database would test nothing |
 | Background work | `node-cron` inside the API process, single worker loop | One instance. Multi-worker claiming solves concurrency this deployment does not have |
 | Email provider | Resend behind a `MailProvider` interface | Not named in the spec. Swappable in one file |
@@ -146,20 +146,21 @@ Applies to every task; not repeated below.
 
 ## Task 7 — Admin authentication and API session layer
 
-**Goal.** Email/password login with lockout and emailed reset, plus the session cookie every later admin endpoint depends on (spec §2.1, §6.23, A-11).
+**Goal.** Email/password login with lockout and emailed reset, plus the bearer-token (JWT) session every later admin endpoint depends on (spec §2.1, §6.23, A-11).
 
 **Dependencies.** Task 4.
 
 **Verification.**
-- Correct credentials set a session cookie with `HttpOnly`, `Secure`, `SameSite=None` — asserted on the `Set-Cookie` header. `SameSite=None` is mandatory here: the admin UI and the API are cross-site (separate domains), and `Secure` was already required, so this costs nothing extra.
+- Correct credentials return a JWT in the response body — `HS256`, issuer- and audience-scoped, 8 h `exp` — with `tokenType: 'Bearer'` and `Cache-Control: no-store`, and set **no cookie of any kind**, asserted by the absence of `Set-Cookie`.
 - Wrong password increments `failed_login_count`; past the threshold `locked_until` is set and correct credentials are still refused until it passes.
-- Changing the password invalidates any already-issued cookie on the next request, because the signature covers the password hash.
-- `GET /api/admin/*` unauthenticated returns 401 with no redirect.
-- Because the cookie is `SameSite=None`, it rides along with cross-site requests, so CSRF protection is an explicit token, not a `SameSite` side effect: a state-changing admin request with a valid session cookie but a missing or invalid CSRF token is rejected (403) before it touches business logic — asserted directly, plus a request bearing a foreign `Origin` header and no token.
+- Changing the password invalidates any already-issued token on the next request, because the token carries an HMAC fingerprint of the password hash that `requireAdmin` checks against the current one.
+- `GET /api/admin/*` without a valid `Authorization: Bearer` token returns 401 with a `WWW-Authenticate: Bearer` challenge and no redirect.
+- The token is read from the `Authorization` header only — never a cookie, the query string or another header — and verification pins `HS256`: `alg: none`, any other algorithm, a wrong issuer or audience, a missing `exp`, and an expired, tampered or foreign-secret token are each a 401, never a 500. A cross-site request bearing a foreign `Origin` and whatever cookies the browser holds is a 401 — the bearer design has no ambient credential, so there is no CSRF token to test for. Asserted directly, and the CORS allowlist is asserted never to allow credentials.
 - Password reset stores only a hash; the emailed token works once and is rejected on reuse and after expiry.
 - `password_hash` appears in no API response — asserted by serialising the admin user through the public mapper.
+- **Docs agree with code.** `specs_v2.md` §2.2 and §7, this plan's Stack decisions and this task, `data-model_v2.md` §5.1 and `audit-fixes.md` §9 describe bearer-token auth. No current-design passage in `docs/` describes an admin session cookie or a CSRF token flow — checked by grep; historical records (revision rows, `audit-fixes.md` §4 and §8, `old-drafts/`) keep what earlier revisions decided.
 
-**Assumptions.** Argon2id via `@node-rs/argon2`. Lockout escalates 1 → 5 → 15 minutes; the spec says "rising interval" without values. No TOTP — removed in revision 2.1 as untraceable to any client requirement. CSRF defence is a double-submit cookie token (implementer's choice vs. a synchronizer token) issued alongside the session and checked on every non-GET `/api/admin/*` route — reinstated in revision 2.2, since cross-site cookies need it now that `SameSite=Lax` can't provide it for free. Every admin-authenticated `fetch` from the frontend must also send `credentials: 'include'`, starting with whichever task builds the admin login screen — flagged here, not built here.
+**Assumptions.** Argon2id via `@node-rs/argon2`. Lockout escalates 1 → 5 → 15 minutes; the spec says "rising interval" without values. No TOTP — removed in revision 2.1 as untraceable to any client requirement. JWTs via `jose`, not `jsonwebtoken`: ESM-native, actively maintained, and without `jsonwebtoken`'s history of algorithm-confusion footguns. HS256, because one service both issues and verifies. `jose` enforces no minimum HMAC key length, so the 32-character floor on `SESSION_SECRET` is the only guard and must not be relaxed. There is no logout endpoint: a stateless token cannot be revoked server-side, so signing out is the client discarding it, and revocation is a password change or a `SESSION_SECRET` rotation. The admin UI must hold the token and send `Authorization: Bearer` on every admin request — in memory, or `sessionStorage` so a reload does not sign him out, never `localStorage` — starting with whichever task builds the admin login screen; flagged here, not built here. **Revision 2.3** replaced the 2.2 design (a `SameSite=None` session cookie plus a double-submit CSRF token) — see `audit-fixes.md` §9.
 
 ---
 
