@@ -20,12 +20,19 @@ export type AdminSession = z.infer<typeof sessionSchema>
 
 /** The stored session, or null if there is none, it is unreadable, or it has expired. */
 export function readSession(now: Date = new Date()): AdminSession | null {
+  let raw: string | null
+  try {
+    raw = sessionStorage.getItem(STORAGE_KEY)
+  } catch {
+    return null
+  }
+  if (raw === null) return null
+
   let parsed: unknown
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
-    if (raw === null) return null
     parsed = JSON.parse(raw)
   } catch {
+    clearSession()
     return null
   }
 

@@ -43,8 +43,18 @@ const dayHeadingFormatter = new Intl.DateTimeFormat('en-GB', {
 })
 const weekdayFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short' })
 
+/** Years below 100 are refused because the API refuses them (its engine's
+ *  `Date.UTC` reads them as 19xx); accepting one here would request a range
+ *  that can only fail, instead of falling back to today. */
+const MIN_YEAR = 100
+
 export function isKigaliDate(value: string): boolean {
-  return DATE_PATTERN.test(value) && !Number.isNaN(utcMidnight(value)) && toDate(utcMidnight(value)) === value
+  return (
+    DATE_PATTERN.test(value) &&
+    Number(value.slice(0, 4)) >= MIN_YEAR &&
+    !Number.isNaN(utcMidnight(value)) &&
+    toDate(utcMidnight(value)) === value
+  )
 }
 
 /** The Kigali calendar date an instant falls on. */
