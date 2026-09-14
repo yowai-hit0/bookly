@@ -11,5 +11,43 @@
   "notFound": {
     "title": "Page not found",
     "body": "That page does not exist."
+  },
+  "admin": {
+    "signIn": {
+      "title": "Admin sign in",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "submitting": "Signing in…",
+      "invalid": "That email and password did not work.",
+      "failed": "Could not sign in. Check your connection and try again."
+    },
+    "nav": {
+      "signOut": "Sign out"
+    },
+    "calendar": {
+      "timezoneNote": "All times are Kigali time (UTC+2).",
+      "views": {
+        "month": "Month",
+        "week": "Week",
+        "day": "Day"
+      },
+      "previous": "Previous",
+      "next": "Next",
+      "today": "Today",
+      "loading": "Loading calendar…",
+      "loadFailed": "Could not load the calendar.",
+      "retry": "Try again",
+      "empty": "Nothing scheduled.",
+      "allDay": "All day",
+      "conflict": "Conflicts with a block",
+      "status": {
+        "confirmed": "Confirmed",
+        "pending_payment": "Hold",
+        "completed": "Completed",
+        "no_show": "No-show",
+        "block": "Blocked"
+      }
+    }
   }
 }

@@ -1,6 +1,6 @@
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import { prisma as defaultPrisma } from '../db/client.js';
-import { readSettingRow } from './repository.js';
+import { readSettingRow, updateSettingRow } from './repository.js';
 
 /**
  * The five editable operating values (spec P-30), plus the two constants that
@@ -23,7 +23,34 @@ export { ACCESS_TOKEN_LIFETIME_DAYS, SLOT_GRANULARITY_MINUTES } from './constant
 
 /** The single accessor for the five operating values (plan.md Task 4). */
 export async function getSettings(prisma: PrismaClient = defaultPrisma): Promise<Settings> {
-  const row = await readSettingRow(prisma);
+  return toSettings(await readSettingRow(prisma));
+}
+
+/**
+ * Saves any subset of the five values and returns all five as stored (plan.md
+ * Task 8). Range rules are the caller's to enforce first; the database CHECKs
+ * behind this are a backstop, not the validation.
+ *
+ * Nothing already booked moves: a booking snapshotted its own buffer end and
+ * fee rate at creation (data-model_v2.md §5.9), so a changed buffer or rate
+ * applies to new bookings only.
+ */
+export async function updateSettings(
+  update: Partial<Settings>,
+  prisma: PrismaClient = defaultPrisma,
+): Promise<Settings> {
+  const { bookingFeeRate, ...rest } = update;
+  return toSettings(
+    await updateSettingRow(prisma, {
+      ...rest,
+      // numeric(4,3): written as a three-place string so no float reaches the
+      // column. Callers reject a fourth decimal place rather than have it round.
+      ...(bookingFeeRate === undefined ? {} : { bookingFeeRate: bookingFeeRate.toFixed(3) }),
+    }),
+  );
+}
+
+function toSettings(row: Prisma.SettingGetPayload<object>): Settings {
   return {
     bookingFeeRate: row.bookingFeeRate.toNumber(),
     minLeadTimeMinutes: row.minLeadTimeMinutes,

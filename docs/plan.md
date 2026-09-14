@@ -181,6 +181,8 @@ Applies to every task; not repeated below.
 - **Settings screen:** the booking-fee rate, minimum notice, hold duration, buffer and delivery-link lifetime are all editable and persist; each is range-validated server-side (a rate above 1 returns 422, not a `23514` from the database).
 - Changing the buffer does **not** move an existing booking's `buffer_ends_at` — asserted against a booking created before the edit.
 
+**Assumptions.** API only: no admin login screen exists yet (Task 7 deferred it), so the settings *screen* is its endpoint, and the UI arrives with whichever task builds the admin shell. Endpoints: `/api/admin/working-hours` and `/api/admin/blocks` (GET, POST, PUT `/:id`, DELETE `/:id`) and `/api/admin/settings` (GET, PATCH). One status rule for every admin write: **400** for a malformed payload (wrong type, unknown key, malformed date, both or neither of `weekday`/`effectiveDate`), **422** for a well-formed value outside its range. Full-day blocks arrive as inclusive Kigali dates and are converted server-side; partial blocks arrive as ISO instants with an explicit offset. The §6.4 warning measures overlap against a `confirmed` booking's session, not its buffer, and does not warn for a live `pending_payment` hold. The "public availability response" is `findAvailability()`, which never selects `reason`; the `GET /api/availability` route stays Task 12's and should return it unchanged. Settings carry no invented upper bounds beyond storage limits (`int4`, rate ≤ 1, three decimal places).
+
 ---
 
 ## Task 9 — Admin calendar views
@@ -195,6 +197,8 @@ Applies to every task; not repeated below.
 - One month issues a bounded number of Prisma queries (asserted with a query-event counter) and the endpoint returns in under 500 ms at p95 against a seeded 500-booking dataset (spec §7).
 - A booking overlapping a block renders with a conflict marker (the §6.4 aftermath).
 - Built from shadcn primitives; no third-party calendar widget is introduced.
+
+**Assumptions.** One endpoint, `GET /api/admin/calendar?from=&to=` (inclusive Kigali dates, at most 62 days), issuing two queries whatever the range holds. The calendar shows what occupies time: `confirmed`, `completed`, `no_show`, and `pending_payment` only while its hold is live; cancelled and expired bookings belong to the bookings list (Task 19). The conflict marker uses the same measure as the §6.4 warning: the booking's session overlapping a block, not its buffer. This task also builds the minimum admin shell the views need: `/admin/login`, the token in `sessionStorage`, and a layout that sends a signed-out visitor to login. Week and day views list each day's entries in time order rather than drawing an hourly grid. Playwright specs answer `/api/*` with `page.route` and emulate the browser zone with `timezoneId`, because the `TZ` variable is ignored by Chromium on Windows. `npm test` stays Vitest-only; browser tests run with `npm run test:e2e`.
 
 ---
 

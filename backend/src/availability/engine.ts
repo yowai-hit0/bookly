@@ -186,8 +186,9 @@ function addMinutes(instant: Date, minutes: number): Date {
   return new Date(instant.getTime() + minutes * MS_PER_MINUTE);
 }
 
-/** Minutes since Kigali midnight on `date`, as a UTC instant. */
-function kigaliMinuteToUtc(date: KigaliDate, minutesFromMidnight: number): Date {
+/** Minutes since Kigali midnight on `date`, as a UTC instant. `1440` is the
+ *  next day's midnight, which is how a whole day's end is expressed. */
+export function kigaliMinuteToUtc(date: KigaliDate, minutesFromMidnight: number): Date {
   const { year, month, day } = splitDate(date);
   return new Date(
     Date.UTC(year, month - 1, day, 0, minutesFromMidnight - KIGALI_UTC_OFFSET_MINUTES),
@@ -210,7 +211,7 @@ function splitDate(date: KigaliDate): { year: number; month: number; day: number
   return { year, month, day };
 }
 
-function assertKigaliDate(date: KigaliDate): void {
+export function assertKigaliDate(date: KigaliDate): void {
   if (!DATE_PATTERN.test(date)) {
     throw new RangeError(`Expected a YYYY-MM-DD Kigali date, received: ${date}`);
   }

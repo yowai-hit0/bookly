@@ -8,6 +8,9 @@ import {
 } from '../auth/admin-auth.js';
 import { adminLocals, requireAdmin } from '../auth/middleware.js';
 import { toPublicAdmin } from '../auth/public-admin.js';
+import { blocksRouter, workingHoursRouter } from './admin-availability.js';
+import { calendarRouter } from './admin-calendar.js';
+import { settingsRouter } from './admin-settings.js';
 
 /**
  * `/api/admin/*` (plan.md Task 7, revision 2.3).
@@ -106,6 +109,14 @@ export function adminRouter(deps: AuthDeps): Router {
   router.get('/me', (_req, res) => {
     res.json({ admin: toPublicAdmin(adminLocals(res).admin) });
   });
+
+  // Availability and settings (Task 8).
+  router.use('/working-hours', workingHoursRouter(deps.prisma));
+  router.use('/blocks', blocksRouter(deps.prisma));
+  router.use('/settings', settingsRouter(deps.prisma));
+
+  // Calendar views (Task 9).
+  router.use('/calendar', calendarRouter(deps.prisma, deps.now));
 
   return router;
 }

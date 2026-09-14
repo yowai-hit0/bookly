@@ -1,7 +1,8 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 
 /**
- * The only code in the project that touches the `setting` table for a read.
+ * The only code in the project that touches the `setting` table for a read or
+ * an edit.
  * `settings/index.ts` is the only permitted importer of this module -- proven
  * by a test that scans `src/` for any other import of it -- so a fee rate, a
  * notice period, a hold duration, a buffer or an expiry can be read from
@@ -17,4 +18,12 @@ export function readSettingRow(prisma: PrismaClient): Promise<Prisma.SettingGetP
   // missing row means the seed never ran rather than a state this function
   // should paper over.
   return prisma.setting.findUniqueOrThrow({ where: { id: 1 } });
+}
+
+/** The settings screen's save (spec P-30). Same missing-row rule as the read. */
+export function updateSettingRow(
+  prisma: PrismaClient,
+  data: Prisma.SettingUpdateInput,
+): Promise<Prisma.SettingGetPayload<object>> {
+  return prisma.setting.update({ where: { id: 1 }, data });
 }
