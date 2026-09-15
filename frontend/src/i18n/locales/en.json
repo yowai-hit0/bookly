@@ -23,9 +23,13 @@
       "failed": "Could not sign in. Check your connection and try again."
     },
     "nav": {
+      "label": "Admin",
+      "calendar": "Calendar",
+      "catalogue": "Catalogue",
       "signOut": "Sign out"
     },
     "calendar": {
+      "title": "Calendar",
       "timezoneNote": "All times are Kigali time (UTC+2).",
       "views": {
         "month": "Month",
@@ -38,7 +42,6 @@
       "loading": "Loading calendar…",
       "loadFailed": "Could not load the calendar.",
       "retry": "Try again",
-      "empty": "Nothing scheduled.",
       "allDay": "All day",
       "conflict": "Conflicts with a block",
       "status": {
@@ -47,6 +50,86 @@
         "completed": "Completed",
         "no_show": "No-show",
         "block": "Blocked"
+      }
+    },
+    "catalogue": {
+      "title": "Catalogue",
+      "intro": "What clients can book. Changes apply to new bookings only; existing bookings keep what they were sold.",
+      "loading": "Loading catalogue…",
+      "loadFailed": "Could not load the catalogue.",
+      "retry": "Try again",
+      "empty": "No services yet. Add the first one.",
+      "addService": "Add service",
+      "newService": "New service",
+      "editService": "Edit service",
+      "packages": "Packages",
+      "noPackages": "No packages yet.",
+      "addPackage": "Add package",
+      "newPackage": "New package",
+      "editPackage": "Edit package",
+      "addons": "Add-ons",
+      "noAddons": "No add-ons yet.",
+      "addAddon": "Add add-on",
+      "newAddon": "New add-on",
+      "editAddon": "Edit add-on",
+      "sharedAddons": "Add-ons for every service",
+      "sharedAddonsHint": "Offered alongside every service's own add-ons.",
+      "active": "Active",
+      "inactive": "Inactive",
+      "edit": "Edit",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "delete": "Delete",
+      "editNamed": "Edit {{name}}",
+      "activateNamed": "Activate {{name}}",
+      "deactivateNamed": "Deactivate {{name}}",
+      "deleteNamed": "Delete {{name}}",
+      "save": "Save",
+      "create": "Create",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "confirmDelete": "Delete {{name}}? This cannot be undone.",
+      "inUse": "That can't be deleted because bookings or packages still use it. Deactivate it instead.",
+      "actionFailed": "That change didn't save. Try again.",
+      "saveFailed": "Could not save. Try again.",
+      "feeDefault": "Default booking fee",
+      "feeOverride": "Booking fee {{percent}}%",
+      "order": "Order {{order}}",
+      "photos_one": "{{count}} photo",
+      "photos_other": "{{count}} photos",
+      "duration": "{{minutes}} min",
+      "durationWarning": "{{name}} lasts {{minutes}} min, longer than the longest open day ({{opens}}–{{closes}}, {{longest}} min). Clients will never find a slot for it.",
+      "durationWarningNoHours": "{{name}} is saved, but no day is open at all, so clients will never find a slot for it.",
+      "fields": {
+        "nameEn": "Name",
+        "slug": "URL slug",
+        "descriptionEn": "Description",
+        "coverImageUrl": "Cover image URL",
+        "bookingFeePercent": "Booking fee override (%)",
+        "sortOrder": "Display order",
+        "isActive": "Active (visible to clients)",
+        "priceRwf": "Price (RWF)",
+        "photoCount": "Photos",
+        "durationMinutes": "Duration (minutes)"
+      },
+      "hints": {
+        "slug": "Lowercase letters, numbers and hyphens, e.g. corporate-events.",
+        "coverImageUrl": "Paste an https link to an image hosted elsewhere.",
+        "bookingFeePercent": "Leave blank to use the global rate.",
+        "sortOrder": "Lower numbers show first.",
+        "priceRwf": "Whole RWF, digits only."
+      },
+      "invalid": {
+        "nameEn": "Enter a name, up to 200 characters.",
+        "slug": "Use lowercase letters, numbers and single hyphens.",
+        "slugTaken": "Another service already uses this slug.",
+        "descriptionEn": "Keep the description under 5,000 characters.",
+        "coverImageUrl": "Enter a full https:// link, or leave it blank.",
+        "bookingFeePercent": "Enter a percentage from 0 to 100, with one decimal place at most.",
+        "sortOrder": "Enter a whole number, 0 or more.",
+        "priceRwf": "Enter a whole number of RWF, 0 or more.",
+        "photoCount": "Enter a whole number, 0 or more.",
+        "durationMinutes": "Enter a whole number of minutes, at least 1."
       }
     }
   }

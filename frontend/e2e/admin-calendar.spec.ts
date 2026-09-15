@@ -2,9 +2,9 @@ import { type Page, expect, test } from '@playwright/test'
 
 /**
  * The admin calendar in Chromium (plan.md Task 9; spec §3.3 step 1, §6.4,
- * §6.5). The API is answered here with `page.route`; the browser clock is
- * fixed; the browser zone is emulated with `timezoneId`, since Chromium ignores
- * the `TZ` variable on Windows.
+ * §6.5), drawn by FullCalendar. The API is answered here with `page.route`;
+ * the browser clock is fixed; the browser zone is emulated with `timezoneId`,
+ * since Chromium ignores the `TZ` variable on Windows.
  *
  * The clock is 2026-10-06 22:30 UTC: 00:30 on Wednesday 7 October in Kigali,
  * but still Tuesday 6 October, 18:30, in New York.
@@ -76,12 +76,12 @@ const OCTOBER = {
 }
 
 /** What the October month grid must show, identically in every browser zone. */
-const MONTH_ENTRIES: [day: string, status: string, texts: string[]][] = [
-  ['Wed 7 Oct', 'confirmed', ['09:00', 'Grace Mukamana', 'Confirmed', 'Conflicts with a block']],
-  ['Wed 7 Oct', 'block', ['09:30–11:00', 'Blocked']],
-  ['Thu 8 Oct', 'pending_payment', ['01:00', 'Claudine Ingabire', 'Hold']],
-  ['Thu 15 Oct', 'confirmed', ['14:00', 'Eric Habimana', 'Confirmed']],
-  ['Fri 23 Oct', 'confirmed', ['23:30', 'Divine Uwera', 'Confirmed']],
+const MONTH_ENTRIES: [date: string, status: string, texts: string[]][] = [
+  ['2026-10-07', 'confirmed', ['09:00', 'Grace Mukamana', 'Confirmed', 'Conflicts with a block']],
+  ['2026-10-07', 'block', ['09:30', 'Blocked']],
+  ['2026-10-08', 'pending_payment', ['01:00', 'Claudine Ingabire', 'Hold']],
+  ['2026-10-15', 'confirmed', ['14:00', 'Eric Habimana', 'Confirmed']],
+  ['2026-10-23', 'confirmed', ['23:30', 'Divine Uwera', 'Confirmed']],
 ]
 
 type CalendarRequest = { from: string | null; to: string | null; authorization: string | null }
@@ -124,17 +124,25 @@ async function seedSession(page: Page) {
   )
 }
 
-/** Every rendered entry as [day, status, visible text], in DOM order. */
+/** Every rendered booking or block as the Kigali date of its cell, its status and its text. */
 function renderedEntries(page: Page) {
-  return page.locator('section[aria-label]').evaluateAll((sections) =>
-    sections.flatMap((section) =>
-      Array.from(section.querySelectorAll('li')).map((item) => ({
-        day: section.getAttribute('aria-label') ?? '',
-        status: item.dataset.status ?? '',
-        text: item.innerText.replace(/\s+/g, ' ').trim(),
-      })),
-    ),
+  return page.locator('[data-kind]').evaluateAll((elements) =>
+    elements.map((element) => ({
+      date: element.closest('[data-date]')?.getAttribute('data-date') ?? '',
+      status: element.getAttribute('data-status') ?? '',
+      text: (element as HTMLElement).innerText.replace(/\s+/g, ' ').trim(),
+    })),
   )
+}
+
+function toolbarButton(page: Page, name: string) {
+  return page.getByRole('button', { name, exact: true })
+}
+
+/** Distinct consecutive ranges: the dev server's StrictMode mounts the calendar twice. */
+function distinctRanges(requests: CalendarRequest[]): string[] {
+  const ranges = requests.map(({ from, to }) => `${from}/${to}`)
+  return ranges.filter((range, index) => range !== ranges[index - 1])
 }
 
 test.beforeEach(async ({ page }) => {
@@ -160,32 +168,28 @@ for (const [timezoneId, localHourAtNow] of [
         await page.evaluate(() => [Intl.DateTimeFormat().resolvedOptions().timeZone, new Date().getHours()]),
       ).toEqual([timezoneId, localHourAtNow])
 
-      await expect(page.getByRole('heading', { level: 1, name: 'October 2026' })).toBeVisible()
-      await expect(page.getByRole('listitem')).toHaveCount(5)
+      await expect(page.locator('.fc-toolbar-title')).toHaveText('October 2026')
+      await expect(page.locator('[data-kind]')).toHaveCount(5)
       const entries = await renderedEntries(page)
-      expect(entries.map(({ day, status }) => [day, status])).toEqual(MONTH_ENTRIES.map(([day, status]) => [day, status]))
+      expect(entries.map(({ date, status }) => [date, status])).toEqual(MONTH_ENTRIES.map(([date, status]) => [date, status]))
       for (const [index, [, , texts]] of MONTH_ENTRIES.entries()) {
         for (const text of texts) expect(entries[index]?.text).toContain(text)
       }
-      await expect(page.getByRole('region', { name: 'Wed 7 Oct' }).getByRole('button')).toHaveAttribute('aria-current', 'date')
+      // "Today" is Kigali's today, whatever date the browser's zone is on.
+      await expect(page.locator('.fc-daygrid-day.fc-day-today')).toHaveAttribute('data-date', '2026-10-07')
 
       await page.goto('/admin/calendar?view=week&date=2026-10-07')
 
-      const thursday = page.getByRole('region', { name: 'Thu 8 Oct' })
-      await expect(thursday.getByRole('listitem')).toHaveCount(1)
-      await expect(thursday).toContainText('01:00–02:00')
-      await expect(page.getByRole('region', { name: 'Wed 7 Oct' })).toContainText('09:00–10:00')
-      await expect(page.getByRole('region', { name: 'Wed 7 Oct' })).not.toContainText('Claudine Ingabire')
+      const thursday = page.locator('.fc-timegrid-col[data-date="2026-10-08"] [data-kind]')
+      await expect(thursday).toHaveCount(1)
+      await expect(thursday).toContainText('01:00 - 02:00')
+      await expect(thursday).toContainText('Claudine Ingabire')
+      await expect(page.locator('.fc-timegrid-col[data-date="2026-10-07"] [data-kind="booking"]')).toContainText('09:00 - 10:00')
 
       await page.goto('/admin/calendar?view=week&date=2026-10-23')
 
-      await expect(page.getByRole('region', { name: 'Fri 23 Oct' })).toContainText('23:30–00:00')
-      await expect(page.getByRole('region', { name: 'Sat 24 Oct' })).toContainText('Nothing scheduled.')
-
-      // "Today" is Kigali's today, whatever date the browser's zone is on.
-      await page.goto('/admin/calendar?view=day')
-
-      await expect(page.getByRole('heading', { level: 1, name: 'Wed 7 Oct' })).toBeVisible()
+      await expect(page.locator('.fc-timegrid-col[data-date="2026-10-23"] [data-kind]')).toContainText('23:30 - 00:00')
+      await expect(page.locator('.fc-timegrid-col[data-date="2026-10-24"] [data-kind]')).toHaveCount(0)
     })
   })
 }
@@ -199,51 +203,50 @@ test('marks the booking that overlaps a block with a visible conflict marker', a
   const marker = page.getByText('Conflicts with a block')
   await expect(marker).toHaveCount(1)
   await expect(marker).toBeVisible()
-  await expect(page.getByRole('listitem').filter({ has: marker })).toContainText('Grace Mukamana')
+  await expect(page.locator('[data-kind]').filter({ has: marker })).toContainText('Grace Mukamana')
+  await expect(page.locator('.bookly-event--conflict')).toHaveCount(1)
 })
 
-test('switches between month, week and day, fetching each visible range', async ({ page }) => {
+test('switches views and dates with the toolbar, fetching only ranges it does not hold', async ({ page }) => {
   await seedSession(page)
   const requests = await mockApi(page)
 
   await page.goto('/admin/calendar?view=month&date=2026-10-07')
-  await expect(page.getByRole('listitem')).toHaveCount(5)
+  await expect(page.locator('[data-kind]')).toHaveCount(5)
+  await expect(page).toHaveURL(/\?view=month&date=2026-10-01$/)
 
-  await page.getByRole('tab', { name: 'Week' }).click()
+  await toolbarButton(page, 'Week').click()
 
-  await expect(page).toHaveURL(/\?view=week&date=2026-10-07$/)
-  await expect(page.getByRole('heading', { level: 1, name: 'Mon 5 Oct – Sun 11 Oct' })).toBeVisible()
-  await expect(page.getByRole('region')).toHaveCount(7)
+  await expect(page).toHaveURL(/\?view=week&date=2026-10-05$/)
+  await expect(page.locator('.fc-toolbar-title')).toHaveText('5 – 11 Oct 2026')
   await expect(page.getByText('Wedding · Full day · BKY-2610-00001')).toBeVisible()
   await expect(page.getByText('Clinic')).toBeVisible()
+  // The hourly grid opens scrolled to the working day.
+  await expect
+    .poll(() => page.locator('.fc-timegrid-body').evaluate((body) => body.closest('.fc-scroller')?.scrollTop ?? 0))
+    .toBeGreaterThan(0)
 
-  await page.getByRole('tab', { name: 'Day' }).click()
+  await toolbarButton(page, 'Day').click()
 
-  await expect(page.getByRole('heading', { level: 1, name: 'Wed 7 Oct' })).toBeVisible()
-  await expect(page.getByRole('listitem')).toHaveCount(2)
+  // The day view keeps the date the calendar was opened on, not the week's Monday.
+  await expect(page).toHaveURL(/\?view=day&date=2026-10-07$/)
+  await expect(page.locator('[data-kind]')).toHaveCount(2)
 
-  await page.getByRole('button', { name: 'Next' }).click()
-
-  await expect(page.getByRole('heading', { level: 1, name: 'Thu 8 Oct' })).toBeVisible()
-  await expect(page.getByRole('listitem')).toHaveCount(1)
-
-  await page.getByRole('tab', { name: 'Month' }).click()
-  await page.getByRole('region', { name: 'Thu 15 Oct' }).getByRole('button', { name: '15' }).click()
+  await toolbarButton(page, 'Month').click()
+  await page.locator('.fc-daygrid-day[data-date="2026-10-15"] .fc-daygrid-day-number').click()
 
   await expect(page).toHaveURL(/\?view=day&date=2026-10-15$/)
-  await expect(page.getByRole('listitem')).toHaveCount(1)
+  await expect(page.locator('[data-kind]')).toHaveCount(1)
+  await expect(page.locator('[data-kind]')).toContainText('Eric Habimana')
 
-  // Consecutive repeats collapsed: the dev server runs React's StrictMode, whose
-  // simulated remount starts, aborts and restarts the first request.
-  const ranges = requests.map(({ from, to }) => `${from}/${to}`)
-  expect(ranges.filter((range, index) => range !== ranges[index - 1])).toEqual([
-    '2026-09-28/2026-11-01',
-    '2026-10-05/2026-10-11',
-    '2026-10-07/2026-10-07',
-    '2026-10-08/2026-10-08',
-    '2026-09-28/2026-11-01',
-    '2026-10-15/2026-10-15',
-  ])
+  await toolbarButton(page, 'Month').click()
+  await toolbarButton(page, 'Next').click()
+
+  await expect(page).toHaveURL(/\?view=month&date=2026-11-01$/)
+  await expect(page.locator('.fc-toolbar-title')).toHaveText('November 2026')
+
+  // Week and day views sat inside the month already fetched; only November is new.
+  await expect.poll(() => distinctRanges(requests)).toEqual(['2026-09-28/2026-11-01', '2026-10-26/2026-12-06'])
   expect(new Set(requests.map(({ authorization }) => authorization))).toEqual(new Set([`Bearer ${SESSION.token}`]))
 })
 
@@ -268,9 +271,10 @@ test.describe('signing in', () => {
       email: 'photographer@bookly.example',
       password: 'correct horse battery staple',
     })
-    await expect(page).toHaveURL(/\/admin\/calendar$/)
-    await expect(page.getByRole('heading', { level: 1, name: 'October 2026' })).toBeVisible()
-    await expect(page.getByRole('listitem')).toHaveCount(5)
+    await expect(page).toHaveURL(/\/admin\/calendar\?view=month&date=2026-10-01$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Calendar' })).toBeVisible()
+    await expect(page.locator('.fc-toolbar-title')).toHaveText('October 2026')
+    await expect(page.locator('[data-kind]')).toHaveCount(5)
     expect(requests.at(-1)).toEqual({ from: '2026-09-28', to: '2026-11-01', authorization: `Bearer ${SESSION.token}` })
     expect(
       await page.evaluate((key) => [window.sessionStorage.getItem(key), window.localStorage.length], SESSION_KEY),
@@ -278,7 +282,7 @@ test.describe('signing in', () => {
 
     // sessionStorage survives a reload, so he stays signed in.
     await page.reload()
-    await expect(page.getByRole('listitem')).toHaveCount(5)
+    await expect(page.locator('[data-kind]')).toHaveCount(5)
 
     await page.getByRole('button', { name: 'Sign out' }).click()
 

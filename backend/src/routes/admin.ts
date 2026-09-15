@@ -10,6 +10,7 @@ import { adminLocals, requireAdmin } from '../auth/middleware.js';
 import { toPublicAdmin } from '../auth/public-admin.js';
 import { blocksRouter, workingHoursRouter } from './admin-availability.js';
 import { calendarRouter } from './admin-calendar.js';
+import { catalogueRouter } from './admin-catalogue.js';
 import { settingsRouter } from './admin-settings.js';
 
 /**
@@ -117,6 +118,9 @@ export function adminRouter(deps: AuthDeps): Router {
 
   // Calendar views (Task 9).
   router.use('/calendar', calendarRouter(deps.prisma, deps.now));
+
+  // Catalogue CMS (Task 10).
+  router.use(catalogueRouter(deps.prisma, deps.now));
 
   return router;
 }

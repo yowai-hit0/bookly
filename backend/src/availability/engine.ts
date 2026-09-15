@@ -201,6 +201,11 @@ function kigaliWeekday(date: KigaliDate): number {
   return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
 }
 
+/** The Kigali calendar date an instant falls on. */
+export function kigaliDateOf(instant: Date): KigaliDate {
+  return toKigaliDate(new Date(instant.getTime() + KIGALI_UTC_OFFSET_MINUTES * MS_PER_MINUTE));
+}
+
 /** Prisma reads a `@db.Date` as UTC midnight, so the date part is the day. */
 function toKigaliDate(value: Date): KigaliDate {
   return value.toISOString().slice(0, 10);

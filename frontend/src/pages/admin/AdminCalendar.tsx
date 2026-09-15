@@ -1,138 +1,245 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import type { CalendarOptions, DatesSetArg, EventContentArg, EventSourceFuncArg, FormatterInput } from '@fullcalendar/core'
+import enGbLocale from '@fullcalendar/core/locales/en-gb'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import luxonPlugin from '@fullcalendar/luxon3'
+import FullCalendar from '@fullcalendar/react'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import { TriangleAlert } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router'
 import { UnauthenticatedError, adminFetch } from '@/admin/api'
-import {
-  CALENDAR_VIEWS,
-  type CalendarView,
-  type KigaliDate,
-  formatDayHeading,
-  formatMonthTitle,
-  isKigaliDate,
-  kigaliDateOf,
-  stepDate,
-  visibleRange,
-} from '@/admin/calendar-dates'
+import { CALENDAR_VIEWS, type CalendarView, isKigaliDate, kigaliDateOf } from '@/admin/calendar-dates'
+import { type CalendarData, type CalendarEntry, kigaliRangeOf, toEventInputs } from '@/admin/calendar-events'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { type CalendarData, DayView, MonthView, WeekView } from './CalendarViews'
+import { TIME_ZONE } from '@/lib/format'
 
 /**
  * The admin calendar (plan.md Task 9, spec §3.3 step 1): bookings, live holds
- * and blocks in month, week or day view.
+ * and blocks in month, week and day views, drawn by FullCalendar.
  *
- * The view and date live in the URL (`?view=week&date=2026-10-07`), so a reload
- * or a shared link lands on the same page. Each view fetches exactly the days
- * it shows, in one request.
+ * FullCalendar runs in Africa/Kigali through its Luxon plugin, so every time
+ * and every day boundary is Kigali's whatever the browser's zone is (spec
+ * §6.5). It fetches exactly the range it shows, once per range, through the
+ * event source below.
+ *
+ * The URL records the view and date (`?view=week&date=2026-10-05`): they are
+ * read once to open the calendar there, and rewritten whenever he navigates,
+ * so a reload or a shared link lands on the same page.
  */
 
-/** A settled request, tagged with the range and attempt it answered. `data` is
- *  null when the request failed. */
-type Settled = { key: string; data: CalendarData | null }
+const PLUGINS = [luxonPlugin, dayGridPlugin, timeGridPlugin]
 
-const VIEW_COMPONENTS = { month: MonthView, week: WeekView, day: DayView } as const
+const FULLCALENDAR_VIEW: Record<CalendarView, string> = {
+  month: 'dayGridMonth',
+  week: 'timeGridWeek',
+  day: 'timeGridDay',
+}
+
+const HEADER_TOOLBAR = {
+  left: 'prev,next today',
+  center: 'title',
+  right: 'dayGridMonth,timeGridWeek,timeGridDay',
+}
+
+const TIME_FORMAT: FormatterInput = { hour: '2-digit', minute: '2-digit', hour12: false }
+
+const VIEW_OPTIONS: CalendarOptions['views'] = {
+  dayGridMonth: { dayHeaderFormat: { weekday: 'short' } },
+  timeGridWeek: { dayHeaderFormat: { weekday: 'short', day: 'numeric', month: 'short' } },
+  timeGridDay: { dayHeaderFormat: { weekday: 'long', day: 'numeric', month: 'long' } },
+}
+
+/**
+ * Month grows to fit its weeks. The hourly grids scroll inside this height and
+ * open at 08:00, so the working day is in view while 01:00 stays reachable.
+ * Set from the page, because FullCalendar ignores `height` given per view.
+ */
+const TIME_GRID_HEIGHT = 760
+const SCROLL_TIME = '08:00:00'
 
 function isView(value: string | null): value is CalendarView {
   return value !== null && (CALENDAR_VIEWS as readonly string[]).includes(value)
 }
 
+function viewOf(fullCalendarView: string): CalendarView {
+  return CALENDAR_VIEWS.find((view) => FULLCALENDAR_VIEW[view] === fullCalendarView) ?? 'month'
+}
+
 export function AdminCalendar() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
+  const calendarRef = useRef<FullCalendar>(null)
+  const [loading, setLoading] = useState(false)
+  const [failed, setFailed] = useState(false)
 
-  const today = kigaliDateOf(new Date())
-  const viewParam = params.get('view')
-  const dateParam = params.get('date')
-  const view: CalendarView = isView(viewParam) ? viewParam : 'month'
-  const date: KigaliDate = dateParam !== null && isKigaliDate(dateParam) ? dateParam : today
-  const { from, to } = visibleRange(view, date)
+  // Read once, on mount. From then on FullCalendar owns navigation and the URL
+  // follows it, so the two can never disagree.
+  const [initial] = useState(() => {
+    const view = params.get('view')
+    const date = params.get('date')
+    return {
+      view: FULLCALENDAR_VIEW[isView(view) ? view : 'month'],
+      date: date !== null && isKigaliDate(date) ? date : kigaliDateOf(new Date()),
+    }
+  })
 
-  const [attempt, setAttempt] = useState(0)
-  const [settled, setSettled] = useState<Settled | null>(null)
-  const requestKey = `${from}/${to}/${attempt}`
+  // Stable identities: a new function or object here would make FullCalendar
+  // reset the option, and a new event source would refetch.
+  const fetchEvents = useCallback(
+    async ({ startStr, endStr }: EventSourceFuncArg) => {
+      const { from, to } = kigaliRangeOf(startStr, endStr)
+      try {
+        const data = await adminFetch<CalendarData>(`/admin/calendar?from=${from}&to=${to}`)
+        setFailed(false)
+        return toEventInputs(data)
+      } catch (error) {
+        if (error instanceof UnauthenticatedError) navigate('/admin/login', { replace: true })
+        else setFailed(true)
+        throw error
+      }
+    },
+    [navigate],
+  )
 
+  // FullCalendar reports its first dates while it mounts, before this page's
+  // own effects have run -- too early to navigate. The URL is updated from an
+  // effect instead.
+  const [shown, setShown] = useState<string | null>(null)
+  const [viewType, setViewType] = useState(initial.view)
+  const onDatesSet = useCallback(({ view }: DatesSetArg) => {
+    setViewType(view.type)
+    setShown(`?view=${viewOf(view.type)}&date=${view.calendar.formatIso(view.currentStart, true)}`)
+  }, [])
   useEffect(() => {
-    const controller = new AbortController()
+    if (shown !== null) navigate({ search: shown }, { replace: true })
+  }, [shown, navigate])
 
-    adminFetch<CalendarData>(`/admin/calendar?from=${from}&to=${to}`, { signal: controller.signal })
-      .then((data) => setSettled({ key: requestKey, data }))
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return
-        if (error instanceof UnauthenticatedError) {
-          navigate('/admin/login', { replace: true })
-          return
-        }
-        setSettled({ key: requestKey, data: null })
-      })
+  // Switching from month, FullCalendar scrolls to SCROLL_TIME while the grid is
+  // still auto-height, so there is nothing to scroll; do it again once the
+  // fixed height has rendered. Moving between dates re-applies it on its own.
+  useEffect(() => {
+    if (viewType !== FULLCALENDAR_VIEW.month) calendarRef.current?.getApi().scrollToTime(SCROLL_TIME)
+  }, [viewType])
 
-    return () => controller.abort()
-  }, [from, to, requestKey, navigate])
+  const buttonText = useMemo(
+    () => ({
+      today: t('admin:calendar.today'),
+      month: t('admin:calendar.views.month'),
+      week: t('admin:calendar.views.week'),
+      day: t('admin:calendar.views.day'),
+    }),
+    [t],
+  )
+  const buttonHints = useMemo(
+    () => ({ prev: t('admin:calendar.previous'), next: t('admin:calendar.next'), today: t('admin:calendar.today') }),
+    [t],
+  )
 
-  // Loading is derived: a result for any other range or attempt is not shown,
-  // so one view never briefly renders another range's data.
-  const state =
-    settled === null || settled.key !== requestKey
-      ? ({ status: 'loading' } as const)
-      : settled.data === null
-        ? ({ status: 'error' } as const)
-        : ({ status: 'ready', data: settled.data } as const)
-
-  function show(nextView: CalendarView, nextDate: KigaliDate) {
-    setParams({ view: nextView, date: nextDate })
+  function retry() {
+    setFailed(false)
+    calendarRef.current?.getApi().refetchEvents()
   }
-
-  const title = view === 'month' ? formatMonthTitle(date) : view === 'week' ? `${formatDayHeading(from)} – ${formatDayHeading(to)}` : formatDayHeading(date)
-  const View = VIEW_COMPONENTS[view]
 
   return (
     <main className="mx-auto flex max-w-7xl flex-col gap-4 p-4">
-      <Tabs value={view} onValueChange={(value) => isView(value) && show(value, date)}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-col">
-            <h1 className="text-xl font-semibold">{title}</h1>
-            <p className="text-muted-foreground text-xs">{t('admin:calendar.timezoneNote')}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="icon" aria-label={t('admin:calendar.previous')} onClick={() => show(view, stepDate(view, date, -1))}>
-              <ChevronLeft />
-            </Button>
-            <Button variant="outline" onClick={() => show(view, today)}>
-              {t('admin:calendar.today')}
-            </Button>
-            <Button variant="outline" size="icon" aria-label={t('admin:calendar.next')} onClick={() => show(view, stepDate(view, date, 1))}>
-              <ChevronRight />
-            </Button>
-            <TabsList>
-              {CALENDAR_VIEWS.map((value) => (
-                <TabsTrigger key={value} value={value}>
-                  {t(`admin:calendar.views.${value}`)}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-        </div>
+      <div className="flex flex-col">
+        <h1 className="text-xl font-semibold">{t('admin:calendar.title')}</h1>
+        <p className="text-muted-foreground text-xs">{t('admin:calendar.timezoneNote')}</p>
+      </div>
 
-        <TabsContent value={view}>
-          {state.status === 'loading' && (
-            <p className="text-muted-foreground text-sm" role="status">
-              {t('admin:calendar.loading')}
-            </p>
-          )}
-          {state.status === 'error' && (
-            <div className="flex items-center gap-2" role="alert">
-              <p className="text-destructive text-sm">{t('admin:calendar.loadFailed')}</p>
-              <Button variant="outline" size="sm" onClick={() => setAttempt((n) => n + 1)}>
-                {t('admin:calendar.retry')}
-              </Button>
-            </div>
-          )}
-          {state.status === 'ready' && (
-            <View data={state.data} from={from} to={to} date={date} today={today} onOpenDay={(day) => show('day', day)} />
-          )}
-        </TabsContent>
-      </Tabs>
+      {loading && (
+        <p className="text-muted-foreground text-sm" role="status">
+          {t('admin:calendar.loading')}
+        </p>
+      )}
+      {failed && (
+        <div className="flex items-center gap-2" role="alert">
+          <p className="text-destructive text-sm">{t('admin:calendar.loadFailed')}</p>
+          <Button variant="outline" size="sm" onClick={retry}>
+            {t('admin:calendar.retry')}
+          </Button>
+        </div>
+      )}
+
+      <FullCalendar
+        ref={calendarRef}
+        plugins={PLUGINS}
+        locale={enGbLocale}
+        timeZone={TIME_ZONE}
+        initialView={initial.view}
+        initialDate={initial.date}
+        views={VIEW_OPTIONS}
+        headerToolbar={HEADER_TOOLBAR}
+        buttonText={buttonText}
+        buttonHints={buttonHints}
+        allDayText={t('admin:calendar.allDay')}
+        firstDay={1}
+        fixedWeekCount={false}
+        height={viewType === FULLCALENDAR_VIEW.month ? 'auto' : TIME_GRID_HEIGHT}
+        scrollTime={SCROLL_TIME}
+        navLinks
+        eventDisplay="block"
+        eventTimeFormat={TIME_FORMAT}
+        slotLabelFormat={TIME_FORMAT}
+        events={fetchEvents}
+        eventSourceFailure={ignoreFailure}
+        loading={setLoading}
+        datesSet={onDatesSet}
+        eventContent={renderEventContent}
+      />
     </main>
+  )
+}
+
+/** The failure is already shown above the calendar; FullCalendar need not log it. */
+function ignoreFailure() {}
+
+function renderEventContent(arg: EventContentArg) {
+  return (
+    <EventContent
+      entry={arg.event.extendedProps.entry as CalendarEntry}
+      timeText={arg.timeText}
+      detailed={arg.view.type !== FULLCALENDAR_VIEW.month}
+    />
+  )
+}
+
+/**
+ * One booking or block. The status is visible text, not colour alone, and a
+ * booking overlapping a block carries a conflict marker (spec §6.4). Week and
+ * day views have room for the service, package and reference, or the block's
+ * private reason.
+ */
+function EventContent({ entry, timeText, detailed }: { entry: CalendarEntry; timeText: string; detailed: boolean }) {
+  const { t } = useTranslation()
+  const status = entry.kind === 'booking' ? entry.booking.status : 'block'
+  const time = timeText !== '' ? timeText : entry.kind === 'block' && entry.block.isAllDay ? t('admin:calendar.allDay') : ''
+
+  return (
+    <div className="flex h-full flex-col gap-0.5 overflow-hidden px-1 py-0.5 text-xs" data-kind={entry.kind} data-status={status}>
+      <div className="flex flex-wrap items-center gap-1">
+        {time !== '' && <span className="font-medium tabular-nums">{time}</span>}
+        {entry.kind === 'booking' && <span className="truncate">{entry.booking.contactName}</span>}
+        <span className="rounded border border-current px-1 text-[0.65rem] leading-4 font-medium">
+          {t(`admin:calendar.status.${status}`)}
+        </span>
+        {entry.kind === 'booking' && entry.booking.conflictsWithBlock && (
+          <span className="bg-destructive inline-flex items-center gap-0.5 rounded px-1 text-[0.65rem] leading-4 font-medium text-white">
+            <TriangleAlert aria-hidden="true" className="size-3" />
+            {t('admin:calendar.conflict')}
+          </span>
+        )}
+      </div>
+      {detailed && entry.kind === 'booking' && (
+        <div className="opacity-80">
+          {entry.booking.serviceName} · {entry.booking.packageName} · {entry.booking.reference}
+        </div>
+      )}
+      {detailed && entry.kind === 'block' && entry.block.reason !== null && (
+        <div className="opacity-80">{entry.block.reason}</div>
+      )}
+    </div>
   )
 }

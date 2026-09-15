@@ -5,10 +5,13 @@ import { clearSession, readSession } from './session'
 export class ApiError extends Error {
   override readonly name: string = 'ApiError'
   readonly status: number
+  /** The fields a 422 `validation_failed` names; empty otherwise. */
+  readonly fields: readonly string[]
 
-  constructor(status: number, code: string) {
+  constructor(status: number, code: string, fields: readonly string[] = []) {
     super(code)
     this.status = status
+    this.fields = fields
   }
 }
 
@@ -45,15 +48,19 @@ export async function adminFetch<T>(path: string, init: RequestInit = {}): Promi
     clearSession()
     throw new UnauthenticatedError()
   }
-  if (!res.ok) throw new ApiError(res.status, await errorCode(res))
+  if (!res.ok) throw await apiError(res)
+  // A delete answers 204 with no body to parse.
+  if (res.status === 204) return undefined as T
   return (await res.json()) as T
 }
 
-async function errorCode(res: Response): Promise<string> {
+async function apiError(res: Response): Promise<ApiError> {
   try {
-    const body = (await res.json()) as { error?: unknown }
-    return typeof body.error === 'string' ? body.error : `http_${res.status}`
+    const body = (await res.json()) as { error?: unknown; fields?: unknown }
+    const code = typeof body.error === 'string' ? body.error : `http_${res.status}`
+    const fields = Array.isArray(body.fields) ? body.fields.filter((f): f is string => typeof f === 'string') : []
+    return new ApiError(res.status, code, fields)
   } catch {
-    return `http_${res.status}`
+    return new ApiError(res.status, `http_${res.status}`)
   }
 }

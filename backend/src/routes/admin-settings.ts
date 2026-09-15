@@ -2,7 +2,7 @@ import type { PrismaClient } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
 import { getSettings, updateSettings } from '../settings/index.js';
-import { parseOrReject } from './validation.js';
+import { INT4_MAX, feeRate, parseOrReject } from './validation.js';
 
 /**
  * `/api/admin/settings` -- the settings screen's API (plan.md Task 8, spec
@@ -15,23 +15,10 @@ import { parseOrReject } from './validation.js';
  * raise 22003. No operating ceiling is invented here.
  */
 
-const INT4_MAX = 2_147_483_647;
-
-/** numeric(4,3) would silently round a fourth decimal place; refuse it instead. */
-function hasAtMostThreeDecimals(value: number): boolean {
-  const thousandths = value * 1000;
-  return Math.abs(thousandths - Math.round(thousandths)) < 1e-9;
-}
-
 /** Any subset of the five values. Unknown keys are refused, so a misspelt
  *  field is a 400 rather than a save that silently changed nothing. */
 const settingsBody = z.strictObject({
-  bookingFeeRate: z
-    .number()
-    .min(0)
-    .max(1)
-    .refine(hasAtMostThreeDecimals, 'At most three decimal places')
-    .optional(),
+  bookingFeeRate: feeRate.optional(),
   minLeadTimeMinutes: z.int().min(0).max(INT4_MAX).optional(),
   holdMinutes: z.int().min(1).max(INT4_MAX).optional(),
   bufferMinutes: z.int().min(0).max(INT4_MAX).optional(),

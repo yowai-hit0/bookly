@@ -1,7 +1,8 @@
 import { LogOut } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Navigate, Outlet, useNavigate } from 'react-router'
+import { NavLink, Navigate, Outlet, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { clearSession, readSession } from './session'
 
 /**
@@ -23,7 +24,18 @@ export function AdminLayout() {
   return (
     <div className="min-h-svh">
       <header className="flex items-center justify-between border-b px-4 py-2">
-        <span className="font-semibold">{t('common:appName')}</span>
+        <nav className="flex items-center gap-4" aria-label={t('admin:nav.label')}>
+          <span className="font-semibold">{t('common:appName')}</span>
+          {(['calendar', 'catalogue'] as const).map((page) => (
+            <NavLink
+              key={page}
+              to={`/admin/${page}`}
+              className={({ isActive }) => cn('text-sm hover:underline', isActive ? 'font-medium' : 'text-muted-foreground')}
+            >
+              {t(`admin:nav.${page}`)}
+            </NavLink>
+          ))}
+        </nav>
         <Button variant="ghost" size="sm" onClick={signOut}>
           <LogOut />
           {t('admin:nav.signOut')}

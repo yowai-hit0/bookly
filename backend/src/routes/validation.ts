@@ -50,3 +50,19 @@ export const kigaliDate = z.iso.date().refine((value) => {
     return false;
   }
 }, 'Unsupported date');
+
+/** The largest `integer` PostgreSQL stores; past it, a write raises 22003. */
+export const INT4_MAX = 2_147_483_647;
+
+/** numeric(4,3) would silently round a fourth decimal place; refuse it instead. */
+function hasAtMostThreeDecimals(value: number): boolean {
+  const thousandths = value * 1000;
+  return Math.abs(thousandths - Math.round(thousandths)) < 1e-9;
+}
+
+/** A booking-fee rate as `numeric(4,3)` stores it: 0 to 1, three decimal places. */
+export const feeRate = z
+  .number()
+  .min(0)
+  .max(1)
+  .refine(hasAtMostThreeDecimals, 'At most three decimal places');

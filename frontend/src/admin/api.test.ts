@@ -5,7 +5,8 @@ import { readSession, saveSession } from './session'
 /**
  * The admin API client (plan.md Task 7 and Task 9 Assumptions): the token
  * travels only in `Authorization: Bearer`, a 401 signs him out, and any other
- * failure surfaces the API's own error code.
+ * failure surfaces the API's own error code -- plus, since Task 10, the fields
+ * a 422 names, and nothing to parse on a 204.
  */
 
 const NOW = new Date('2026-10-07T08:00:00.000Z')
@@ -130,6 +131,39 @@ describe('adminFetch', () => {
     expect(error).not.toBeInstanceOf(UnauthenticatedError)
     expect(error).toMatchObject({ status, message: code, name: 'ApiError' })
     expect(readSession()).toEqual(SESSION)
+  })
+
+  it('resolves a 204 to undefined without reading a body', async () => {
+    saveSession(SESSION)
+    stubFetch(() => new Response(null, { status: 204 }))
+
+    await expect(adminFetch('/admin/services/s1', { method: 'DELETE' })).resolves.toBeUndefined()
+  })
+
+  it.each<[string, () => Response, string[]]>([
+    ['a 422 naming fields', () => json({ error: 'validation_failed', fields: ['nameEn', 'bookingFeeRateOverride'] }, 422), ['nameEn', 'bookingFeeRateOverride']],
+    ['a 422 whose fields hold non-strings', () => json({ error: 'validation_failed', fields: ['slug', 3, null, { f: 1 }] }, 422), ['slug']],
+    ['a 422 whose fields is not an array', () => json({ error: 'validation_failed', fields: 'slug' }, 422), []],
+    ['a 409 with no fields', () => json({ error: 'slug_taken' }, 409), []],
+    ['a 500 with an HTML body', () => new Response('<h1>Bad gateway</h1>', { status: 500 }), []],
+  ])('on %s carries the fields the API named', async (_label, respond, fields) => {
+    saveSession(SESSION)
+    stubFetch(respond)
+
+    const error = await rejectionOf(adminFetch('/admin/services', { method: 'POST' }))
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).fields).toEqual(fields)
+  })
+
+  it('gives an unauthenticated error no fields', async () => {
+    saveSession(SESSION)
+    stubFetch(() => json({ error: 'unauthenticated', fields: ['token'] }, 401))
+
+    const error = await rejectionOf(adminFetch('/admin/catalogue'))
+
+    expect(error).toBeInstanceOf(UnauthenticatedError)
+    expect((error as ApiError).fields).toEqual([])
   })
 
   it('lets a network failure propagate as it is', async () => {
