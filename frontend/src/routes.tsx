@@ -4,6 +4,8 @@ import { Home } from '@/pages/Home'
 import { NotFound } from '@/pages/NotFound'
 import { AdminCatalogue } from '@/pages/admin/AdminCatalogue'
 import { AdminLogin } from '@/pages/admin/AdminLogin'
+import { ServiceDetail } from '@/pages/services/ServiceDetail'
+import { ServiceList } from '@/pages/services/ServiceList'
 
 /**
  * Plain paths, no locale prefix (plan.md Task 2, spec §7, R-2). A French
@@ -11,6 +13,8 @@ import { AdminLogin } from '@/pages/admin/AdminLogin'
  */
 export const routes: RouteObject[] = [
   { path: '/', element: <Home /> },
+  { path: '/services', element: <ServiceList /> },
+  { path: '/services/:slug', element: <ServiceDetail /> },
   { path: '/admin/login', element: <AdminLogin /> },
   {
     path: '/admin',

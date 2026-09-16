@@ -29,6 +29,28 @@ const dateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
   hour12: false,
 })
 
+const timeFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: TIME_ZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+
+// A calendar date or month is a day on the wall, not an instant, so it is
+// formatted at UTC midnight in UTC, where no zone can move it to another day.
+const dateFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC',
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+})
+
+const monthFormatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', month: 'long', year: 'numeric' })
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/
+
 const numberFormatter = new Intl.NumberFormat('en-GB')
 
 /** Renders a UTC instant as Kigali wall time: `1 Jul 2026, 08:00`. */
@@ -38,6 +60,33 @@ export function formatDateTime(instant: Date | string): string {
     throw new RangeError(`Invalid date: ${String(instant)}`)
   }
   return dateTimeFormatter.format(date)
+}
+
+/** Renders a UTC instant as a Kigali clock time: `08:00`. */
+export function formatTime(instant: Date | string): string {
+  const date = instant instanceof Date ? instant : new Date(instant)
+  if (Number.isNaN(date.getTime())) {
+    throw new RangeError(`Invalid date: ${String(instant)}`)
+  }
+  return timeFormatter.format(date)
+}
+
+/** Renders a Kigali calendar date, `YYYY-MM-DD`: `Wednesday, 1 July 2026`. */
+export function formatDate(date: string): string {
+  const midnight = new Date(`${date}T00:00:00Z`)
+  // The round trip refuses a day the calendar does not have, such as 2026-02-30.
+  if (!DATE_PATTERN.test(date) || Number.isNaN(midnight.getTime()) || midnight.toISOString().slice(0, 10) !== date) {
+    throw new RangeError(`Expected a YYYY-MM-DD date, received: ${date}`)
+  }
+  return dateFormatter.format(midnight)
+}
+
+/** Renders a calendar month, `YYYY-MM`: `October 2026`. */
+export function formatMonth(month: string): string {
+  if (!MONTH_PATTERN.test(month)) {
+    throw new RangeError(`Expected a YYYY-MM month, received: ${month}`)
+  }
+  return monthFormatter.format(new Date(`${month}-01T00:00:00Z`))
 }
 
 /** Renders a whole-RWF amount: `45,000 RWF`. Throws on anything else. */

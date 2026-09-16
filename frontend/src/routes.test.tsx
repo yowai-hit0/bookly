@@ -40,6 +40,32 @@ describe('routing', () => {
     expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
   })
 
+  it('serves the public service list from /services (plan.md Task 11)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ services: [] }))))
+    renderAt('/services')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Services' })).toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith('/api/services', expect.anything())
+  })
+
+  it('serves a service page from /services/:slug (plan.md Task 11)', async () => {
+    const service = { id: 's1', slug: 'portraits', nameEn: 'Portraits', descriptionEn: null, coverImageUrl: null, packages: [], addons: [], bookingFeeRate: 0.4 }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ service }))))
+    renderAt('/services/portraits')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Portraits' })).toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith('/api/services/portraits', expect.anything())
+  })
+
+  it('has nothing below a service page — /services/portraits/extra is a 404', () => {
+    renderAt('/services/portraits/extra')
+    expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+  })
+
+  it('declares the two public service paths', () => {
+    const paths = routes.map((route) => route.path)
+    expect(paths).toContain('/services')
+    expect(paths).toContain('/services/:slug')
+  })
+
   it('declares no route whose first segment is a locale', () => {
     const firstSegments = routes
       .map((route) => route.path?.split('/').filter(Boolean)[0])

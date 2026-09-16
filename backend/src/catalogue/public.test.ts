@@ -2,8 +2,9 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import type pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createPrismaClient } from '../db/client.js';
+import { updateSettings } from '../settings/index.js';
 import { connect, testDatabaseUrl, truncateAll } from '../test/database.js';
-import { listPublicCatalogue } from './public.js';
+import { effectiveBookingFeeRate, findPublicService, listPublicCatalogue } from './public.js';
 
 /**
  * `listPublicCatalogue()` against real PostgreSQL (plan.md Task 10; spec §3.4,
@@ -11,6 +12,12 @@ import { listPublicCatalogue } from './public.js';
  * each with its active packages, then its own active add-ons followed by the
  * active add-ons offered on every service -- and nothing the public must not
  * see.
+ *
+ * `findPublicService()` is one entry of that list by slug, plus the booking-fee
+ * rate that applies to it (plan.md Task 11; data-model_v2.md §9.5): the
+ * service's override if set, else the global setting. The top-level afterAll
+ * truncates, so a settings row edited here never reaches settings.test.ts,
+ * which seeds without truncating and asserts the defaults.
  */
 
 let prisma: PrismaClient;
@@ -185,6 +192,220 @@ describe('listPublicCatalogue', () => {
     for (const hidden of ['FR', 'Un look.', 'Heure en plus', 'Retouche express', 'en studio', '0.3', 'isActive', 'sortOrder', 'serviceId', 'createdAt']) {
       expect(json).not.toContain(hidden);
     }
+  });
+});
+
+// --- One service's detail (plan.md Task 11) ------------------------------------------
+
+describe('findPublicService', () => {
+  beforeEach(async () => {
+    // getSettings() throws on a missing row (data-model_v2.md §5.2); seed the
+    // schema defaults the way Task 4 seeds production.
+    await prisma.setting.create({ data: { id: 1, bookingFeeRate: '0.400' } });
+  });
+
+  it('returns an active service with its active packages and add-ons, and the global rate when it has no override', async () => {
+    const portraits = await insertService('portraits', {
+      nameEn: 'Portraits',
+      descriptionEn: 'Studio portraits.',
+      coverImageUrl: 'https://images.example.com/portraits.jpg',
+    });
+    const standard = await insertPackage(portraits.id, 'Standard', { descriptionEn: 'One look.', priceRwf: 45_000, photoCount: 25, durationMinutes: 90 });
+    await insertPackage(portraits.id, 'Retired', { isActive: false });
+    const extraHour = await insertAddon(portraits.id, 'Extra hour', { priceRwf: 15_000 });
+    await insertAddon(portraits.id, 'Old frame', { isActive: false });
+    const rush = await insertAddon(null, 'Rush edit', { priceRwf: 5_000 });
+    await insertAddon(null, 'Discontinued prints', { isActive: false });
+
+    await expect(findPublicService(prisma, 'portraits')).resolves.toStrictEqual({
+      id: portraits.id,
+      slug: 'portraits',
+      nameEn: 'Portraits',
+      descriptionEn: 'Studio portraits.',
+      coverImageUrl: 'https://images.example.com/portraits.jpg',
+      packages: [
+        {
+          id: standard.id,
+          nameEn: 'Standard',
+          descriptionEn: 'One look.',
+          priceRwf: 45_000,
+          photoCount: 25,
+          durationMinutes: 90,
+        },
+      ],
+      addons: [
+        { id: extraHour.id, nameEn: 'Extra hour', priceRwf: 15_000 },
+        { id: rush.id, nameEn: 'Rush edit', priceRwf: 5_000 },
+      ],
+      bookingFeeRate: 0.4,
+    });
+  });
+
+  it('is the public list’s entry for that service, plus the rate', async () => {
+    const weddings = await insertService('weddings', { sortOrder: 1 });
+    const products = await insertService('products', { bookingFeeRateOverride: '0.250' });
+    await insertPackage(weddings.id, 'Full day', { priceRwf: 600_000 });
+    await insertPackage(products.id, 'Ten items');
+    await insertAddon(weddings.id, 'Second shooter');
+    await insertAddon(products.id, 'White background');
+    await insertAddon(null, 'Rush edit');
+
+    const list = await listPublicCatalogue(prisma);
+    for (const [slug, bookingFeeRate] of [['weddings', 0.4], ['products', 0.25]] as const) {
+      expect(await findPublicService(prisma, slug)).toStrictEqual({
+        ...list.find((service) => service.slug === slug),
+        bookingFeeRate,
+      });
+    }
+  });
+
+  it('charges a service’s own override: 0.300 is a rate of 0.3, whatever the global rate', async () => {
+    await insertService('portraits', { bookingFeeRateOverride: '0.300' });
+
+    const detail = await findPublicService(prisma, 'portraits');
+
+    expect(detail?.bookingFeeRate).toBe(0.3);
+    expect(typeof detail?.bookingFeeRate).toBe('number');
+  });
+
+  it('charges an override of 0.000 as 0 rather than falling back to the global rate', async () => {
+    await insertService('free-deposit', { bookingFeeRateOverride: '0.000' });
+    await insertService('pay-in-full', { bookingFeeRateOverride: '1.000' });
+    await insertService('odd-rate', { bookingFeeRateOverride: '0.375' });
+
+    expect((await findPublicService(prisma, 'free-deposit'))?.bookingFeeRate).toBe(0);
+    expect((await findPublicService(prisma, 'pay-in-full'))?.bookingFeeRate).toBe(1);
+    expect((await findPublicService(prisma, 'odd-rate'))?.bookingFeeRate).toBe(0.375);
+  });
+
+  it('follows the global setting when it changes, and ignores it where an override is set', async () => {
+    await insertService('portraits');
+    await insertService('weddings', { bookingFeeRateOverride: '0.300' });
+    expect((await findPublicService(prisma, 'portraits'))?.bookingFeeRate).toBe(0.4);
+
+    await updateSettings({ bookingFeeRate: 0.35 }, prisma);
+
+    expect((await findPublicService(prisma, 'portraits'))?.bookingFeeRate).toBe(0.35);
+    expect((await findPublicService(prisma, 'weddings'))?.bookingFeeRate).toBe(0.3);
+  });
+
+  it('is null for an unknown slug, and for a deactivated service even with active packages (spec §6.14)', async () => {
+    const events = await insertService('events', { isActive: false });
+    await insertPackage(events.id, 'Half day');
+    await insertAddon(events.id, 'Drone');
+
+    await expect(findPublicService(prisma, 'events')).resolves.toBeNull();
+    await expect(findPublicService(prisma, 'nothing-here')).resolves.toBeNull();
+    await expect(findPublicService(prisma, '')).resolves.toBeNull();
+  });
+
+  it('matches the slug exactly, never as a pattern or a prefix', async () => {
+    await insertService('portraits');
+
+    for (const slug of ['portrait', 'portraits-2', 'Portraits', 'portrait%', 'portrait_']) {
+      await expect(findPublicService(prisma, slug)).resolves.toBeNull();
+    }
+  });
+
+  it('becomes null when the service is deactivated, and returns when it is reactivated', async () => {
+    const service = await insertService('portraits');
+    expect(await findPublicService(prisma, 'portraits')).not.toBeNull();
+
+    await prisma.service.update({ where: { id: service.id }, data: { isActive: false } });
+    await expect(findPublicService(prisma, 'portraits')).resolves.toBeNull();
+
+    await prisma.service.update({ where: { id: service.id }, data: { isActive: true } });
+    expect((await findPublicService(prisma, 'portraits'))?.id).toBe(service.id);
+  });
+
+  it('offers its own add-ons, then the shared ones, and never another service’s', async () => {
+    const weddings = await insertService('weddings');
+    const products = await insertService('products');
+    await insertAddon(weddings.id, 'Second shooter', { sortOrder: 5 });
+    await insertAddon(weddings.id, 'Album', { sortOrder: 2 });
+    await insertAddon(products.id, 'White background', { sortOrder: 0 });
+    // Sort order 0, yet still after the service's own add-on of order 5.
+    await insertAddon(null, 'Rush edit', { sortOrder: 1 });
+    await insertAddon(null, 'Prints', { sortOrder: 0 });
+
+    const weddingsDetail = await findPublicService(prisma, 'weddings');
+    const productsDetail = await findPublicService(prisma, 'products');
+
+    expect(weddingsDetail?.addons.map((addon) => addon.nameEn)).toEqual(['Album', 'Second shooter', 'Prints', 'Rush edit']);
+    expect(productsDetail?.addons.map((addon) => addon.nameEn)).toEqual(['White background', 'Prints', 'Rush edit']);
+  });
+
+  it('orders packages by display order, then name, then age', async () => {
+    const service = await insertService('portraits');
+    await insertPackage(service.id, 'Beta', { sortOrder: 1 });
+    await insertPackage(service.id, 'Zulu', { sortOrder: 0 });
+    await insertPackage(service.id, 'Alpha', { sortOrder: 1 });
+
+    const detail = await findPublicService(prisma, 'portraits');
+
+    expect(detail?.packages.map((pkg) => pkg.nameEn)).toEqual(['Zulu', 'Alpha', 'Beta']);
+  });
+
+  it('returns a service with no active packages or add-ons, with empty lists', async () => {
+    const service = await insertService('portraits');
+    await insertPackage(service.id, 'Retired', { isActive: false });
+
+    const detail = await findPublicService(prisma, 'portraits');
+
+    expect(detail?.packages).toEqual([]);
+    expect(detail?.addons).toEqual([]);
+  });
+
+  it('projects an allowlist: no raw override, status, sort key, French, service id or timestamps', async () => {
+    const service = await insertService('portraits', {
+      nameEn: 'Portraits',
+      nameFr: 'Portraits FR',
+      descriptionEn: 'Studio portraits.',
+      descriptionFr: 'Portraits en studio.',
+      coverImageUrl: 'https://images.example.com/portraits.jpg',
+      bookingFeeRateOverride: '0.375',
+      sortOrder: 4,
+    });
+    await insertPackage(service.id, 'Standard', { nameFr: 'Standard FR', descriptionFr: 'Un look.', sortOrder: 2 });
+    await insertAddon(service.id, 'Extra hour', { nameFr: 'Heure en plus', sortOrder: 3 });
+    await insertAddon(null, 'Rush edit', { nameFr: 'Retouche express' });
+
+    const detail = await findPublicService(prisma, 'portraits');
+
+    expect(Object.keys(detail ?? {}).sort()).toEqual([
+      'addons',
+      'bookingFeeRate',
+      'coverImageUrl',
+      'descriptionEn',
+      'id',
+      'nameEn',
+      'packages',
+      'slug',
+    ]);
+    expect(detail?.packages.map((pkg) => Object.keys(pkg).sort())).toEqual([
+      ['descriptionEn', 'durationMinutes', 'id', 'nameEn', 'photoCount', 'priceRwf'],
+    ]);
+    expect(detail?.addons.map((addon) => Object.keys(addon).sort())).toEqual([
+      ['id', 'nameEn', 'priceRwf'],
+      ['id', 'nameEn', 'priceRwf'],
+    ]);
+    const json = JSON.stringify(detail);
+    for (const hidden of ['FR', 'Un look.', 'Heure en plus', 'Retouche express', 'en studio', 'Override', 'isActive', 'sortOrder', 'serviceId', 'createdAt', 'updatedAt']) {
+      expect(json).not.toContain(hidden);
+    }
+  });
+});
+
+describe('effectiveBookingFeeRate', () => {
+  it('is the override as a number when one is set, else the global rate', async () => {
+    const withOverride = await insertService('portraits', { bookingFeeRateOverride: '0.300' });
+    const withoutOverride = await insertService('weddings');
+    const zeroOverride = await insertService('free', { bookingFeeRateOverride: '0.000' });
+
+    expect(effectiveBookingFeeRate(withOverride, 0.4)).toBe(0.3);
+    expect(effectiveBookingFeeRate(withoutOverride, 0.4)).toBe(0.4);
+    expect(effectiveBookingFeeRate(withoutOverride, 0.125)).toBe(0.125);
+    expect(effectiveBookingFeeRate(zeroOverride, 0.4)).toBe(0);
   });
 });
 

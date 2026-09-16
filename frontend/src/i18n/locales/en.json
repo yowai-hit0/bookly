@@ -12,6 +12,65 @@
     "title": "Page not found",
     "body": "That page does not exist."
   },
+  "services": {
+    "title": "Services",
+    "intro": "Choose a service to see its packages and prices.",
+    "loading": "Loading…",
+    "loadFailed": "Could not load services. Check your connection and try again.",
+    "loadServiceFailed": "Could not load this service. Check your connection and try again.",
+    "retry": "Try again",
+    "empty": "No services are available to book right now.",
+    "fromPrice": "From {{price}}",
+    "allServices": "All services",
+    "noPackages": "No packages are available for this service right now.",
+    "choosePackage": "Choose a package",
+    "chooseAddons": "Add-ons (optional)",
+    "photos_one": "{{count}} photo",
+    "photos_other": "{{count}} photos",
+    "duration": {
+      "minutes": "{{count}} min",
+      "hours_one": "{{count}} hour",
+      "hours_other": "{{count}} hours",
+      "hoursAndMinutes": "{{hours}} h {{minutes}} min"
+    },
+    "picker": {
+      "title": "Choose a date and time",
+      "choosePackageFirst": "Choose a package to see available times.",
+      "timezone": "All times are Kigali time (UTC+2).",
+      "previousMonth": "Previous month",
+      "nextMonth": "Next month",
+      "loading": "Loading available times…",
+      "loadFailed": "Could not load available times.",
+      "retry": "Try again",
+      "noTimesThisMonth": "No times are available in {{month}}. Try the next month.",
+      "weekdays": {
+        "mon": "Mon",
+        "tue": "Tue",
+        "wed": "Wed",
+        "thu": "Thu",
+        "fri": "Fri",
+        "sat": "Sat",
+        "sun": "Sun"
+      },
+      "dayAvailable_one": "{{date}}, {{count}} time available",
+      "dayAvailable_other": "{{date}}, {{count}} times available",
+      "dayUnavailable": "{{date}}, no times available",
+      "timesFor": "Start times on {{date}}",
+      "noTimesLeft": "No times are left on this day. Choose another date.",
+      "checking": "Checking that time is still free…",
+      "justTaken": "Sorry, that time was just taken. The calendar has been refreshed, so please choose another time.",
+      "checkFailed": "Could not confirm that time is still free. Check your connection and try again.",
+      "selected": "Selected: {{date}}, {{start}} to {{end}}, Kigali time"
+    },
+    "summary": {
+      "title": "Price summary",
+      "pickPackage": "Choose a package to see your total.",
+      "total": "Total",
+      "bookingFee": "Booking fee ({{percent}}%), paid now to secure your date",
+      "sessionFee": "Session fee, due after the shoot",
+      "nonRefundable": "The booking fee is non-refundable if you cancel."
+    }
+  },
   "admin": {
     "signIn": {
       "title": "Admin sign in",

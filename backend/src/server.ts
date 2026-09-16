@@ -23,6 +23,7 @@ function boot(): void {
       webOrigin: env.WEB_ORIGIN,
       now: () => new Date(),
     },
+    publicApi: { prisma, now: () => new Date() },
   });
 
   const server = app.listen(env.PORT, () => {
