@@ -27,3 +27,6 @@ npm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# development email sink (backend MAIL_OUTPUT_DIR): holds live access links
+.mail/

@@ -1,0 +1,656 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it, vi } from 'vitest';
+import en from '../i18n/locales/en.json' with { type: 'json' };
+import { EMAIL_TEMPLATES, OUTBOX_KINDS } from '../outbox/enqueue.js';
+import {
+  ADMIN_ALERT_VARIANTS,
+  EMAIL_FIXTURES,
+  type EmailFixture,
+  FIXTURE_ACCESS_TOKEN,
+  FIXTURE_REFERENCE,
+  FIXTURE_RESET_TOKEN,
+  FIXTURE_WEB_ORIGIN,
+  emailFixture,
+} from '../test/email-fixtures.js';
+import { escapeHtml } from './layout.js';
+import { TEMPLATES, renderEmail } from './render.js';
+import { adminAlert } from './templates/admin-alert.js';
+import { EmailPayloadError } from './templates/shared.js';
+
+/**
+ * Rendering (plan.md Task 15, spec §4.1): all nine templates and every
+ * admin_alert variant from fixtures, snapshot-tested, with Kigali times and
+ * integer RWF read against the same docs/fixtures/format.json the frontend
+ * asserts. No database: rendering is a pure function of template and payload.
+ */
+
+const formatFixture = JSON.parse(
+  readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../docs/fixtures/format.json'), 'utf8'),
+) as {
+  formatDateTime: { case: string; input: string; expected: string }[];
+  formatTime: { case: string; input: string; expected: string }[];
+  formatDate: { case: string; input: string; expected: string }[];
+  formatMoney: { case: string; input: number; expected: string }[];
+  formatMoneyRejects: { case: string; input: number }[];
+};
+
+type Payload = Record<string, unknown>;
+
+function render(template: string, payload: unknown, locale?: string | null) {
+  return renderEmail(template, payload, { webOrigin: FIXTURE_WEB_ORIGIN, locale });
+}
+
+function renderFixture(fixture: EmailFixture) {
+  return render(fixture.template, fixture.payload);
+}
+
+function withPayload(name: string, changes: Payload): { template: string; payload: Payload } {
+  const fixture = emailFixture(name);
+  return { template: fixture.template, payload: { ...(fixture.payload as Payload), ...changes } };
+}
+
+function renderWith(name: string, changes: Payload) {
+  const { template, payload } = withPayload(name, changes);
+  return render(template, payload);
+}
+
+function payloadError(run: () => unknown): EmailPayloadError {
+  try {
+    run();
+  } catch (error) {
+    if (error instanceof EmailPayloadError) return error;
+    throw new Error(`Expected EmailPayloadError, got ${String(error)}`);
+  }
+  throw new Error('Expected EmailPayloadError, nothing was thrown');
+}
+
+/** The Kigali calendar date of an instant, computed independently of the code under test. */
+function kigaliDate(instant: string): string {
+  return new Date(Date.parse(instant) + 2 * 60 * 60_000).toISOString().slice(0, 10);
+}
+
+function hrefs(html: string): string[] {
+  return [...html.matchAll(/href="([^"]*)"/g)].map((m) => (m[1] ?? '').replaceAll('&amp;', '&'));
+}
+
+function urlsIn(content: string): string[] {
+  return [...content.matchAll(/https?:\/\/[^\s<>"')]+/g)].map((m) => m[0].replaceAll('&amp;', '&'));
+}
+
+// --- Every template ------------------------------------------------------------
+
+describe('the fixtures', () => {
+  it('cover all nine templates and every admin_alert variant', () => {
+    expect([...new Set(EMAIL_FIXTURES.map((fixture) => fixture.template))].sort()).toEqual([...EMAIL_TEMPLATES].sort());
+
+    const variants = EMAIL_FIXTURES.filter((fixture) => fixture.template === 'admin_alert').map(
+      (fixture) => (fixture.payload as Payload).variant,
+    );
+    expect([...variants].sort()).toEqual([...ADMIN_ALERT_VARIANTS].sort());
+
+    // And the template accepts no variant the fixtures do not cover.
+    const union = adminAlert.payload as unknown as { options: { shape: { variant: { value: string } } }[] };
+    expect(union.options.map((option) => option.shape.variant.value).sort()).toEqual([...ADMIN_ALERT_VARIANTS].sort());
+  });
+
+  it('includes the four admin_alert situations the plan names: payment received, retries exhausted, login lockout, refund due', () => {
+    for (const variant of ['payment_received', 'retries_exhausted', 'login_lockout', 'refund_due']) {
+      expect(ADMIN_ALERT_VARIANTS).toContain(variant);
+    }
+  });
+});
+
+describe.each(EMAIL_FIXTURES.map((fixture) => [fixture.name, fixture] as const))('%s', (_name, fixture) => {
+  it('renders without error to a subject, an HTML body and a text body', () => {
+    const email = renderFixture(fixture);
+
+    expect(email.subject.length).toBeGreaterThan(5);
+    expect(email.subject).not.toMatch(/[\r\n]/);
+    expect(email.html.startsWith('<!doctype html>')).toBe(true);
+    expect(email.html).toContain(`<title>${escapeHtml(email.subject)}</title>`);
+    expect(email.text.length).toBeGreaterThan(20);
+    expect(email.text).toContain('Bookly, Kigali. All times are Kigali time (UTC+2).');
+  });
+
+  it('leaves no placeholder, missing translation key or undefined value behind', () => {
+    const email = renderFixture(fixture);
+    const sections = Object.keys(en.email);
+
+    for (const part of [email.subject, email.text, email.html]) {
+      expect(part).not.toMatch(/\{\{|\}\}|\bundefined\b|\bNaN\b|\[object Object\]|\b(email|common):[a-z]/);
+      for (const section of sections) expect(part).not.toContain(`${section}.`);
+    }
+  });
+
+  it('matches its snapshot', () => {
+    const email = renderFixture(fixture);
+
+    expect(email.subject).toMatchSnapshot('subject');
+    expect(email.text).toMatchSnapshot('text');
+    expect(email.html).toMatchSnapshot('html');
+  });
+});
+
+// --- Kigali time and integer RWF ----------------------------------------------------
+
+describe('times in Africa/Kigali and integer RWF, against docs/fixtures/format.json', () => {
+  it.each(formatFixture.formatDateTime)('shows a payment instant as the fixture does: $case', ({ input, expected }) => {
+    const receipt = renderWith('payment_receipt', { paidAt: input });
+    expect(receipt.text).toContain(`Paid on: ${expected} (Kigali time)`);
+    expect(receipt.html).toContain(`${expected} (Kigali time)`);
+
+    const alert = renderWith('admin_alert payment_received', { paidAt: input });
+    expect(alert.text).toContain(`Paid on: ${expected} (Kigali time)`);
+
+    const lockout = renderWith('admin_alert login_lockout', { lockedUntil: input });
+    expect(lockout.text).toContain(`locked until ${expected} (Kigali time)`);
+
+    const reset = renderWith('admin_alert password_reset', { expiresAt: input });
+    expect(reset.text).toContain(`until ${expected} (Kigali time)`);
+  });
+
+  it.each(formatFixture.formatTime)('shows a shoot time as the fixture does: $case', ({ input, expected }) => {
+    const endsAt = new Date(Date.parse(input) + 60 * 60_000).toISOString();
+
+    const email = renderWith('booking_confirmation', { startsAt: input, endsAt });
+
+    expect(email.text).toMatch(new RegExp(`When: [A-Za-z]+, \\d{1,2} [A-Za-z]+ \\d{4}, ${expected} to \\d{2}:\\d{2} \\(Kigali time\\)`));
+  });
+
+  it('dates a shoot by its Kigali calendar day, as formatDate in the fixture does', () => {
+    let matched = 0;
+    for (const { input } of formatFixture.formatTime) {
+      const dateCase = formatFixture.formatDate.find((c) => c.input === kigaliDate(input));
+      if (dateCase === undefined) continue;
+      matched += 1;
+      const endsAt = new Date(Date.parse(input) + 60 * 60_000).toISOString();
+
+      const email = renderWith('booking_confirmation', { startsAt: input, endsAt });
+
+      expect(email.subject).toContain(dateCase.expected);
+      expect(email.text).toContain(`When: ${dateCase.expected}, `);
+    }
+    expect(matched).toBeGreaterThanOrEqual(2);
+  });
+
+  it('rolls the date and year forward when UTC is still on the day before', () => {
+    // 22:00Z on 31 December is 00:00 on 1 January in Kigali (format.json).
+    const email = renderWith('booking_confirmation', { startsAt: '2026-12-31T22:00:00Z', endsAt: '2026-12-31T23:00:00Z' });
+
+    expect(email.subject).toContain('Friday, 1 January 2027');
+    expect(email.text).toContain('Friday, 1 January 2027, 00:00 to 01:00 (Kigali time)');
+    expect(email.text).not.toContain('2026');
+
+    const calendar = renderWith('admin_new_booking', { startsAt: '2026-12-31T22:00:00Z', endsAt: '2026-12-31T23:00:00Z' });
+    expect(hrefs(calendar.html)).toContain(`${FIXTURE_WEB_ORIGIN}/admin/calendar?view=day&date=2027-01-01`);
+  });
+
+  it.each(formatFixture.formatDate)('states a delivery expiry as the fixture does: $case', ({ input, expected }) => {
+    const email = renderWith('photo_delivery', { expiresOn: input });
+
+    expect(email.text).toContain(`until the end of ${expected} (Kigali time)`);
+    expect(email.html).toContain(escapeHtml(`Download your photos by ${expected}.`));
+  });
+
+  it.each(formatFixture.formatMoney)('shows an amount as the fixture does: $case', ({ input, expected }) => {
+    const confirmation = renderWith('booking_confirmation', { paidRwf: input, outstandingRwf: input });
+    expect(confirmation.text).toContain(`Paid: ${expected}`);
+    expect(confirmation.text).toContain(`Still to pay: ${expected}`);
+
+    const request = renderWith('session_fee_request', { amountRwf: input });
+    expect(request.text).toContain(`Amount due: ${expected}`);
+
+    const newBooking = renderWith('admin_new_booking', { totalRwf: input, addons: [{ name: 'Prints', priceRwf: input }] });
+    expect(newBooking.text).toContain(`Total: ${expected}`);
+    expect(newBooking.text).toContain(`Prints: ${expected}`);
+
+    const refund = renderWith('admin_alert refund_due', { amountRwf: input });
+    expect(refund.subject).toContain(`Refund due: ${expected}`);
+  });
+
+  it.each(formatFixture.formatMoneyRejects)('refuses an amount the fixture refuses: $case', ({ input }) => {
+    for (const [name, field] of [
+      ['booking_confirmation', 'paidRwf'],
+      ['session_fee_request', 'amountRwf'],
+      ['payment_receipt', 'outstandingRwf'],
+      ['cancellation (by admin)', 'refundRwf'],
+      ['admin_alert refund_due', 'amountRwf'],
+    ] as const) {
+      const { template, payload } = withPayload(name, { [field]: input });
+      expect(payloadError(() => render(template, payload)).message).toContain(field);
+    }
+  });
+
+  it('renders identically whatever the process time zone', async () => {
+    const baseline = EMAIL_FIXTURES.map((fixture) => renderFixture(fixture));
+    const originalTz = process.env.TZ;
+    const originalZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const originalOffset = new Date('2026-01-01T12:00:00Z').getTimezoneOffset();
+    try {
+      for (const [zone, offset] of [
+        ['Pacific/Kiritimati', -840],
+        ['America/Los_Angeles', 480],
+        ['UTC', 0],
+      ] as const) {
+        process.env.TZ = zone;
+        // The switch really happened, or this test would prove nothing.
+        expect(new Date('2026-01-01T12:00:00Z').getTimezoneOffset()).toBe(offset);
+        vi.resetModules();
+        const fresh = await import('./render.js');
+        const again = EMAIL_FIXTURES.map((fixture) =>
+          fresh.renderEmail(fixture.template, fixture.payload, { webOrigin: FIXTURE_WEB_ORIGIN }),
+        );
+        expect(again).toEqual(baseline);
+      }
+    } finally {
+      // Deleting TZ does not make Node re-read the system zone, so set it back first.
+      process.env.TZ = originalTz ?? originalZone;
+      if (originalTz === undefined) delete process.env.TZ;
+      vi.resetModules();
+    }
+    expect(new Date('2026-01-01T12:00:00Z').getTimezoneOffset()).toBe(originalOffset);
+  });
+});
+
+// --- booking_confirmation -----------------------------------------------------------
+
+describe('booking_confirmation', () => {
+  const link = `${FIXTURE_WEB_ORIGIN}/booking/${FIXTURE_ACCESS_TOKEN}`;
+
+  it('contains the reference, date and time, location, amount paid, amount outstanding and the access link', () => {
+    const email = renderFixture(emailFixture('booking_confirmation'));
+
+    for (const body of [email.text, email.html]) {
+      expect(body).toContain(FIXTURE_REFERENCE);
+      expect(body).toContain('Wednesday, 7 October 2026, 09:30 to 10:30 (Kigali time)');
+      expect(body).toContain('Kigali Heights, KG 7 Ave');
+      expect(body).toContain('18,000 RWF');
+      expect(body).toContain('27,000 RWF');
+      expect(body).toContain(link);
+    }
+    expect(email.text).toContain('Paid: 18,000 RWF');
+    expect(email.text).toContain('Still to pay: 27,000 RWF');
+    expect(hrefs(email.html)).toContain(link);
+    expect(email.subject).toContain(FIXTURE_REFERENCE);
+  });
+
+  it('puts the token in the path of a link on the site, never in a query string', () => {
+    const email = renderFixture(emailFixture('booking_confirmation'));
+    const url = new URL(hrefs(email.html).find((href) => href.includes(FIXTURE_ACCESS_TOKEN)) ?? '');
+
+    expect(url.origin).toBe(FIXTURE_WEB_ORIGIN);
+    expect(url.pathname).toBe(`/booking/${FIXTURE_ACCESS_TOKEN}`);
+    expect(url.search).toBe('');
+    expect(url.hash).toBe('');
+  });
+
+  it.each(
+    EMAIL_FIXTURES.filter((fixture) => 'accessToken' in fixture.payload).map((fixture) => [fixture.name, fixture] as const),
+  )('%s carries the raw token nowhere except inside the booking link', (_name, fixture) => {
+    const email = renderFixture(fixture);
+
+    expect(email.subject).not.toContain(FIXTURE_ACCESS_TOKEN);
+    for (const body of [email.html, email.text]) {
+      expect(body).toContain(link);
+      expect(body.replaceAll(link, '<link>')).not.toContain(FIXTURE_ACCESS_TOKEN);
+    }
+    // Every URL that carries it is exactly that link.
+    for (const url of [...urlsIn(email.text), ...hrefs(email.html)].filter((u) => u.includes(FIXTURE_ACCESS_TOKEN))) {
+      expect(url).toBe(link);
+    }
+  });
+
+  it('password_reset carries its token only inside the reset link', () => {
+    const email = renderFixture(emailFixture('admin_alert password_reset'));
+    const resetUrl = `${FIXTURE_WEB_ORIGIN}/admin/reset-password#token=${FIXTURE_RESET_TOKEN}`;
+
+    expect(email.subject).not.toContain(FIXTURE_RESET_TOKEN);
+    expect(hrefs(email.html)).toContain(resetUrl);
+    for (const body of [email.html, email.text]) {
+      expect(body).toContain(resetUrl);
+      expect(body.replaceAll(resetUrl, '<link>')).not.toContain(FIXTURE_RESET_TOKEN);
+    }
+  });
+});
+
+// --- Links -----------------------------------------------------------------------------
+
+describe('links point at WEB_ORIGIN, never at the API host', () => {
+  it.each(EMAIL_FIXTURES.map((fixture) => [fixture.name, fixture] as const))('%s', (_name, fixture) => {
+    const email = renderFixture(fixture);
+    const links = [...hrefs(email.html), ...urlsIn(email.html), ...urlsIn(email.text)];
+    const delivery = fixture.template === 'photo_delivery' ? String((fixture.payload as Payload).deliveryUrl) : null;
+
+    for (const url of links) {
+      expect(url).not.toMatch(/:4000|\/api(\/|$)|localhost/);
+      if (url === delivery) continue;
+      expect(url.startsWith(`${FIXTURE_WEB_ORIGIN}/`), url).toBe(true);
+    }
+  });
+
+  it('gives every email with an action a link, so the check above is not vacuous', () => {
+    const withoutLinks = EMAIL_FIXTURES.filter((fixture) => hrefs(renderFixture(fixture).html).length === 0).map(
+      (fixture) => fixture.name,
+    );
+    expect(withoutLinks.sort()).toEqual(
+      ['admin_alert booking_cancelled', 'admin_alert retries_exhausted', 'cancellation (by admin)', 'cancellation (by client)'].sort(),
+    );
+  });
+
+  it('follows WEB_ORIGIN in development too, never the API port', () => {
+    const webOrigin = 'http://localhost:5173';
+    for (const fixture of EMAIL_FIXTURES) {
+      const payload =
+        fixture.name === 'admin_alert password_reset'
+          ? { ...(fixture.payload as Payload), resetUrl: `${webOrigin}/admin/reset-password#token=${FIXTURE_RESET_TOKEN}` }
+          : fixture.payload;
+      const email = renderEmail(fixture.template, payload, { webOrigin });
+      for (const url of [...hrefs(email.html), ...urlsIn(email.text)]) {
+        if (fixture.template === 'photo_delivery' && url.startsWith('https://photos.')) continue;
+        expect(url.startsWith(`${webOrigin}/`), `${fixture.name}: ${url}`).toBe(true);
+      }
+    }
+  });
+
+  it.each([
+    ['the API host', 'http://localhost:4000/api/admin/reset-password#token=abc'],
+    ['another site', 'https://evil.example/admin/reset-password#token=abc'],
+    ['a look-alike subdomain', 'https://bookly.example.evil.example/admin/reset-password#token=abc'],
+    ['userinfo trickery', 'https://bookly.example@evil.example/admin/reset-password#token=abc'],
+    ['plain http on the same host', 'http://bookly.example/admin/reset-password#token=abc'],
+    ['a javascript: URL', 'javascript:alert(document.cookie)'],
+    ['not a URL at all', 'reset-password#token=abc'],
+  ])('refuses a password_reset link on %s', (_case, resetUrl) => {
+    const { template, payload } = withPayload('admin_alert password_reset', { resetUrl });
+
+    const error = payloadError(() => render(template, payload));
+    expect(error.message).not.toContain('abc');
+    expect(error.message).not.toContain('evil');
+  });
+});
+
+// --- Escaping ------------------------------------------------------------------------
+
+describe('escaping', () => {
+  const HOSTILE = `<script>alert("x")</script> & <img src=x onerror='y'>`;
+  const ESCAPED = '&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &lt;img src=x onerror=&#39;y&#39;&gt;';
+
+  const fields: [fixture: string, field: string, value: unknown][] = [
+    ['booking_confirmation', 'clientName', HOSTILE],
+    ['booking_confirmation', 'serviceName', HOSTILE],
+    ['booking_confirmation', 'packageName', HOSTILE],
+    ['booking_confirmation', 'locationText', HOSTILE],
+    ['admin_new_booking', 'clientName', HOSTILE],
+    ['admin_new_booking', 'specialRequests', HOSTILE],
+    ['admin_new_booking', 'addons', [{ name: HOSTILE, priceRwf: 5000 }]],
+    ['session_fee_request', 'clientName', HOSTILE],
+    ['payment_receipt', 'paymentReference', HOSTILE],
+    ['photo_delivery', 'note', HOSTILE],
+    ['photo_delivery', 'clientName', HOSTILE],
+    ['cancellation (by admin)', 'reason', HOSTILE],
+    ['cancellation (by client)', 'clientName', HOSTILE],
+    ['reschedule', 'locationText', HOSTILE],
+    ['access_link_resend', 'serviceName', HOSTILE],
+    ['admin_alert payment_received', 'clientName', HOSTILE],
+    ['admin_alert retries_exhausted', 'lastError', HOSTILE],
+    ['admin_alert refund_due', 'paymentReference', HOSTILE],
+    ['admin_alert booking_cancelled', 'clientName', HOSTILE],
+  ];
+
+  it.each(fields)('%s: %s is escaped in HTML and literal in text', (name, field, value) => {
+    const email = renderWith(name, { [field]: value });
+
+    expect(email.html).not.toMatch(/<script|<img/i);
+    expect(email.html).toContain(ESCAPED);
+    expect(email.text).toContain(HOSTILE);
+  });
+
+  it('keeps a visitor’s own line breaks, as <br> in HTML and as newlines in text', () => {
+    const email = renderFixture(emailFixture('admin_new_booking'));
+
+    expect(email.html).toContain('Outdoor shots if the weather allows.<br>Please bring a reflector.');
+    expect(email.text).toContain('Outdoor shots if the weather allows.\nPlease bring a reflector.');
+  });
+
+  it.each([
+    ['admin_new_booking', 'clientName'],
+    ['booking_confirmation', 'serviceName'],
+    ['admin_alert payment_received', 'clientName'],
+    ['admin_alert refund_due', 'clientName'],
+    ['admin_alert booking_cancelled', 'clientName'],
+  ])('%s: CR/LF in %s cannot inject a header through the subject', (name, field) => {
+    for (const value of ['Eve\r\nBcc: attacker@evil.example', 'Eve\nBcc: attacker@evil.example', 'Eve\rBcc: attacker@evil.example']) {
+      const email = renderWith(name, { [field]: value });
+
+      expect(email.subject).not.toMatch(/[\r\n]/);
+      expect(email.subject).toContain('Eve Bcc: attacker@evil.example');
+      expect(email.html).not.toMatch(/<title>[^<]*[\r\n]/);
+    }
+  });
+
+  it.each([
+    ['admin_alert booking_cancelled', 'clientName', '{{reference}}'],
+    ['admin_alert payment_received', 'clientName', '{{reference}}'],
+    ['admin_new_booking', 'clientName', '{{date}}'],
+    ['booking_confirmation', 'serviceName', '{{reference}}'],
+    ['admin_alert booking_cancelled', 'clientName', '$t(email:common.footer)'],
+    ['admin_alert booking_cancelled', 'clientName', '$& $1 $$'],
+  ])('%s: interpolation syntax in %s (%s) is shown literally, not interpreted', (name, field, value) => {
+    const fixture = emailFixture(name);
+    const email = renderWith(name, { [field]: value });
+    const baseline = renderFixture(fixture);
+    const original = String((fixture.payload as Payload)[field]);
+
+    // Exactly the baseline with the original value swapped for the typed one.
+    expect(email.subject).toBe(baseline.subject.replace(original, () => value));
+    expect(email.text).toBe(baseline.text.replaceAll(original, () => value));
+  });
+});
+
+// --- Validation ------------------------------------------------------------------------
+
+describe('payload validation', () => {
+  it('names every missing field, and nothing else', () => {
+    const { payload } = withPayload('booking_confirmation', {});
+    delete payload.accessToken;
+    delete payload.locationText;
+
+    const error = payloadError(() => render('booking_confirmation', payload));
+
+    expect(error.message).toBe('The booking_confirmation payload is invalid at: locationText, accessToken');
+  });
+
+  it('never repeats an offending value: not a token, an address or a name', () => {
+    const cases: [string, Payload, string, string][] = [
+      ['booking_confirmation', { accessToken: 'SECRET-token-with-illegal-characters!!' }, 'accessToken', 'SECRET-token'],
+      ['admin_new_booking', { clientEmail: 'not-an-address-private-person' }, 'clientEmail', 'private-person'],
+      ['booking_confirmation', { clientName: 'x'.repeat(201) + 'PRIVATE' }, 'clientName', 'PRIVATE'],
+      ['admin_alert password_reset', { resetUrl: 'not a url PRIVATE-TOKEN' }, 'resetUrl', 'PRIVATE-TOKEN'],
+      ['photo_delivery', { deliveryUrl: 'http://drive.example/PRIVATE-share' }, '', 'PRIVATE-share'],
+    ];
+    for (const [name, changes, path, secret] of cases) {
+      const { template, payload } = withPayload(name, changes);
+      const error = payloadError(() => render(template, payload));
+      expect(error.message).toContain(path);
+      expect(error.message).not.toContain(secret);
+    }
+  });
+
+  it.each([
+    ['a fraction', 18_000.5],
+    ['a negative amount', -1],
+    ['a numeric string', '18000'],
+    ['NaN', Number.NaN],
+    ['an unsafe integer', 2 ** 60],
+  ])('rejects %s as an amount', (_case, amount) => {
+    const error = payloadError(() => renderWith('booking_confirmation', { paidRwf: amount }));
+    expect(error.message).toBe('The booking_confirmation payload is invalid at: paidRwf');
+  });
+
+  it('names nested paths', () => {
+    const error = payloadError(() => renderWith('admin_new_booking', { addons: [{ name: 'Prints', priceRwf: 1.5 }] }));
+    expect(error.message).toBe('The admin_new_booking payload is invalid at: addons.0.priceRwf');
+  });
+
+  it.each(['http://photos.example-host.com/s/abc', 'javascript:alert(1)', 'ftp://photos.example-host.com/abc', 'not a url'])(
+    'rejects a delivery link that is not https: %s',
+    (deliveryUrl) => {
+      expect(() => renderWith('photo_delivery', { deliveryUrl })).toThrow(EmailPayloadError);
+    },
+  );
+
+  it.each([
+    ['a date that does not exist', { expiresOn: '2026-02-30' }, 'photo_delivery'],
+    ['an instant for a date', { expiresOn: '2027-01-01T00:00:00Z' }, 'photo_delivery'],
+    ['a local time without an offset', { startsAt: '2026-10-07T09:30:00' }, 'booking_confirmation'],
+    ['prose for an instant', { startsAt: '7 October 2026' }, 'booking_confirmation'],
+    ['a short token', { accessToken: 'abc' }, 'booking_confirmation'],
+    ['an unknown cancelledBy', { cancelledBy: 'system' }, 'cancellation (by client)'],
+    ['an unknown payment kind', { kind: 'tip' }, 'payment_receipt'],
+    ['an unknown refund reason', { reason: 'goodwill' }, 'admin_alert refund_due'],
+    ['an unknown provider', { provider: 'stripe' }, 'admin_alert refund_due'],
+    ['an unknown message kind', { messageKind: 'sms' }, 'admin_alert retries_exhausted'],
+    ['a zero lockout count', { failedLoginCount: 0 }, 'admin_alert login_lockout'],
+    ['an empty reference', { reference: '   ' }, 'session_fee_request'],
+  ])('rejects %s', (_case, changes, name) => {
+    expect(() => renderWith(name, changes)).toThrow(EmailPayloadError);
+  });
+
+  it('rejects an unknown admin_alert variant, or none, naming variant', () => {
+    expect(payloadError(() => render('admin_alert', { variant: 'weekly_digest' })).message).toContain('variant');
+    expect(payloadError(() => render('admin_alert', { failedLoginCount: 5 })).message).toContain('variant');
+  });
+
+  it.each([null, undefined, 'a string', 42, []])('rejects a payload that is not an object: %s', (payload) => {
+    expect(payloadError(() => render('booking_confirmation', payload)).message).toContain('booking_confirmation');
+  });
+
+  it.each(['booking_invite', '', '__proto__', 'constructor', 'toString'])('rejects an unknown template: "%s"', (template) => {
+    expect(() => render(template, {})).toThrow(EmailPayloadError);
+  });
+
+  it.each(['fr', 'xx', '', null, undefined, 'EN', 'en-GB'])('falls back to English for locale %s', (locale) => {
+    for (const fixture of EMAIL_FIXTURES) {
+      expect(render(fixture.template, fixture.payload, locale)).toEqual(renderFixture(fixture));
+    }
+  });
+
+  it('defaults the optional admin_new_booking fields', () => {
+    const { payload } = withPayload('admin_new_booking', {});
+    delete payload.partySize;
+    delete payload.specialRequests;
+    delete payload.addons;
+
+    const email = render('admin_new_booking', payload);
+
+    expect(email.text).toContain('People: Not given');
+    expect(email.text).toContain('Special requests: Not given');
+  });
+});
+
+// --- Content rules ---------------------------------------------------------------------
+
+describe('content rules', () => {
+  it('a client cancellation says the booking fee is non-refundable, and shows no reason', () => {
+    const email = renderWith('cancellation (by client)', { reason: 'I changed my mind' });
+
+    expect(email.text).toContain('the booking fee of 18,000 RWF is non-refundable');
+    expect(email.html).toContain('non-refundable');
+    expect(email.text).not.toContain('Reason:');
+    expect(email.text).not.toContain('I changed my mind');
+    expect(email.text).not.toMatch(/refund of/);
+  });
+
+  it('a client cancellation after a paid session fee also promises that refund', () => {
+    const email = renderWith('cancellation (by client)', { refundRwf: 27_000 });
+
+    expect(email.text).toContain('non-refundable');
+    expect(email.text).toContain('We owe you a refund of 27,000 RWF');
+  });
+
+  it('an admin cancellation shows the reason and the refund, and never calls the fee non-refundable', () => {
+    const email = renderFixture(emailFixture('cancellation (by admin)'));
+
+    expect(email.text).toContain('Reason: The photographer is unwell.');
+    expect(email.text).toContain('We owe you a refund of 18,000 RWF');
+    expect(email.text).not.toMatch(/non-refundable/i);
+    // The system never moves money (spec §6.16): a promise to arrange, not a refund made.
+    expect(email.text).not.toMatch(/(have|has been) refunded/i);
+  });
+
+  it('photo_delivery states the expiry date as text', () => {
+    const email = renderFixture(emailFixture('photo_delivery'));
+
+    expect(email.text).toContain('The download link works until the end of Friday, 1 January 2027 (Kigali time).');
+    expect(email.html).toContain('Friday, 1 January 2027');
+    expect(hrefs(email.html)).toContain('https://photos.example-host.com/s/abc123');
+  });
+
+  it('payment_receipt says paid in full only when nothing is outstanding', () => {
+    expect(renderWith('payment_receipt', { outstandingRwf: 0 }).text).toContain('paid in full');
+    const partial = renderWith('payment_receipt', { outstandingRwf: 5_000, paidRwf: 40_000 });
+    expect(partial.text).not.toMatch(/paid in full/i);
+    expect(partial.html).not.toMatch(/paid in full/i);
+  });
+
+  it('booking_confirmation says paid in full only when nothing is outstanding', () => {
+    expect(renderWith('booking_confirmation', { outstandingRwf: 0 }).text).toContain('paid in full');
+    expect(renderFixture(emailFixture('booking_confirmation')).text).not.toMatch(/paid in full/i);
+  });
+
+  it('access_link_resend says older links no longer work', () => {
+    expect(renderFixture(emailFixture('access_link_resend')).text).toContain('Any link we sent you before no longer works.');
+  });
+
+  it('reschedule shows both the old and the new time', () => {
+    const email = renderFixture(emailFixture('reschedule'));
+
+    expect(email.text).toContain('Was: Wednesday, 7 October 2026, 09:30 to 10:30 (Kigali time)');
+    expect(email.text).toContain('Now: Friday, 9 October 2026, 11:00 to 12:00 (Kigali time)');
+  });
+
+  it('refund_due tells the photographer the system does not move money', () => {
+    const email = renderFixture(emailFixture('admin_alert refund_due'));
+
+    expect(email.text).toContain('The system does not move money. Refund the client through MTN MoMo');
+  });
+
+  it('no template mentions a processing fee', () => {
+    expect(JSON.stringify(en.email)).not.toMatch(/processing fee|transaction fee|service charge/i);
+    for (const fixture of EMAIL_FIXTURES) {
+      const email = renderFixture(fixture);
+      expect([email.subject, email.text, email.html].join('\n')).not.toMatch(/processing fee|transaction fee|service charge/i);
+    }
+  });
+
+  it.each([
+    ...EMAIL_TEMPLATES.map((template) => ['email', template] as const),
+    ...OUTBOX_KINDS.filter((kind) => kind !== 'email').map((kind) => [kind, null] as const),
+    ['email', null] as const,
+  ])('a retries_exhausted alert for %s %s names the message in words, not a translation key', (messageKind, template) => {
+    const email = render('admin_alert', {
+      variant: 'retries_exhausted',
+      messageKind,
+      template,
+      bookingReference: null,
+      attempts: 8,
+      lastError: 'Error: boom',
+    });
+
+    const line = email.text.split('\n').find((l) => l.startsWith('Message: ')) ?? '';
+    expect(line).toMatch(/^Message: [A-Z][a-z]+( [A-Za-z]+)+$/);
+    expect(email.text).not.toContain('retriesExhausted');
+  });
+});
+
+describe('the registry', () => {
+  it('holds one definition per template, each with a schema and a composer', () => {
+    expect(Object.keys(TEMPLATES).sort()).toEqual([...EMAIL_TEMPLATES].sort());
+    for (const definition of Object.values(TEMPLATES)) {
+      expect(typeof definition.payload.safeParse).toBe('function');
+      expect(typeof definition.compose).toBe('function');
+    }
+  });
+});

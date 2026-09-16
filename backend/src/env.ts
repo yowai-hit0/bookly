@@ -22,6 +22,18 @@ const schema = z.object({
    *  minimum key length, so this floor is the only one. Rotating it invalidates
    *  every issued token -- the only "revoke everything" there is. */
   SESSION_SECRET: z.string().min(32),
+  /** Resend API key (plan.md Stack decisions). Required in production; without
+   *  it in development, emails are written to MAIL_OUTPUT_DIR instead of sent. */
+  RESEND_API_KEY: z.string().min(1).optional(),
+  /** The sender, on a domain verified with the provider. */
+  MAIL_FROM: z.string().min(3).default('Bookly <bookings@localhost>'),
+  /** Where replies go, if not to MAIL_FROM. */
+  MAIL_REPLY_TO: z.email().optional(),
+  /** Development only: rendered emails land here when no RESEND_API_KEY is set. */
+  MAIL_OUTPUT_DIR: z.string().min(1).default('.mail'),
+}).refine((env) => env.NODE_ENV !== 'production' || env.RESEND_API_KEY !== undefined, {
+  message: 'RESEND_API_KEY is required in production: without it no email would ever be sent',
+  path: ['RESEND_API_KEY'],
 });
 
 export type Env = z.infer<typeof schema>;

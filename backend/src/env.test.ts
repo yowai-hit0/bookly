@@ -36,3 +36,42 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ ...valid, PAYMENT_PROVIDER: 'stripe' })).toThrow(EnvValidationError);
   });
 });
+
+describe('parseEnv: email (plan.md Task 15)', () => {
+  it('defaults the sender and the development mail folder, and leaves the key and reply-to unset', () => {
+    const env = parseEnv(valid);
+    expect(env.MAIL_FROM).toBe('Bookly <bookings@localhost>');
+    expect(env.MAIL_OUTPUT_DIR).toBe('.mail');
+    expect(env.RESEND_API_KEY).toBeUndefined();
+    expect(env.MAIL_REPLY_TO).toBeUndefined();
+  });
+
+  it.each(['development', 'test'])('does not require RESEND_API_KEY in %s', (NODE_ENV) => {
+    expect(parseEnv({ ...valid, NODE_ENV }).RESEND_API_KEY).toBeUndefined();
+  });
+
+  it('requires RESEND_API_KEY in production, naming it', () => {
+    expect(() => parseEnv({ ...valid, NODE_ENV: 'production' })).toThrow(EnvValidationError);
+    expect(() => parseEnv({ ...valid, NODE_ENV: 'production' })).toThrow(/RESEND_API_KEY/);
+    expect(() => parseEnv({ ...valid, NODE_ENV: 'production', RESEND_API_KEY: '' })).toThrow(/RESEND_API_KEY/);
+    expect(parseEnv({ ...valid, NODE_ENV: 'production', RESEND_API_KEY: 're_live_key' }).RESEND_API_KEY).toBe('re_live_key');
+  });
+
+  it('reads the configured sender, reply-to and folder', () => {
+    const env = parseEnv({
+      ...valid,
+      MAIL_FROM: 'Bookly Studio <hello@bookly.example>',
+      MAIL_REPLY_TO: 'photographer@bookly.example',
+      MAIL_OUTPUT_DIR: 'tmp/mail',
+    });
+    expect(env).toMatchObject({
+      MAIL_FROM: 'Bookly Studio <hello@bookly.example>',
+      MAIL_REPLY_TO: 'photographer@bookly.example',
+      MAIL_OUTPUT_DIR: 'tmp/mail',
+    });
+  });
+
+  it('rejects a MAIL_REPLY_TO that is not an address, naming it', () => {
+    expect(() => parseEnv({ ...valid, MAIL_REPLY_TO: 'not an address' })).toThrow(/MAIL_REPLY_TO/);
+  });
+});
