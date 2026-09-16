@@ -5,6 +5,7 @@ import type { AuthDeps } from './auth/admin-auth.js';
 import { adminRouter } from './routes/admin.js';
 import { healthRouter } from './routes/health.js';
 import { availabilityRouter } from './routes/public-availability.js';
+import { bookingsRouter } from './routes/public-bookings.js';
 import { publicCatalogueRouter } from './routes/public-catalogue.js';
 
 // Dev/test default, kept in sync with vite.config.ts's port and .env.example's
@@ -17,8 +18,8 @@ export type AppOptions = {
    *  which keeps the health checks free of a database. */
   admin?: AuthDeps;
   /** Mounts the anonymous public routes (`/api/services`, `/api/quote`,
-   *  `/api/availability`). Omitted, they 404 too, for the same reason. `now` is
-   *  the injected clock availability measures lead time against. */
+   *  `/api/availability`, `/api/bookings`). Omitted, they 404 too, for the same
+   *  reason. `now` is the injected clock lead time and consent are measured by. */
   publicApi?: { prisma: PrismaClient; now?: () => Date };
 };
 
@@ -38,6 +39,7 @@ export function createApp(options: AppOptions = {}): Express {
     const { prisma, now = () => new Date() } = options.publicApi;
     app.use('/api', publicCatalogueRouter(prisma));
     app.use('/api/availability', availabilityRouter(prisma, now));
+    app.use('/api/bookings', bookingsRouter(prisma, now));
   }
   if (options.admin) app.use('/api/admin', adminRouter(options.admin));
 

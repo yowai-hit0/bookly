@@ -62,6 +62,48 @@
       "checkFailed": "Could not confirm that time is still free. Check your connection and try again.",
       "selected": "Selected: {{date}}, {{start}} to {{end}}, Kigali time"
     },
+    "booking": {
+      "title": "Your details",
+      "intro": "We use these to arrange your shoot and to send your confirmation.",
+      "fields": {
+        "fullName": "Full name",
+        "email": "Email",
+        "phone": "Phone number",
+        "location": "Shoot location",
+        "partySize": "Number of people",
+        "specialRequests": "Special requests"
+      },
+      "hints": {
+        "phone": "Include your country code if your number is not Rwandan.",
+        "partySize": "Leave blank for a product shoot.",
+        "specialRequests": "Optional."
+      },
+      "invalid": {
+        "fullName": "Enter your full name.",
+        "email": "Enter a valid email address.",
+        "phone": "Enter a phone number we can reach you on.",
+        "location": "Tell us where the shoot will take place.",
+        "partySize": "Enter a whole number of people, at least 1, or leave it blank.",
+        "specialRequests": "Keep special requests under 2,000 characters.",
+        "consent": "Tick the box to agree before you book."
+      },
+      "consent": "I agree that Bookly may use these details to arrange and deliver my booking.",
+      "chooseTimeFirst": "Choose a date and time to continue.",
+      "submit": "Confirm booking",
+      "submitting": "Booking…",
+      "failed": "Your booking did not go through. Check your connection and try again.",
+      "catalogueChanged": "Something you chose is no longer available. Reload the page to see what is on offer now.",
+      "held": {
+        "title": "Your time is held",
+        "reference": "Booking reference",
+        "service": "Service",
+        "serviceValue": "{{service}}, {{package}}",
+        "when": "When",
+        "whenValue": "{{date}}, {{start}} to {{end}}, Kigali time",
+        "holdUntil": "We are holding this time for you until {{time}}, Kigali time. Pay the booking fee of {{fee}} before then to confirm your booking; after that, the time is released for others to book.",
+        "holdUntilUnknown": "We are holding this time for you for a short while. Pay the booking fee of {{fee}} to confirm your booking."
+      }
+    },
     "summary": {
       "title": "Price summary",
       "pickPackage": "Choose a package to see your total.",

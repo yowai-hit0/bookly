@@ -1,10 +1,10 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useCallback, useState } from 'react'
+import { type RefObject, createRef, useCallback, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@/i18n'
 import type { DayAvailability } from '@/catalogue/availability'
-import { SlotPicker } from './SlotPicker'
+import { SlotPicker, type SlotPickerHandle } from './SlotPicker'
 
 /**
  * The public calendar and slot picker (plan.md Task 12; spec §3.1 steps 4-5,
@@ -967,5 +967,157 @@ describe('the keyboard', () => {
     await act(async () => check.resolve(json({ days: OCTOBER_SHORT })))
 
     expect(screen.getByRole('button', { name: '10:00' })).toHaveFocus()
+  })
+})
+
+// --- Told by the page that a start was refused (plan.md Task 13) -------------------------------
+
+describe('reportTaken, when the booking API refuses the chosen start', () => {
+  type RefHarnessProps = {
+    handle: RefObject<SlotPickerHandle | null>
+    onChange: (start: string | null) => void
+    initialValue?: string | null
+  }
+
+  /** The picker as ServiceDetail holds it: a stable setter fed back as `value`, and a ref to its handle. */
+  function RefHarness({ handle, onChange, initialValue = null }: RefHarnessProps) {
+    const [value, setValue] = useState<string | null>(initialValue)
+    const handleChange = useCallback(
+      (start: string | null) => {
+        onChange(start)
+        setValue(start)
+      },
+      [onChange],
+    )
+    return (
+      <>
+        <SlotPicker ref={handle} packageId="p1" durationMinutes={60} value={value} onChange={handleChange} />
+        <button type="button">Elsewhere on the page</button>
+      </>
+    )
+  }
+
+  function renderWithHandle(initialValue: string | null = null) {
+    const handle = createRef<SlotPickerHandle>()
+    const onChange = vi.fn<(start: string | null) => void>()
+    render(<RefHarness handle={handle} onChange={onChange} initialValue={initialValue} />)
+    const reportTaken = (start: string) =>
+      act(() => {
+        if (handle.current === null) throw new Error('SlotPicker exposed no handle')
+        handle.current.reportTaken(start)
+      })
+    return { onChange, reportTaken }
+  }
+
+  function requests(sent: Sent[]): string[] {
+    return sent.map(({ packageId, month }) => `${packageId}|${month}`)
+  }
+
+  it('clears the start, focuses the "just taken" alert, and reloads the month on screen', async () => {
+    const refreshed = monthDays('2026-10', { '2026-10-07': ['09:00', '10:00', '14:00'], '2026-10-08': ['11:00'] })
+    const sent = stubApi({ 'p1|2026-10': [OCTOBER_SHORT, OCTOBER_SHORT, refreshed] })
+    const { onChange, reportTaken } = renderWithHandle()
+    await loadedMonth('October 2026')
+    const u = user()
+    await u.click(dayButton(`${WEDNESDAY}, 4 times available`))
+    await u.click(screen.getByRole('button', { name: '09:30' }))
+    await waitFor(() => expect(selectedText()).toBe(`Selected: ${WEDNESDAY}, 09:30 to 10:30, Kigali time`))
+    screen.getByRole('button', { name: 'Elsewhere on the page' }).focus()
+
+    await reportTaken(at('2026-10-07', '09:30'))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(JUST_TAKEN)
+    await waitFor(() => expect(alert).toHaveFocus())
+    expect(onChange.mock.calls).toEqual([[at('2026-10-07', '09:30')], [null]])
+    expect(selectedText()).toBeNull()
+    // Asked again, and the fresh answer is what is shown.
+    await waitFor(() => expect(listedTimes()).toEqual(['09:00', '10:00', '14:00']))
+    expect(requests(sent)).toEqual(['p1|2026-10', 'p1|2026-10', 'p1|2026-10'])
+    expect(sent.every(({ cache }) => cache === 'no-store')).toBe(true)
+    expect(dayButton(`${WEDNESDAY}, 3 times available`)).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '10:00' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('goes back to the start’s own month and date when the visitor has browsed to another', async () => {
+    const refreshed = monthDays('2026-10', { '2026-10-07': ['09:00', '14:00'] })
+    const sent = stubApi({ 'p1|2026-10': [OCTOBER_SHORT, OCTOBER_SHORT, refreshed], 'p1|2026-11': [NOVEMBER_SHORT] })
+    const { onChange, reportTaken } = renderWithHandle()
+    await loadedMonth('October 2026')
+    const u = user()
+    await u.click(dayButton(`${WEDNESDAY}, 4 times available`))
+    await u.click(screen.getByRole('button', { name: '10:00' }))
+    await waitFor(() => expect(selectedText()).not.toBeNull())
+    await u.click(screen.getByRole('button', { name: 'Next month' }))
+    await loadedMonth('November 2026')
+    await u.click(dayButton('Monday, 2 November 2026, 2 times available'))
+
+    await reportTaken(at('2026-10-07', '10:00'))
+
+    await loadedMonth('October 2026')
+    expect(screen.getByRole('heading', { level: 3, name: 'October 2026' })).toBeInTheDocument()
+    await waitFor(() => expect(listedTimes()).toEqual(['09:00', '14:00']))
+    expect(dayButton(`${WEDNESDAY}, 2 times available`)).toHaveAttribute('aria-pressed', 'true')
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent(JUST_TAKEN)
+    await waitFor(() => expect(alert).toHaveFocus())
+    expect(onChange.mock.calls.at(-1)).toEqual([null])
+    expect(selectedText()).toBeNull()
+    expect(requests(sent)).toEqual(['p1|2026-10', 'p1|2026-10', 'p1|2026-11', 'p1|2026-10'])
+  })
+
+  it('opens the start’s month for a start chosen before the picker mounted', async () => {
+    const sent = stubApi({ 'p1|2026-11': [NOVEMBER_SHORT, monthDays('2026-11', { '2026-11-02': ['10:00'] })] })
+    const { reportTaken } = renderWithHandle(at('2026-11-02', '10:30'))
+    await loadedMonth('November 2026')
+
+    await reportTaken(at('2026-11-02', '10:30'))
+
+    await waitFor(() => expect(listedTimes()).toEqual(['10:00']))
+    expect(dayButton('Monday, 2 November 2026, 1 time available')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('alert')).toHaveTextContent(JUST_TAKEN)
+    expect(selectedText()).toBeNull()
+    expect(requests(sent)).toEqual(['p1|2026-11', 'p1|2026-11'])
+  })
+
+  it('moves focus to the alert again when a second start is refused', async () => {
+    stubApi({ 'p1|2026-10': [OCTOBER_SHORT] })
+    const { reportTaken } = renderWithHandle()
+    await loadedMonth('October 2026')
+    const u = user()
+    await u.click(dayButton(`${WEDNESDAY}, 4 times available`))
+    await u.click(screen.getByRole('button', { name: '09:00' }))
+    await waitFor(() => expect(selectedText()).not.toBeNull())
+
+    await reportTaken(at('2026-10-07', '09:00'))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveFocus())
+
+    // The visitor picks again on the same date, then is refused again.
+    await u.click(screen.getByRole('button', { name: '14:00' }))
+    await waitFor(() => expect(selectedText()).not.toBeNull())
+    screen.getByRole('button', { name: 'Elsewhere on the page' }).focus()
+    await reportTaken(at('2026-10-07', '14:00'))
+
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveFocus())
+    expect(selectedText()).toBeNull()
+  })
+
+  it('lets the visitor choose a refreshed start straight away, which clears the alert', async () => {
+    const refreshed = monthDays('2026-10', { '2026-10-07': ['09:00', '14:00'] })
+    stubApi({ 'p1|2026-10': [OCTOBER_SHORT, OCTOBER_SHORT, refreshed] })
+    const { onChange, reportTaken } = renderWithHandle()
+    await loadedMonth('October 2026')
+    const u = user()
+    await u.click(dayButton(`${WEDNESDAY}, 4 times available`))
+    await u.click(screen.getByRole('button', { name: '09:30' }))
+    await waitFor(() => expect(selectedText()).not.toBeNull())
+    await reportTaken(at('2026-10-07', '09:30'))
+    await waitFor(() => expect(listedTimes()).toEqual(['09:00', '14:00']))
+
+    await u.click(screen.getByRole('button', { name: '14:00' }))
+
+    await waitFor(() => expect(selectedText()).toBe(`Selected: ${WEDNESDAY}, 14:00 to 15:00, Kigali time`))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(onChange.mock.calls.at(-1)).toEqual([at('2026-10-07', '14:00')])
   })
 })

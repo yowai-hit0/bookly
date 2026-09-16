@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useEffect, useId, useRef, useState } from 'react'
+import { type Ref, useEffect, useId, useImperativeHandle, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type KigaliDate, kigaliDateOf } from '@/admin/calendar-dates'
 import {
@@ -36,12 +36,23 @@ import { cn } from '@/lib/utils'
  * skips it.
  */
 
+/** What the page can tell the picker. */
+export type SlotPickerHandle = {
+  /**
+   * The API refused `start` when the booking was submitted (spec §6.1, plan.md
+   * Task 13): clear it, say plainly it was just taken, and refresh the calendar
+   * on its date -- the same state a click on a vanished start produces.
+   */
+  reportTaken: (start: string) => void
+}
+
 type Props = {
   packageId: string
   durationMinutes: number
   /** The chosen start, an ISO-8601 UTC instant, or null. */
   value: string | null
   onChange: (start: string | null) => void
+  ref?: Ref<SlotPickerHandle>
 }
 
 /** One month's load for one package. `days` is null when it failed. */
@@ -55,7 +66,7 @@ const MS_PER_MINUTE = 60_000
  *  spinning on a stalled mobile connection. A developer default. */
 const CHECK_TIMEOUT_MS = 15_000
 
-export function SlotPicker({ packageId, durationMinutes, value, onChange }: Props) {
+export function SlotPicker({ packageId, durationMinutes, value, onChange, ref }: Props) {
   const { t } = useTranslation()
   const headingId = useId()
   const monthLabelId = useId()
@@ -68,6 +79,8 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange }: Prop
   /** The start being checked, and for which package and month. */
   const [checking, setChecking] = useState<{ key: string; start: string } | null>(null)
   const [notice, setNotice] = useState<Notice>(null)
+  /** Bumped on every "just taken", so a second one moves focus again. */
+  const [takenCount, setTakenCount] = useState(0)
   const noticeRef = useRef<HTMLParagraphElement>(null)
 
   const key = `${packageId}|${month}`
@@ -121,10 +134,32 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange }: Prop
     return () => controller.abort()
   }, [value, month, packageId, onChange])
 
-  // The start just clicked has vanished from the page; put focus on the reason.
+  // The start just chosen has vanished from the page; put focus on the reason.
   useEffect(() => {
     if (notice === 'taken') noticeRef.current?.focus()
-  }, [notice])
+  }, [notice, takenCount])
+
+  function announceTaken() {
+    setNotice('taken')
+    setTakenCount((n) => n + 1)
+  }
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      reportTaken(start: string) {
+        onChange(null)
+        confirmedFor.current = null
+        setSelectedDate(kigaliDateOf(start))
+        announceTaken()
+        const startMonth = kigaliMonthOf(start)
+        // Reload the start's month: the month shown refetches, another one loads.
+        if (startMonth === month) setAttempt((n) => n + 1)
+        else setMonth(startMonth)
+      },
+    }),
+    [month, onChange],
+  )
 
   function showMonth(next: KigaliMonth) {
     setNotice(null)
@@ -155,7 +190,7 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange }: Prop
         onChange(start)
       } else {
         onChange(null)
-        setNotice('taken')
+        announceTaken()
       }
     } catch {
       // Still the current check: it failed or timed out, so say so. Superseded

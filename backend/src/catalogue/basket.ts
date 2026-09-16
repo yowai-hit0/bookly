@@ -1,5 +1,5 @@
-import type { PrismaClient } from '@prisma/client';
-import { getSettings } from '../settings/index.js';
+import type { Addon, Package, PrismaClient, Service } from '@prisma/client';
+import { type Settings, getSettings } from '../settings/index.js';
 import { BOOKABLE_PACKAGE, CATALOGUE_ORDER, type PublicAddon, effectiveBookingFeeRate, toPublicAddon } from './public.js';
 import { type Quote, quoteBasket } from './quote.js';
 
@@ -33,7 +33,26 @@ export type BasketResult =
   | { ok: true; quote: PricedBasket }
   | { ok: false; fields: ('packageId' | 'addonIds')[] };
 
-export async function priceBasket(prisma: PrismaClient, selection: BasketSelection): Promise<BasketResult> {
+/**
+ * The rows a basket was priced from, with the settings read alongside them.
+ * Booking creation snapshots exactly these (plan.md Task 13), so what a booking
+ * records is what its quote was computed from -- one read, not two that a
+ * price edit could fall between.
+ */
+export type ResolvedBasket = {
+  ok: true;
+  package: Package & { service: Service };
+  /** In the order `PricedBasket.addons` documents. */
+  addons: Addon[];
+  settings: Settings;
+  bookingFeeRate: number;
+  quote: Quote;
+};
+
+export async function resolveBasket(
+  prisma: PrismaClient,
+  selection: BasketSelection,
+): Promise<ResolvedBasket | { ok: false; fields: ('packageId' | 'addonIds')[] }> {
   const [pkg, settings] = await Promise.all([
     prisma.package.findFirst({
       where: { id: selection.packageId, ...BOOKABLE_PACKAGE },
@@ -69,6 +88,14 @@ export async function priceBasket(prisma: PrismaClient, selection: BasketSelecti
     bookingFeeRate,
   });
 
+  return { ok: true, package: pkg, addons, settings, bookingFeeRate, quote };
+}
+
+export async function priceBasket(prisma: PrismaClient, selection: BasketSelection): Promise<BasketResult> {
+  const basket = await resolveBasket(prisma, selection);
+  if (!basket.ok) return basket;
+
+  const { package: pkg, addons, bookingFeeRate, quote } = basket;
   return {
     ok: true,
     quote: {

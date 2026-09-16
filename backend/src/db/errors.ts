@@ -19,6 +19,10 @@ export const SQLSTATE = {
   FOREIGN_KEY_VIOLATION: '23503',
   /** A CHECK constraint refused the value. */
   CHECK_VIOLATION: '23514',
+  /** PostgreSQL broke a lock cycle by aborting this transaction. Safe to retry. */
+  DEADLOCK_DETECTED: '40P01',
+  /** A serializable transaction could not be ordered. Safe to retry. */
+  SERIALIZATION_FAILURE: '40001',
 } as const;
 
 export type Sqlstate = (typeof SQLSTATE)[keyof typeof SQLSTATE];
@@ -52,6 +56,21 @@ export function sqlstateOf(error: unknown): string | undefined {
 /** True when the error is `booking_no_overlap` refusing an overlap. */
 export function isSlotTaken(error: unknown): boolean {
   return sqlstateOf(error) === SQLSTATE.EXCLUSION_VIOLATION;
+}
+
+/**
+ * True when the database aborted the transaction to resolve contention -- a
+ * deadlock or a serialization failure -- so running it again is correct.
+ *
+ * The one place a Prisma code is branched on, because Prisma sometimes reports
+ * this with no SQLSTATE underneath: `P2034` is specifically "transaction failed
+ * due to a write conflict or a deadlock", unlike the path-dependent codes the
+ * module note warns about.
+ */
+export function isTransactionConflict(error: unknown): boolean {
+  const sqlstate = sqlstateOf(error);
+  if (sqlstate === SQLSTATE.DEADLOCK_DETECTED || sqlstate === SQLSTATE.SERIALIZATION_FAILURE) return true;
+  return isRecord(error) && typeof error.clientVersion === 'string' && error.code === 'P2034';
 }
 
 function driverCause(error: Record<string, unknown>): Record<string, unknown> | undefined {

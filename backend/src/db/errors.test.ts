@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SQLSTATE, isSlotTaken, sqlstateOf } from './errors.js';
+import { SQLSTATE, isSlotTaken, isTransactionConflict, sqlstateOf } from './errors.js';
 
 /**
  * The SQLSTATE seam, tested without a database (data-model_v2.md §9.2).
@@ -104,5 +104,35 @@ describe('isSlotTaken', () => {
     ['a plain Error', new Error('boom')],
   ])('is false for %s', (_label, value) => {
     expect(isSlotTaken(value)).toBe(false);
+  });
+});
+
+describe('isTransactionConflict', () => {
+  it('is true for a deadlock or a serialization failure, in either error shape', () => {
+    expect(isTransactionConflict(prismaError('P2010', { originalCode: '40P01', code: '40P01' }))).toBe(true);
+    expect(isTransactionConflict(prismaError('P2039', { originalCode: '40001', code: '40001' }))).toBe(true);
+    expect(isTransactionConflict({ code: SQLSTATE.DEADLOCK_DETECTED, severity: 'ERROR' })).toBe(true);
+    expect(isTransactionConflict({ code: SQLSTATE.SERIALIZATION_FAILURE, severity: 'ERROR' })).toBe(true);
+  });
+
+  it('is true for Prisma’s own write-conflict-or-deadlock error, which can carry no SQLSTATE', () => {
+    expect(isTransactionConflict(prismaError('P2034'))).toBe(true);
+  });
+
+  it('is false for a P2034-looking code that did not come from Prisma', () => {
+    // Only Prisma's errors carry clientVersion; a raw driver `code` is a SQLSTATE.
+    expect(isTransactionConflict({ code: 'P2034', severity: 'ERROR' })).toBe(false);
+  });
+
+  it('is false for the violations that are answers, not contention', () => {
+    expect(isTransactionConflict(prismaError('P2039', EXCLUSION_CAUSE))).toBe(false);
+    expect(isTransactionConflict({ code: SQLSTATE.UNIQUE_VIOLATION, severity: 'ERROR' })).toBe(false);
+    expect(isTransactionConflict(prismaError('P2028'))).toBe(false);
+  });
+
+  it('is false for anything that is not an error record', () => {
+    for (const value of [undefined, null, 'P2034', 40, new Error('deadlock detected')]) {
+      expect(isTransactionConflict(value)).toBe(false);
+    }
   });
 });

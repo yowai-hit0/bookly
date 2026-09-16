@@ -1,13 +1,22 @@
 import type { TFunction } from 'i18next'
-import { useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router'
 import { type PublicServiceDetail, fetchService } from '@/catalogue/api'
+import {
+  DETAIL_FIELDS,
+  type DetailField,
+  type HeldBooking,
+  parseBookingDetails,
+  submitBooking,
+} from '@/catalogue/bookings'
 import { Button } from '@/components/ui/button'
 import { formatMoney } from '@/lib/format'
 import { NotFound } from '@/pages/NotFound'
+import { BookingDetailsForm } from './BookingDetailsForm'
+import { BookingHeld } from './BookingHeld'
 import { PriceSummary } from './PriceSummary'
-import { SlotPicker } from './SlotPicker'
+import { SlotPicker, type SlotPickerHandle } from './SlotPicker'
 
 /**
  * One service's packages and add-ons, with a total that updates as they are
@@ -17,7 +26,8 @@ import { SlotPicker } from './SlotPicker'
  * for both, so a retired service does not exist to the public (spec §6.14).
  * Nothing is preselected -- the visitor picks the package they are buying.
  * Once a package is chosen, the slot picker offers its bookable starts
- * (plan.md Task 12).
+ * (plan.md Task 12), and the booking form below it creates the booking once a
+ * start is chosen (Task 13); the page then becomes the held booking's summary.
  */
 
 type Loaded =
@@ -79,10 +89,70 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
   const [addonIds, setAddonIds] = useState<ReadonlySet<string>>(new Set())
   /** The chosen start, an ISO instant, confirmed free by the API when chosen. */
   const [startsAt, setStartsAt] = useState<string | null>(null)
+  const formId = useId()
+  const picker = useRef<SlotPickerHandle>(null)
+  const [invalid, setInvalid] = useState<ReadonlySet<DetailField>>(new Set())
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<'failed' | 'catalogueChanged' | null>(null)
+  /** The booking the API created; the page becomes its confirmation. */
+  const [held, setHeld] = useState<HeldBooking | null>(null)
 
   const chosenPackage = service.packages.find((pkg) => pkg.id === packageId) ?? null
   // Catalogue order, whatever order they were ticked in.
   const chosenAddons = service.addons.filter((addon) => addonIds.has(addon.id))
+
+  /**
+   * Creates the booking (plan.md Task 13). The form's own check runs first as a
+   * convenience; the API's answer is what counts. A start the API refuses --
+   * taken in a race (409), or no longer offered (422 on `startsAt`) -- is the
+   * picker's "just taken" state with a refreshed calendar, never a dead end
+   * (spec §6.1). What the visitor typed stays in the form either way.
+   */
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = event.currentTarget
+    if (submitting || chosenPackage === null || startsAt === null) return
+    setSubmitError(null)
+
+    const parsed = parseBookingDetails(new FormData(form))
+    if (!parsed.ok) {
+      markInvalid(form, parsed.fields)
+      return
+    }
+    setInvalid(new Set())
+
+    setSubmitting(true)
+    const result = await submitBooking({
+      packageId: chosenPackage.id,
+      addonIds: chosenAddons.map((addon) => addon.id),
+      startsAt,
+      ...parsed.details,
+    })
+    setSubmitting(false)
+
+    if (result.status === 'created') {
+      setHeld(result.booking)
+      return
+    }
+    if (result.status === 'failed') {
+      setSubmitError('failed')
+      return
+    }
+
+    const fields: readonly string[] = result.status === 'slot_taken' ? ['startsAt'] : result.fields
+    const details = DETAIL_FIELDS.filter((field) => fields.includes(field))
+    const catalogueChanged = fields.includes('packageId') || fields.includes('addonIds')
+    if (catalogueChanged) setSubmitError('catalogueChanged')
+    if (details.length > 0) markInvalid(form, details)
+    if (fields.includes('startsAt')) picker.current?.reportTaken(startsAt)
+    if (!catalogueChanged && details.length === 0 && !fields.includes('startsAt')) setSubmitError('failed')
+  }
+
+  function markInvalid(form: HTMLFormElement, fields: readonly DetailField[]) {
+    setInvalid(new Set(fields))
+    const first = fields[0] === undefined ? null : form.elements.namedItem(fields[0])
+    if (first instanceof HTMLElement) first.focus()
+  }
 
   function toggleAddon(id: string, checked: boolean) {
     setAddonIds((current) => {
@@ -91,6 +161,14 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
       else next.delete(id)
       return next
     })
+  }
+
+  if (held !== null) {
+    return (
+      <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
+        <BookingHeld booking={held} />
+      </main>
+    )
   }
 
   return (
@@ -174,17 +252,44 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
                 <p className="text-muted-foreground text-sm">{t('services:picker.choosePackageFirst')}</p>
               </section>
             ) : (
-              <SlotPicker
-                packageId={chosenPackage.id}
-                durationMinutes={chosenPackage.durationMinutes}
-                value={startsAt}
-                onChange={setStartsAt}
-              />
+              <>
+                <SlotPicker
+                  ref={picker}
+                  packageId={chosenPackage.id}
+                  durationMinutes={chosenPackage.durationMinutes}
+                  value={startsAt}
+                  onChange={setStartsAt}
+                />
+                <BookingDetailsForm id={formId} invalid={invalid} onSubmit={(event) => void submit(event)} />
+              </>
             )}
           </div>
 
           <div className="lg:sticky lg:top-4">
-            <PriceSummary pkg={chosenPackage} addons={chosenAddons} bookingFeeRate={service.bookingFeeRate} />
+            <PriceSummary pkg={chosenPackage} addons={chosenAddons} bookingFeeRate={service.bookingFeeRate}>
+              {chosenPackage !== null &&
+                (startsAt === null ? (
+                  <p className="text-muted-foreground text-sm">{t('services:booking.chooseTimeFirst')}</p>
+                ) : (
+                  <Button
+                    type="submit"
+                    form={formId}
+                    className="w-full"
+                    // Not `disabled`: that would drop keyboard focus mid-submit.
+                    // `submit` ignores a second press instead.
+                    aria-disabled={submitting}
+                    aria-busy={submitting}
+                  >
+                    {t(submitting ? 'services:booking.submitting' : 'services:booking.submit')}
+                  </Button>
+                ))}
+              {/* Outside the start check: a refusal can clear the start and still need saying. */}
+              {chosenPackage !== null && submitError !== null && (
+                <p className="text-destructive text-sm" role="alert">
+                  {t(`services:booking.${submitError}`)}
+                </p>
+              )}
+            </PriceSummary>
           </div>
         </div>
       )}

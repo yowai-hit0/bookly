@@ -1,5 +1,5 @@
 import type { Booking, Prisma, PrismaClient } from '@prisma/client';
-import { isSlotTaken } from '../db/errors.js';
+import { isSlotTaken, isTransactionConflict } from '../db/errors.js';
 
 /**
  * The slot claim transaction (plan.md Task 6, data-model_v2.md §9.2).
@@ -28,6 +28,24 @@ export type ClaimSlotInput = Omit<
   bufferEndsAt: Date;
 };
 
+/** A deadlock with the sweeper is retried; three in a row is not contention any more. */
+export const MAX_CLAIM_ATTEMPTS = 3;
+
+/**
+ * Generous against a queue of claims, each a few milliseconds long, yet bounded:
+ * a stuck claim must not hold a pooled connection and the queue indefinitely.
+ * Developer defaults, not spec values.
+ */
+const CLAIM_MAX_WAIT_MS = 10_000;
+const CLAIM_TIMEOUT_MS = 15_000;
+
+/**
+ * The input built inside the claim's own transaction, for a caller whose other
+ * writes must stand or fall with the claim -- recording the client a booking
+ * belongs to, which a lost race must not leave behind (plan.md Task 13).
+ */
+export type ClaimSlotInputBuilder = (tx: Prisma.TransactionClient) => Promise<ClaimSlotInput>;
+
 export type ClaimResult =
   | { status: 'claimed'; booking: Booking }
   /** Live occupancy already covers the range. The client sees "this slot was
@@ -43,32 +61,54 @@ export type ClaimResult =
  */
 export async function claimSlot(
   prisma: PrismaClient,
-  input: ClaimSlotInput,
+  input: ClaimSlotInput | ClaimSlotInputBuilder,
   holdMinutes: number,
 ): Promise<ClaimResult> {
-  try {
-    const booking = await prisma.$transaction(async (tx) => {
-      // Both the hold's expiry and the staleness check below are measured
-      // against the database clock, so no app/database skew can make a hold
-      // outlive or predecease what the sweeper and the claim believe.
-      const holdExpiresAt = await databaseNowPlusMinutes(tx, holdMinutes);
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const booking = await prisma.$transaction(
+        async (tx) => {
+          // Claims queue here, one at a time. Two concurrent inserts under an
+          // exclusion constraint can each wait on the other's uncommitted row:
+          // PostgreSQL then kills one as a deadlock after `deadlock_timeout`,
+          // and a burst of such waits outlasts the transaction's time limit and
+          // rolls back the winner too -- a burst of visitors on one slot, and
+          // nobody gets it. Serialised, every loser meets the winner's committed
+          // row and gets a clean 23P01. The constraint is still the guarantee;
+          // this only orders the claimants. A claim takes milliseconds, and one
+          // photographer's calendar sees a handful a day.
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('bookly.claim_slot'))`;
 
-      await expireOverlappingStaleHolds(tx, input.startsAt, input.bufferEndsAt);
+          const data = typeof input === 'function' ? await input(tx) : input;
 
-      // The constraint now sees only live occupancy.
-      return tx.booking.create({
-        data: { ...input, status: 'pending_payment', holdExpiresAt },
-      });
-    });
+          // Both the hold's expiry and the staleness check below are measured
+          // against the database clock, so no app/database skew can make a hold
+          // outlive or predecease what the sweeper and the claim believe.
+          const holdExpiresAt = await databaseNowPlusMinutes(tx, holdMinutes);
 
-    return { status: 'claimed', booking };
-  } catch (error) {
-    // A failed statement aborts the whole transaction in PostgreSQL, so this is
-    // caught outside the callback: the rollback has already happened by the time
-    // we get here. Catching inside would leave us trying to COMMIT a dead
-    // transaction.
-    if (isSlotTaken(error)) return { status: 'slot_taken' };
-    throw error;
+          await expireOverlappingStaleHolds(tx, data.startsAt, data.bufferEndsAt);
+
+          // The constraint now sees only live occupancy.
+          return tx.booking.create({
+            data: { ...data, status: 'pending_payment', holdExpiresAt },
+          });
+        },
+        { maxWait: CLAIM_MAX_WAIT_MS, timeout: CLAIM_TIMEOUT_MS },
+      );
+
+      return { status: 'claimed', booking };
+    } catch (error) {
+      // A failed statement aborts the whole transaction in PostgreSQL, so this is
+      // caught outside the callback: the rollback has already happened by the time
+      // we get here. Catching inside would leave us trying to COMMIT a dead
+      // transaction.
+      if (isSlotTaken(error)) return { status: 'slot_taken' };
+      // Serialised claims cannot deadlock with each other, but the sweeper's
+      // unordered UPDATE still can with a claim's. The rollback is complete, so
+      // the whole claim -- builder included -- simply runs again.
+      if (isTransactionConflict(error) && attempt < MAX_CLAIM_ATTEMPTS) continue;
+      throw error;
+    }
   }
 }
 

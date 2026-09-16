@@ -1,9 +1,9 @@
-import type { Booking, PrismaClient } from '@prisma/client';
+import type { Booking, Prisma, PrismaClient } from '@prisma/client';
 import type pg from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPrismaClient } from '../db/client.js';
 import { connect, firstRow, testDatabaseUrl, truncateAll } from '../test/database.js';
-import { type ClaimResult, type ClaimSlotInput, claimSlot } from './claim.js';
+import { type ClaimResult, type ClaimSlotInput, MAX_CLAIM_ATTEMPTS, claimSlot } from './claim.js';
 
 /**
  * The slot claim transaction, against real PostgreSQL (plan.md Task 6).
@@ -464,5 +464,226 @@ describe('claimSlot and errors that are not 23P01', () => {
 
     await expect(claimSlot(prisma, input, HOLD_MINUTES)).rejects.toThrow();
     await expect(prisma.booking.count()).resolves.toBe(0);
+  });
+});
+
+// --- The builder form (plan.md Task 13) ---------------------------------------
+
+describe('claimSlot with an input builder', () => {
+  /** A client written through the builder's transaction, as booking creation does. */
+  async function insertClientThrough(tx: Prisma.TransactionClient, email: string): Promise<string> {
+    const client = await tx.client.create({
+      data: { fullName: 'Built Inside', email, phone: '+250788111111' },
+    });
+    return client.id;
+  }
+
+  it('builds the input inside the claim transaction, so a write it makes can be referenced by the booking', async () => {
+    const ids = await insertCatalogue();
+    const builder = vi.fn(async (tx: Prisma.TransactionClient) => ({
+      ...claimInput(ids, reference(1), NINE),
+      clientId: await insertClientThrough(tx, 'built@example.com'),
+    }));
+
+    const booking = claimedBooking(await claimSlot(prisma, builder, HOLD_MINUTES));
+
+    expect(builder).toHaveBeenCalledTimes(1);
+    // A transaction client, not the root client the claim was handed.
+    expect(builder.mock.calls[0]?.[0]).not.toBe(prisma);
+    const client = await prisma.client.findFirstOrThrow({ where: { email: 'built@example.com' } });
+    expect(booking.clientId).toBe(client.id);
+    expect(booking.status).toBe('pending_payment');
+    await expect(statusOf(reference(1))).resolves.toBe('pending_payment');
+  });
+
+  it('rolls back what the builder wrote when the slot turns out to be taken', async () => {
+    const ids = await insertCatalogue();
+    await insertBooking(ids, reference(1), NINE, 'confirmed');
+
+    const result = await claimSlot(
+      prisma,
+      async (tx) => ({
+        ...claimInput(ids, reference(2), NINE),
+        clientId: await insertClientThrough(tx, 'loser@example.com'),
+      }),
+      HOLD_MINUTES,
+    );
+
+    expect(result).toEqual({ status: 'slot_taken' });
+    await expect(prisma.client.count({ where: { email: 'loser@example.com' } })).resolves.toBe(0);
+    await expect(prisma.client.count()).resolves.toBe(1);
+    await expect(prisma.booking.count()).resolves.toBe(1);
+  });
+
+  /** What Prisma throws when PostgreSQL aborts a transaction as a deadlock victim. */
+  const DEADLOCK = {
+    name: 'PrismaClientKnownRequestError',
+    code: 'P2034',
+    clientVersion: '7.10.0',
+    meta: {},
+  };
+
+  it('runs the whole claim again, builder included, after the database aborts it as a deadlock victim', async () => {
+    const ids = await insertCatalogue();
+    let attempts = 0;
+
+    const booking = claimedBooking(
+      await claimSlot(
+        prisma,
+        async (tx) => {
+          attempts += 1;
+          const clientId = await insertClientThrough(tx, `attempt-${attempts}@example.com`);
+          if (attempts === 1) throw DEADLOCK;
+          return { ...claimInput(ids, reference(1), NINE), clientId };
+        },
+        HOLD_MINUTES,
+      ),
+    );
+
+    expect(attempts).toBe(2);
+    // The aborted attempt's client write rolled back with it.
+    await expect(prisma.client.count({ where: { email: 'attempt-1@example.com' } })).resolves.toBe(0);
+    const client = await prisma.client.findFirstOrThrow({ where: { email: 'attempt-2@example.com' } });
+    expect(booking.clientId).toBe(client.id);
+  });
+
+  it(`gives up after ${MAX_CLAIM_ATTEMPTS} deadlocks in a row, writing nothing`, async () => {
+    await insertCatalogue();
+    const clientsBefore = await prisma.client.count();
+    const builder = vi.fn(async (tx: Prisma.TransactionClient) => {
+      await insertClientThrough(tx, `doomed-${builder.mock.calls.length}@example.com`);
+      throw DEADLOCK;
+    });
+
+    await expect(claimSlot(prisma, builder, HOLD_MINUTES)).rejects.toMatchObject({ code: 'P2034' });
+
+    expect(builder).toHaveBeenCalledTimes(MAX_CLAIM_ATTEMPTS);
+    await expect(prisma.client.count()).resolves.toBe(clientsBefore);
+    await expect(prisma.booking.count()).resolves.toBe(0);
+  });
+
+  it('does not retry an error that is not contention', async () => {
+    await insertCatalogue();
+    const builder = vi.fn(async () => {
+      throw new Error('the builder failed');
+    });
+
+    await expect(claimSlot(prisma, builder, HOLD_MINUTES)).rejects.toThrow('the builder failed');
+    expect(builder).toHaveBeenCalledTimes(1);
+  });
+
+  it('rolls back the builder’s writes and the stale-hold expiry together on a lost race', async () => {
+    const ids = await insertCatalogue();
+    const lapsed = new Date(Date.now() - MINUTE_MS);
+    await insertBooking(ids, reference(1), EIGHT, 'pending_payment', lapsed);
+    await insertBooking(ids, reference(2), TEN, 'confirmed');
+
+    const result = await claimSlot(
+      prisma,
+      async (tx) => ({
+        ...claimInput(ids, reference(3), NINE),
+        clientId: await insertClientThrough(tx, 'loser@example.com'),
+      }),
+      HOLD_MINUTES,
+    );
+
+    expect(result).toEqual({ status: 'slot_taken' });
+    await expect(prisma.client.count({ where: { email: 'loser@example.com' } })).resolves.toBe(0);
+    await expect(statusOf(reference(1))).resolves.toBe('pending_payment');
+  });
+
+  it('aborts with the builder’s own error and writes nothing when the builder throws', async () => {
+    await insertCatalogue();
+    const failure = new Error('the builder could not resolve its input');
+
+    const claim = claimSlot(
+      prisma,
+      async (tx) => {
+        await insertClientThrough(tx, 'half-done@example.com');
+        throw failure;
+      },
+      HOLD_MINUTES,
+    );
+
+    await expect(claim).rejects.toBe(failure);
+    await expect(prisma.client.count({ where: { email: 'half-done@example.com' } })).resolves.toBe(0);
+    await expect(prisma.booking.count()).resolves.toBe(0);
+  });
+
+  it('does not report a builder that throws before writing anything as a taken slot', async () => {
+    const ids = await insertCatalogue();
+    await insertBooking(ids, reference(1), NINE, 'confirmed');
+
+    const claim = claimSlot(
+      prisma,
+      async () => {
+        throw new RangeError('no input');
+      },
+      HOLD_MINUTES,
+    );
+
+    await expect(claim).rejects.toBeInstanceOf(RangeError);
+    await expect(prisma.booking.count()).resolves.toBe(1);
+  });
+
+  it('expires a stale hold and sets the hold window exactly as the object form does', async () => {
+    const ids = await insertCatalogue();
+    const lapsed = new Date(Date.now() - MINUTE_MS);
+    await insertBooking(ids, reference(1), NINE, 'pending_payment', lapsed);
+
+    const before = Date.now();
+    const booking = claimedBooking(
+      await claimSlot(prisma, async () => claimInput(ids, reference(2), NINE), HOLD_MINUTES),
+    );
+    const after = Date.now();
+
+    await expect(statusOf(reference(1))).resolves.toBe('expired');
+    const stored = await holdExpiresAtMs(reference(2));
+    expect(stored).toBeGreaterThanOrEqual(before + HOLD_MINUTES * MINUTE_MS - 5_000);
+    expect(stored).toBeLessThanOrEqual(after + HOLD_MINUTES * MINUTE_MS + 5_000);
+    expect(booking.startsAt.toISOString()).toBe(NINE.startsAt.toISOString());
+  });
+
+  // A single round of this race passes or fails by timing: conflicting inserts
+  // under an exclusion constraint can deadlock (40P01) -- most readily on an
+  // empty table, as on a fresh database -- and lock waits can outlast Prisma's
+  // 5 s interactive transaction (P2028). Every loser must still be a typed
+  // slot_taken, and every round must leave exactly one winner, so the race is
+  // run from an empty booking table round after round until a timing-dependent
+  // fault shows.
+  it('lets exactly one of 10 simultaneous builder claims win, and never throws, over 5 rounds', { timeout: 300_000 }, async () => {
+    const ids = await insertCatalogue();
+    const outcomes: Record<string, number> = {};
+    const badRounds: string[] = [];
+
+    for (let round = 0; round < 5; round += 1) {
+      await raw.query('TRUNCATE booking_addon, booking CASCADE');
+      const results = await Promise.allSettled(
+        Array.from({ length: 10 }, (_unused, i) =>
+          claimSlot(
+            prisma,
+            async (tx) => ({
+              ...claimInput(ids, reference(i), NINE),
+              clientId: await insertClientThrough(tx, `racer-${round}-${i}@example.com`),
+            }),
+            HOLD_MINUTES,
+          ),
+        ),
+      );
+      for (const result of results) {
+        const key =
+          result.status === 'fulfilled'
+            ? result.value.status
+            : `threw ${(result.reason as { code?: string }).code ?? String(result.reason)}`;
+        outcomes[key] = (outcomes[key] ?? 0) + 1;
+      }
+      const winners = results.filter((r) => r.status === 'fulfilled' && r.value.status === 'claimed').length;
+      const clients = await prisma.client.count({ where: { email: { startsWith: `racer-${round}-` } } });
+      if (winners !== 1 || clients !== winners) badRounds.push(`round ${round}: ${winners} claimed, ${clients} clients`);
+    }
+
+    expect(Object.keys(outcomes).filter((key) => key.startsWith('threw')), JSON.stringify(outcomes)).toEqual([]);
+    // One winner per round, and the nine losers left no client behind.
+    expect(badRounds, JSON.stringify(outcomes)).toEqual([]);
   });
 });

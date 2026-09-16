@@ -54,6 +54,20 @@ export const kigaliDate = z.iso.date().refine((value) => {
 /** The largest `integer` PostgreSQL stores; past it, a write raises 22003. */
 export const INT4_MAX = 2_147_483_647;
 
+/** A developer default, not a spec value: far above any real basket. */
+export const MAX_ADDONS = 50;
+
+/**
+ * A basket's add-on ids, as the quote and a booking both take them (plan.md
+ * Tasks 11 and 13): at most `MAX_ADDONS`, each once, absent meaning none.
+ */
+export const addonIds = z
+  // Lowercased first: a uuid is case-insensitive, so `[id, ID]` is a repeat.
+  .array(z.guid().transform((id) => id.toLowerCase()))
+  .max(MAX_ADDONS)
+  .refine((ids) => new Set(ids).size === ids.length, 'Each add-on at most once')
+  .default([]);
+
 /** numeric(4,3) would silently round a fourth decimal place; refuse it instead. */
 function hasAtMostThreeDecimals(value: number): boolean {
   const thousandths = value * 1000;

@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { priceBasket } from '../catalogue/basket.js';
 import { findPublicService, listPublicCatalogue } from '../catalogue/public.js';
-import { parseOrReject } from './validation.js';
+import { addonIds, parseOrReject } from './validation.js';
 
 /**
  * Public service browsing and pricing (plan.md Task 11; spec §3.1 steps 1-3
@@ -25,17 +25,9 @@ import { parseOrReject } from './validation.js';
  * a 400, a well-formed one breaking a rule is a 422.
  */
 
-/** A developer default, not a spec value: far above any real basket. */
-const MAX_ADDONS = 50;
-
 const quoteBody = z.object({
   packageId: z.guid(),
-  addonIds: z
-    // Lowercased first: a uuid is case-insensitive, so `[id, ID]` is a repeat.
-    .array(z.guid().transform((id) => id.toLowerCase()))
-    .max(MAX_ADDONS)
-    .refine((ids) => new Set(ids).size === ids.length, 'Each add-on at most once')
-    .default([]),
+  addonIds,
 });
 
 export function publicCatalogueRouter(prisma: PrismaClient): Router {
