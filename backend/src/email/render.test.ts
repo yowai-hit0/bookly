@@ -570,6 +570,25 @@ describe('content rules', () => {
     expect(email.text).toContain('We owe you a refund of 27,000 RWF');
   });
 
+  // The payload `cancel.ts` enqueues when a client cancels a booking whose session
+  // fee had already been collected (plan.md Task 18, spec §6.10).
+  it('a client cancellation with a session fee to refund (plan.md Task 18) matches its snapshot', () => {
+    const email = renderWith('cancellation (by client)', { refundRwf: 27_000, bookingFeeRwf: 18_000 });
+
+    expect(email.subject).toMatchSnapshot('subject');
+    expect(email.text).toMatchSnapshot('text');
+    expect(email.html).toMatchSnapshot('html');
+  });
+
+  it('a client cancellation names the fee it forfeits and the refund it owes as two different sums', () => {
+    const email = renderWith('cancellation (by client)', { refundRwf: 27_000, bookingFeeRwf: 18_000 });
+
+    expect(email.text).toContain('the booking fee of 18,000 RWF is non-refundable');
+    expect(email.text).toContain('We owe you a refund of 27,000 RWF');
+    expect(email.html).toContain('27,000 RWF');
+    expect(email.html).toContain('18,000 RWF');
+  });
+
   it('an admin cancellation shows the reason and the refund, and never calls the fee non-refundable', () => {
     const email = renderFixture(emailFixture('cancellation (by admin)'));
 

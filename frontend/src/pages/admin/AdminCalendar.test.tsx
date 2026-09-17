@@ -124,7 +124,9 @@ function entries(): [string | null, string | null, string][] {
 }
 
 async function waitForEntries(count: number) {
-  await waitFor(() => expect(document.querySelectorAll('[data-kind]')).toHaveLength(count))
+  // Generous: the first of these waits also covers the lazy FullCalendar chunk
+  // loading, which on a busy machine outlasts the 1 s default on its own.
+  await waitFor(() => expect(document.querySelectorAll('[data-kind]')).toHaveLength(count), { timeout: 5000 })
 }
 
 function toolbarButton(name: string): HTMLElement {

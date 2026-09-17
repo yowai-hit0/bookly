@@ -128,7 +128,8 @@
       "label": "Admin",
       "calendar": "Calendar",
       "catalogue": "Catalogue",
-      "signOut": "Sign out"
+      "signOut": "Sign out",
+      "bookings": "Bookings"
     },
     "calendar": {
       "title": "Calendar",
@@ -233,6 +234,143 @@
         "photoCount": "Enter a whole number, 0 or more.",
         "durationMinutes": "Enter a whole number of minutes, at least 1."
       }
+    },
+    "bookings": {
+      "title": "Bookings",
+      "loading": "Loading…",
+      "loadFailed": "We could not load the bookings. Check your connection and try again.",
+      "empty": "No bookings match these filters.",
+      "loadMore": "Load more",
+      "outstanding": "{{amount}} still to pay",
+      "refundDue": "{{amount}} to refund",
+      "filters": {
+        "label": "Filters",
+        "from": "From",
+        "to": "To",
+        "search": "Search",
+        "apply": "Search",
+        "clear": "Clear filters"
+      },
+      "columns": {
+        "when": "When",
+        "reference": "Reference",
+        "client": "Client",
+        "service": "Service",
+        "status": "Status",
+        "money": "Money"
+      },
+      "status": {
+        "pending_payment": "Waiting for payment",
+        "confirmed": "Confirmed",
+        "completed": "Completed",
+        "no_show": "No-show",
+        "expired": "Expired",
+        "cancelled_by_client": "Cancelled by client",
+        "cancelled_by_admin": "Cancelled by you"
+      }
+    },
+    "booking": {
+      "back": "All bookings",
+      "loading": "Loading…",
+      "loadFailed": "We could not load this booking. Check your connection and try again.",
+      "missing": "This booking no longer exists",
+      "postShoot": "added after the shoot",
+      "sections": {
+        "shoot": "The shoot",
+        "client": "Client",
+        "money": "Money",
+        "payments": "Payments",
+        "actions": "Actions",
+        "messages": "Messages sent"
+      },
+      "labels": {
+        "when": "When",
+        "service": "Service",
+        "location": "Location",
+        "people": "Number of people",
+        "requests": "Special requests",
+        "originally": "Originally booked for",
+        "movedAt": "Last moved",
+        "cancellationReason": "Reason given",
+        "name": "Name",
+        "email": "Email",
+        "phone": "Phone",
+        "link": "Booking link",
+        "total": "Total",
+        "collected": "Collected",
+        "outstanding": "Still to pay",
+        "refundDue": "To refund"
+      },
+      "linkLive": "Live until {{date}}",
+      "linkNone": "Not issued yet",
+      "noPayments": "No payments yet.",
+      "noMessages": "Nothing sent yet.",
+      "paymentKinds": {
+        "booking_fee": "Booking fee",
+        "session_fee": "Session fee"
+      },
+      "paymentStatus": {
+        "initiated": "Started",
+        "pending": "Waiting for the payer",
+        "succeeded": "Paid",
+        "failed": "Failed",
+        "refund_due": "Refund due",
+        "refunded": "Refunded"
+      },
+      "paymentRefs": "{{provider}} · our ref {{ourRef}} · their ref {{providerRef}}",
+      "refundReference": "refund {{reference}}",
+      "templates": {
+        "booking_confirmation": "Booking confirmation",
+        "admin_new_booking": "New booking alert",
+        "session_fee_request": "Session fee request",
+        "payment_receipt": "Payment receipt",
+        "photo_delivery": "Photo delivery",
+        "cancellation": "Cancellation notice",
+        "reschedule": "New time notice",
+        "access_link_resend": "New booking link",
+        "admin_alert": "Alert to you",
+        "gcal_create": "Add to Google Calendar",
+        "gcal_update": "Update in Google Calendar",
+        "gcal_delete": "Remove from Google Calendar"
+      },
+      "messageStatus": {
+        "pending": "Queued",
+        "processing": "Sending",
+        "done": "Sent",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      },
+      "reschedule": {
+        "newStart": "New start (Kigali time)",
+        "move": "Move booking",
+        "note": "The client keeps their reference, link and payments, and is emailed the new time."
+      },
+      "cancel": {
+        "start": "Cancel this booking",
+        "warning": "Cancelling releases the time and tells the client. Everything they have paid is flagged for you to refund in full.",
+        "reason": "Reason (shown to the client)",
+        "confirm": "Cancel and refund",
+        "keep": "Keep the booking"
+      },
+      "complete": "Mark completed",
+      "noShow": "Mark no-show",
+      "resendLink": "Send a new booking link",
+      "resendNote": "A new link replaces the old one, which stops working straight away.",
+      "refund": {
+        "reference": "Refund reference",
+        "record": "Record {{amount}} refunded",
+        "note": "The system moves no money. Send the refund yourself, then record it here."
+      },
+      "errors": {
+        "failed": "That did not work. Try again.",
+        "slot_taken": "That time is already taken. Choose another.",
+        "not_allowed": "That is not possible for this booking any more. The booking below is up to date.",
+        "unchanged": "That is the time the booking already has.",
+        "not_refundable": "This payment is not flagged for a refund.",
+        "not_found": "This booking no longer exists.",
+        "invalid_request": "Check what you entered and try again.",
+        "validation_failed": "Check what you entered and try again."
+      }
     }
   },
   "checkout": {
@@ -314,5 +452,66 @@
       "refundOtherTitle": "This payment is due a refund",
       "refundOtherBody": "The photographer has been told and will refund your {{amount}}."
     }
+  },
+  "booking": {
+    "loading": "Loading your booking…",
+    "loadFailed": "We could not load your booking. Check your connection and try again.",
+    "retry": "Try again",
+    "invalidLink": {
+      "title": "This link is not valid",
+      "body": "Check that you opened the whole link from your email. If it has been replaced, use the most recent email we sent you."
+    },
+    "title": "Your booking",
+    "status": {
+      "pending_payment": "Waiting for payment",
+      "confirmed": "Confirmed",
+      "completed": "Completed",
+      "no_show": "Recorded as missed",
+      "expired": "Expired",
+      "cancelled_by_client": "Cancelled by you",
+      "cancelled_by_admin": "Cancelled by the photographer"
+    },
+    "labels": {
+      "reference": "Booking reference",
+      "service": "Service",
+      "when": "When",
+      "location": "Location",
+      "people": "Number of people",
+      "photos": "Photos",
+      "requests": "Special requests",
+      "total": "Total",
+      "paid": "Paid",
+      "outstanding": "Still to pay",
+      "refundDue": "Refund due to you"
+    },
+    "serviceValue": "{{service}}, {{package}}",
+    "whenValue": "{{date}}, {{start}} to {{end}}, Kigali time",
+    "photos_other": "{{count}} photos",
+    "sessionFee": {
+      "title": "Pay the rest",
+      "intro": "{{amount}} is still to pay for this shoot.",
+      "pay": "Pay {{amount}}"
+    },
+    "delivery": {
+      "title": "Your photos",
+      "open": "Open your photos",
+      "expires": "This link works until {{date}}.",
+      "expired": "This link has expired. Contact the photographer for a new one."
+    },
+    "cancel": {
+      "title": "Need to cancel?",
+      "start": "Cancel this booking",
+      "warning": "If you cancel, your booking fee of {{fee}} is not refunded, and the time is released for someone else to book.",
+      "confirm": "Yes, cancel my booking",
+      "keep": "Keep my booking",
+      "cancelling": "Cancelling…",
+      "failed": "We could not cancel your booking. Check your connection and try again.",
+      "notCancellable": "This booking can no longer be cancelled. Contact the photographer if you need to change it."
+    },
+    "cancelled": {
+      "title": "This booking is cancelled",
+      "refund": "You are owed {{amount}} back. The photographer will contact you to arrange it."
+    },
+    "photos_one": "{{count}} photo"
   }
 }

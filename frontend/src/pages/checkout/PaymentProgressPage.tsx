@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router'
 import { kigaliDateOf } from '@/admin/calendar-dates'
+import { bookingPath } from '@/catalogue/booking-access'
 import { type PaymentProgress, checkoutPath, fetchPaymentProgress } from '@/catalogue/payments'
 import { Button } from '@/components/ui/button'
 import { formatDate, formatMoney, formatTime } from '@/lib/format'
@@ -136,6 +137,9 @@ export function PaymentProgressPage() {
 
   const amount = formatMoney(progress.payment.amountRwf)
   const { booking } = progress
+  // The booking fee is paid from a checkout link, the session fee from the
+  // client's own booking page: another attempt belongs where this one started.
+  const payAgainAt = reference === '' ? bookingPath(token) : checkoutPath(reference, token)
 
   const heading = (key: string) => (
     <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold outline-none">
@@ -186,7 +190,7 @@ export function PaymentProgressPage() {
               : t('checkout:progress.failedDeclined')}
           </p>
           <Button asChild className="self-start">
-            <Link to={checkoutPath(reference, token)}>{t('checkout:progress.tryAgain')}</Link>
+            <Link to={payAgainAt}>{t('checkout:progress.tryAgain')}</Link>
           </Button>
         </section>
       )}

@@ -5,17 +5,16 @@ import { kigaliDateOf } from '@/admin/calendar-dates'
 import { isPlausiblePhone } from '@/catalogue/bookings'
 import {
   type Checkout,
-  PHONE_METHODS,
   type PaymentMethod,
   fetchCheckout,
   fetchPaymentMethods,
+  needsPhoneFor,
   paymentPath,
   startPayment,
 } from '@/catalogue/payments'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { formatDate, formatMoney, formatTime } from '@/lib/format'
+import { PaymentFields } from './PaymentFields'
 
 /**
  * The pay page (plan.md Task 16, spec §3.1 step 9, §6.19): a held booking's
@@ -129,7 +128,7 @@ function CheckoutView({ reference, token, checkout, methods, onStale, onMissing 
 
   const fee = formatMoney(checkout.bookingFeeRwf)
   const phoneId = `${idPrefix}phone`
-  const needsPhone = method !== null && PHONE_METHODS.has(method)
+  const needsPhone = needsPhoneFor(method)
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -225,49 +224,14 @@ function CheckoutView({ reference, token, checkout, methods, onStale, onMissing 
         </p>
       ) : (
         <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-2 text-lg font-semibold">{t('checkout:methods.legend')}</legend>
-            {methods.map((option) => (
-              <label
-                key={option}
-                className="has-checked:border-primary has-focus-visible:ring-ring/50 flex cursor-pointer items-center gap-3 rounded-xl border p-3 has-focus-visible:ring-3"
-              >
-                <input
-                  type="radio"
-                  name="method"
-                  value={option}
-                  checked={method === option}
-                  onChange={() => setMethod(option)}
-                  className="accent-primary size-4 shrink-0"
-                />
-                <span>{t(`checkout:methods.${option}`)}</span>
-              </label>
-            ))}
-          </fieldset>
-
-          {needsPhone && (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={phoneId}>{t('checkout:phone.label')}</Label>
-              <Input
-                ref={phoneRef}
-                id={phoneId}
-                name="phone"
-                type="tel"
-                autoComplete="tel"
-                required
-                aria-invalid={phoneInvalid || undefined}
-                aria-describedby={[`${phoneId}-hint`, phoneInvalid ? `${phoneId}-error` : null].filter(Boolean).join(' ')}
-              />
-              <p id={`${phoneId}-hint`} className="text-muted-foreground text-xs">
-                {t('checkout:phone.hint')}
-              </p>
-              {phoneInvalid && (
-                <p id={`${phoneId}-error`} className="text-destructive text-xs">
-                  {t('checkout:phone.invalid')}
-                </p>
-              )}
-            </div>
-          )}
+          <PaymentFields
+            methods={methods}
+            method={method}
+            onMethod={setMethod}
+            phoneId={phoneId}
+            phoneRef={phoneRef}
+            phoneInvalid={phoneInvalid}
+          />
 
           <Button
             type="submit"

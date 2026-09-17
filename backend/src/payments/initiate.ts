@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import { bookingTotals } from '../booking/totals.js';
 import { type PaymentMethod, type PaymentProvider, PaymentProviderError } from './provider.js';
 
 /**
@@ -33,6 +34,17 @@ export type StartPaymentDeps = {
   prisma: PrismaClient;
   provider: PaymentProvider;
   timeoutMs?: number;
+};
+
+export type StartSessionFeeDeps = StartPaymentDeps;
+
+export type StartSessionFeeRequest = {
+  /** The booking the client's token addressed; never taken from a caller's parameter. */
+  bookingId: string;
+  /** For the payer's statement line only. */
+  reference: string;
+  method: PaymentMethod;
+  payerPhone: string;
 };
 
 export type StartPaymentRequest = {
@@ -101,6 +113,98 @@ export async function startBookingFeePayment(deps: StartPaymentDeps, request: St
   });
 
   if (opened.status !== 'opened') return opened;
+  return attempt(deps, opened, { ...request, kind: 'booking_fee' });
+}
+
+/**
+ * Paying the session fee from the client's own booking page (plan.md Task 18;
+ * spec §3.5 step 4, §3.9, §6.15).
+ *
+ * The amount is what `bookingTotals()` makes outstanding as the attempt opens,
+ * except where the photographer has already asked for an amount and nobody has
+ * attempted it: that is the figure the client was sent, and the one they pay
+ * (data-model_v2.md §6.2). The rest is the booking fee's path -- a row first,
+ * the provider second, the webhook last.
+ */
+export async function startSessionFeePayment(
+  deps: StartSessionFeeDeps,
+  request: StartSessionFeeRequest,
+): Promise<StartPaymentResult> {
+  const { prisma, provider } = deps;
+
+  const opened = await prisma.$transaction(async (tx): Promise<OpenedAttempt> => {
+    // The package's own price, from the booking that froze it: never a number
+    // the caller passed in, and never a live catalogue row (spec §6.13).
+    const bookings = await tx.$queryRaw<{ id: string; status: string; package_price_rwf: number }[]>`
+      SELECT id::text AS id, status, package_price_rwf
+        FROM booking
+       WHERE id = ${request.bookingId}::uuid
+         FOR UPDATE`;
+    const booking = bookings[0];
+    if (booking === undefined) return { status: 'not_found' };
+    // A booking that no longer stands owes nothing (data-model_v2.md §6.1).
+    if (booking.status !== 'confirmed' && booking.status !== 'completed') return { status: 'nothing_to_pay' };
+
+    const [addons, payments] = await Promise.all([
+      tx.bookingAddon.findMany({ where: { bookingId: booking.id }, select: { stage: true, amountRwf: true } }),
+      tx.payment.findMany({
+        where: { bookingId: booking.id },
+        select: { kind: true, status: true, amountRwf: true },
+      }),
+    ]);
+    const { outstandingRwf } = bookingTotals({ ...booking, packagePriceRwf: booking.package_price_rwf }, addons, payments);
+    if (outstandingRwf <= 0) return { status: 'nothing_to_pay' };
+
+    // The window is the database's, as the booking fee's is: an app clock that
+    // drifts from it must not decide whether an attempt is still in flight.
+    const attempts = await tx.$queryRaw<
+      { id: string; our_ref: string; status: string; amount_rwf: number; provider: string; recent: boolean }[]
+    >`
+      SELECT id::text AS id, our_ref::text AS our_ref, status, amount_rwf, provider,
+             initiated_at > now() - make_interval(secs => ${PAYMENT_ATTEMPT_WINDOW_SECONDS}::double precision) AS recent
+        FROM payment
+       WHERE booking_id = ${booking.id}::uuid
+         AND kind = 'session_fee'
+       ORDER BY initiated_at DESC
+       LIMIT 1
+         FOR UPDATE`;
+    const latest = attempts[0];
+    // A prompt still on the payer's phone blocks a second one -- but only while
+    // it can still be answered. A `pending` row nothing ever settles would
+    // otherwise lock the client out of their own payment for good.
+    if (latest !== undefined && latest.recent && (latest.status === 'pending' || latest.status === 'initiated')) {
+      return { status: 'in_progress', ourRef: latest.our_ref };
+    }
+    // The photographer's request, made and never attempted: its amount is the
+    // one the client was asked for, whatever has changed since (spec §6.15).
+    // Never a row recorded against another provider (spec §6.18).
+    if (latest?.status === 'initiated' && latest.provider === provider.id) {
+      return { status: 'opened', paymentId: latest.id, ourRef: latest.our_ref, amountRwf: latest.amount_rwf };
+    }
+
+    const inserted = await tx.$queryRaw<{ id: string; our_ref: string; amount_rwf: number }[]>`
+      INSERT INTO payment (booking_id, kind, provider, amount_rwf)
+      VALUES (${booking.id}::uuid, 'session_fee', ${provider.id}, ${outstandingRwf})
+      RETURNING id::text AS id, our_ref::text AS our_ref, amount_rwf`;
+    const payment = inserted[0];
+    if (payment === undefined) throw new Error('The payment insert returned no row');
+    return { status: 'opened', paymentId: payment.id, ourRef: payment.our_ref, amountRwf: payment.amount_rwf };
+  });
+
+  if (opened.status !== 'opened') return opened;
+  return attempt(deps, opened, { ...request, kind: 'session_fee' });
+}
+
+/**
+ * Calls the provider for an attempt already on record, and writes down what it
+ * said. Outside every transaction: a slow provider must not hold a row lock.
+ */
+async function attempt(
+  deps: StartPaymentDeps,
+  opened: { paymentId: string; ourRef: string; amountRwf: number },
+  request: { method: PaymentMethod; payerPhone: string; reference: string; kind: 'booking_fee' | 'session_fee' },
+): Promise<StartPaymentResult> {
+  const { prisma, provider } = deps;
 
   let failure: { outcome: 'rejected' | 'unavailable'; reason: string } | null = null;
   try {
@@ -112,7 +216,7 @@ export async function startBookingFeePayment(deps: StartPaymentDeps, request: St
             amountRwf: opened.amountRwf,
             method: request.method,
             payerPhone: request.payerPhone,
-            kind: 'booking_fee',
+            kind: request.kind,
             bookingReference: request.reference,
           },
           signal,

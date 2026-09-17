@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { ACCESS_TOKEN_LIFETIME_DAYS } from '../settings/constants.js';
 
 /**
  * A booking's access token (data-model_v2.md §5.9; spec §3.9, §7): the secret in
@@ -8,8 +9,9 @@ import { createHash, randomBytes } from 'node:crypto';
  * replacing it (spec §6.21).
  */
 
-/** data-model_v2.md §11.1: a constant, not a setting. */
-export const ACCESS_TOKEN_LIFETIME_DAYS = 365;
+// A constant, not a setting (data-model_v2.md §11.1), and defined once beside
+// the other one: two copies of a lifetime are two lifetimes waiting to differ.
+export { ACCESS_TOKEN_LIFETIME_DAYS };
 const TOKEN_BYTES = 32;
 const DAY_MS = 24 * 60 * 60_000;
 

@@ -262,6 +262,7 @@ async function applyEvent(
   if (payment.kind !== 'booking_fee') {
     // A session fee (Task 20) is recorded; what follows from it is that task's.
     await tx.payment.update({ where: { id: payment.id }, data: { status: 'succeeded', settledAt, ...reported } });
+    await flagOverpayment(tx, logs, payment);
     return finish('applied', 'payment_succeeded');
   }
 
@@ -419,6 +420,50 @@ async function confirm(
       specialRequests: confirmed.specialRequests,
       addons: atBooking.map((addon) => ({ name: addon.nameSnapshot, priceRwf: addon.amountRwf })),
       totalRwf: totals.grandTotalRwf,
+    },
+  });
+}
+
+/**
+ * Money over what the booking is worth -- a second payment for a fee already
+ * settled, or one that arrived after the amount was collected another way --
+ * is owed back. The payment itself stays `succeeded`: it is the difference
+ * that is owed, not the whole of it, and only the photographer can send it
+ * (spec §6.16).
+ */
+async function flagOverpayment(
+  tx: Prisma.TransactionClient,
+  logs: Record<string, unknown>[],
+  payment: PaymentRecord,
+): Promise<void> {
+  const booking = await tx.booking.findUniqueOrThrow({
+    where: { id: payment.booking_id },
+    include: { addons: true, payments: true },
+  });
+  const totals = bookingTotals(booking, booking.addons, booking.payments);
+  const overpaidRwf = totals.collectedRwf - totals.grandTotalRwf;
+  if (overpaidRwf <= 0) return;
+
+  logs.push({ level: 'error', event: 'booking_overpaid', paymentId: payment.id, bookingId: booking.id, overpaidRwf });
+  const admin = await adminRecipient(tx);
+  if (admin === null) {
+    logs.push({ level: 'error', event: 'overpaid_alert_skipped', reason: 'no_admin_user', paymentId: payment.id });
+    return;
+  }
+  await enqueue(tx, {
+    kind: 'email',
+    template: 'admin_alert',
+    recipient: admin,
+    dedupeKey: `email:admin_alert:overpayment:${payment.id}`,
+    payload: {
+      variant: 'refund_due',
+      reference: booking.reference,
+      clientName: booking.contactName,
+      amountRwf: overpaidRwf,
+      reason: 'overpayment',
+      paymentReference: payment.provider_ref ?? payment.our_ref,
+      provider: payment.provider,
+      startsAt: booking.startsAt.toISOString(),
     },
   });
 }

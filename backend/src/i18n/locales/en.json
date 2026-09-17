@@ -99,7 +99,8 @@
       "heading": "Your booking has a new time",
       "intro": "Your booking for {{service}} has been moved. Everything else about it stays the same.",
       "previous": "Was",
-      "current": "Now"
+      "current": "Now",
+      "sameLink": "Your booking link has not changed: the one in your confirmation email still opens this booking."
     },
     "accessLinkResend": {
       "subject": "Your booking link ({{reference}})",
@@ -166,7 +167,8 @@
           "admin_cancelled": "You cancelled this booking, so the client is owed a full refund.",
           "late_payment_slot_taken": "The client's payment arrived after their hold had expired and the time had been booked by someone else.",
           "duplicate_payment": "The client paid the booking fee twice. The booking stands on the first payment; this one is owed back.",
-          "session_fee_after_client_cancel": "The client cancelled after paying the session fee, which is refunded."
+          "session_fee_after_client_cancel": "The client cancelled after paying the session fee, which is refunded.",
+          "overpayment": "This booking has been paid more than it is worth, so the difference is owed back."
         },
         "howTo": "The system does not move money. Refund the client through {{provider}}, then record the refund on the booking."
       },

@@ -600,6 +600,62 @@ You are welcome to book again at any time.
 Bookly, Kigali. All times are Kigali time (UTC+2)."
 `;
 
+exports[`content rules > a client cancellation with a session fee to refund (plan.md Task 18) matches its snapshot > html 1`] = `
+"<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Booking cancelled: BKY-2610-7K3MQ</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;">
+<span style="display:none;max-height:0;overflow:hidden;opacity:0;">Your booking for Wednesday, 7 October 2026 has been cancelled.</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;color:#18181b;">
+<tr><td style="padding:24px 28px 0;font-size:14px;font-weight:600;letter-spacing:0.04em;color:#71717a;">Bookly</td></tr>
+<tr><td style="padding:8px 28px 28px;font-size:15px;line-height:1.55;">
+<h1 style="margin:12px 0 16px;font-size:22px;line-height:1.3;">Your booking has been cancelled</h1>
+<p style="margin:0 0 14px;">Hello Aline Uwase,</p>
+<p style="margin:0 0 14px;">As you asked, we have cancelled your booking for Portrait on Wednesday, 7 October 2026.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 18px;border-top:1px solid #e4e4e7;">
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Booking reference</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">BKY-2610-7K3MQ</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Service</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">Portrait, Standard</td></tr>
+</table>
+<p style="margin:0 0 14px;padding:10px 12px;border-left:3px solid #18181b;background:#fafafa;font-weight:600;">As stated when you booked, the booking fee of 18,000 RWF is non-refundable.</p>
+<p style="margin:0 0 14px;">We owe you a refund of 27,000 RWF. We will contact you to arrange it.</p>
+<p style="margin:0 0 14px;">You are welcome to book again at any time.</p>
+</td></tr>
+</table>
+<p style="max-width:560px;margin:16px auto 0;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;font-size:12px;line-height:1.5;color:#71717a;">Bookly, Kigali. All times are Kigali time (UTC+2).</p>
+</td></tr>
+</table>
+</body>
+</html>"
+`;
+
+exports[`content rules > a client cancellation with a session fee to refund (plan.md Task 18) matches its snapshot > subject 1`] = `"Booking cancelled: BKY-2610-7K3MQ"`;
+
+exports[`content rules > a client cancellation with a session fee to refund (plan.md Task 18) matches its snapshot > text 1`] = `
+"Your booking has been cancelled
+
+Hello Aline Uwase,
+
+As you asked, we have cancelled your booking for Portrait on Wednesday, 7 October 2026.
+
+Booking reference: BKY-2610-7K3MQ
+Service: Portrait, Standard
+
+** As stated when you booked, the booking fee of 18,000 RWF is non-refundable. **
+
+We owe you a refund of 27,000 RWF. We will contact you to arrange it.
+
+You are welcome to book again at any time.
+
+--
+Bookly, Kigali. All times are Kigali time (UTC+2)."
+`;
+
 exports[`content rules > refund_due for a duplicate booking fee (plan.md Task 17) matches its snapshot > html 1`] = `
 "<!doctype html>
 <html lang="en">

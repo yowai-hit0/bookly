@@ -1,10 +1,16 @@
 import { z } from 'zod';
 import { accessToken, bookingBasics, bookingLink, dateOf, defineTemplate, instant, text, tr, when } from './shared.js';
+import type { Block } from '../layout.js';
 
 /**
  * To the client when the photographer moves their booking (spec §6.11, plan.md
  * Task 19): the time it was, the time it is now, and the link to the booking,
  * which keeps its reference and token.
+ *
+ * That last part is why `accessToken` may be null. A reschedule does not issue
+ * a new token, and the plaintext of the existing one was never stored -- so the
+ * email points the client at the link they already have rather than inventing
+ * one, and a resend (spec §6.21) is how a lost link is replaced.
  */
 export const reschedule = defineTemplate({
   payload: z.object({
@@ -12,7 +18,7 @@ export const reschedule = defineTemplate({
     previousStartsAt: instant,
     previousEndsAt: instant,
     locationText: text(500),
-    accessToken,
+    accessToken: accessToken.nullable().default(null),
   }),
   compose(p, ctx) {
     const now = when(ctx, p.startsAt, p.endsAt);
@@ -36,7 +42,9 @@ export const reschedule = defineTemplate({
             { label: tr(ctx, 'email:common.labels.location'), value: p.locationText },
           ],
         },
-        { type: 'button', label: tr(ctx, 'email:common.viewBooking'), href: bookingLink(ctx, p.accessToken) },
+        ...(p.accessToken === null
+          ? [{ type: 'paragraph' as const, text: tr(ctx, 'email:reschedule.sameLink') }]
+          : ([{ type: 'button', label: tr(ctx, 'email:common.viewBooking'), href: bookingLink(ctx, p.accessToken) }] satisfies Block[])),
       ],
     };
   },

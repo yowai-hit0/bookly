@@ -9,6 +9,7 @@ import {
 import { adminLocals, requireAdmin } from '../auth/middleware.js';
 import { toPublicAdmin } from '../auth/public-admin.js';
 import { blocksRouter, workingHoursRouter } from './admin-availability.js';
+import { adminBookingsRouter } from './admin-bookings.js';
 import { calendarRouter } from './admin-calendar.js';
 import { catalogueRouter } from './admin-catalogue.js';
 import { settingsRouter } from './admin-settings.js';
@@ -118,6 +119,9 @@ export function adminRouter(deps: AuthDeps): Router {
 
   // Calendar views (Task 9).
   router.use('/calendar', calendarRouter(deps.prisma, deps.now));
+
+  // Bookings: the list, one booking, and its lifecycle (Task 19).
+  router.use(adminBookingsRouter({ prisma: deps.prisma, now: deps.now }));
 
   // Catalogue CMS (Task 10).
   router.use(catalogueRouter(deps.prisma, deps.now));

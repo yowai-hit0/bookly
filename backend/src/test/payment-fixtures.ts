@@ -1,4 +1,5 @@
 import type { Booking, PrismaClient } from '@prisma/client';
+import { generateAccessToken } from '../booking/access-token.js';
 import { MtnMomoProvider } from '../payments/mtn-momo.js';
 import type {
   InitiatePaymentRequest,
@@ -161,6 +162,40 @@ export async function insertBooking(prisma: PrismaClient, world: PaymentWorld, s
     await prisma.$executeRaw`UPDATE booking SET hold_expires_at = now() + make_interval(mins => ${holdMinutes}::integer) WHERE id = ${booking.id}::uuid`;
   }
   return prisma.booking.findUniqueOrThrow({ where: { id: booking.id } });
+}
+
+/**
+ * Gives a booking a live access token and answers the plaintext (plan.md Task
+ * 18). The expiry is stamped on the DATABASE clock, like the hold, because
+ * `findBookingByToken` compares it against `now()` there.
+ */
+export async function grantAccessToken(
+  prisma: PrismaClient,
+  bookingId: string,
+  options: { expiresInMinutes?: number } = {},
+): Promise<string> {
+  const { token, hash } = generateAccessToken();
+  await prisma.$executeRaw`
+    UPDATE booking
+       SET access_token_hash = ${hash},
+           access_token_expires_at = now() + make_interval(mins => ${options.expiresInMinutes ?? 365 * 1440}::integer),
+           access_token_last_used_at = NULL
+     WHERE id = ${bookingId}::uuid`;
+  return token;
+}
+
+/** A confirmed booking with a live access token: what a client's return link opens. */
+export async function insertBookingWithToken(
+  prisma: PrismaClient,
+  world: PaymentWorld,
+  seed: BookingSeed & { expiresInMinutes?: number } = {},
+): Promise<{ booking: Booking; token: string }> {
+  const { expiresInMinutes, ...bookingSeed } = seed;
+  const booking = await insertBooking(prisma, world, { status: 'confirmed', ...bookingSeed });
+  const token = await grantAccessToken(prisma, booking.id, {
+    ...(expiresInMinutes === undefined ? {} : { expiresInMinutes }),
+  });
+  return { booking, token };
 }
 
 export type PaymentSeed = {

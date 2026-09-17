@@ -16,7 +16,7 @@ import {
   seedWorld,
   stubProvider,
 } from '../test/payment-fixtures.js';
-import { PAYMENT_ATTEMPT_WINDOW_SECONDS, startBookingFeePayment } from './initiate.js';
+import { PAYMENT_ATTEMPT_WINDOW_SECONDS, startBookingFeePayment, startSessionFeePayment } from './initiate.js';
 import { type PaymentProvider, PaymentProviderError } from './provider.js';
 import { receiveWebhook } from './webhooks.js';
 
@@ -38,6 +38,14 @@ import { receiveWebhook } from './webhooks.js';
  * unknown starts nothing; an attempt still waiting inside the window blocks a
  * second prompt, and one outside it does not; and two taps at once make one
  * payment.
+ *
+ * The session fee (plan.md Task 18; spec §3.5 step 4, §6.15) takes the same
+ * path, with the amount read from `bookingTotals()` as the attempt opens rather
+ * than from a frozen column -- except where the photographer has already
+ * requested a figure nobody has attempted, which is the figure the client pays.
+ * It is owed only by a confirmed or completed booking, and a second session fee
+ * after one has succeeded is a new row, which the booking-fee partial unique
+ * index does not touch.
  */
 
 let prisma: PrismaClient;
@@ -571,5 +579,358 @@ describe('an attempt still waiting on the payer', () => {
     for (const result of results) expect(result).toMatchObject({ ourRef: payment.our_ref });
     expect(provider.initiated).toHaveLength(1);
     expect(payment.status).toBe('pending');
+  });
+});
+
+// --- The session fee ---------------------------------------------------------------------------
+
+/** Adds a post-shoot add-on, which is what makes more money outstanding after the shoot. */
+async function addPostShootAddon(bookingId: string, amountRwf: number): Promise<void> {
+  await prisma.bookingAddon.create({
+    data: { bookingId, addonId: world.ownAddonId, nameSnapshot: 'Extra prints', unitPriceRwf: amountRwf, amountRwf, stage: 'post_shoot' },
+  });
+}
+
+function startSession(
+  provider: PaymentProvider,
+  booking: { id: string; reference: string },
+  options: { timeoutMs?: number } = {},
+) {
+  return startSessionFeePayment(
+    { prisma, provider, ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }) },
+    {
+      bookingId: booking.id,
+      reference: booking.reference,
+      method: 'momo_mtn',
+      payerPhone: '+250788123456',
+    },
+  );
+}
+
+/** A confirmed booking, fee paid: 40,000 package + 10,000 add-on, 20,000 collected, 30,000 owed. */
+async function owingBooking(status = 'confirmed') {
+  const booking = await insertBooking(prisma, world, { status });
+  await insertPayment(prisma, booking.id, { status: 'succeeded', amountRwf: 20_000, ageSeconds: 600 });
+  return booking;
+}
+
+describe('the session-fee row exists before the provider is called', () => {
+  it('is committed as initiated, on this booking, with the outstanding amount, when the provider then throws', async () => {
+    const booking = await owingBooking();
+    let seenByProvider: PaymentRow[] = [];
+    const provider = stubProvider({
+      initiate: async (request) => {
+        seenByProvider = await payments();
+        expect(request.ourRef).toBe(seenByProvider.find((row) => row.kind === 'session_fee')?.our_ref);
+        throw new Error('stubbed provider client failure');
+      },
+    });
+
+    const result = await startSession(provider, booking);
+
+    const opened = seenByProvider.find((row) => row.kind === 'session_fee');
+    expect(opened).toMatchObject({
+      booking_id: booking.id,
+      kind: 'session_fee',
+      provider: 'mtn_momo_direct',
+      our_ref: expect.stringMatching(UUID),
+      amount_rwf: 30_000,
+      status: 'initiated',
+      provider_ref: null,
+      failure_reason: null,
+    });
+    expect(result).toStrictEqual({ status: 'provider_failed', ourRef: opened?.our_ref, outcome: 'unavailable' });
+    expect((await payments()).find((row) => row.kind === 'session_fee')).toMatchObject({ status: 'failed' });
+  });
+
+  it('hands the provider the amount, the method, the phone, the kind and the reference', async () => {
+    const booking = await owingBooking();
+    await addPostShootAddon(booking.id, 15_000);
+    const provider = stubProvider();
+
+    await startSession(provider, booking);
+
+    expect(provider.initiated).toStrictEqual([
+      {
+        ourRef: (await payments()).find((row) => row.kind === 'session_fee')?.our_ref,
+        amountRwf: 45_000,
+        method: 'momo_mtn',
+        payerPhone: '+250788123456',
+        kind: 'session_fee',
+        bookingReference: booking.reference,
+      },
+    ]);
+  });
+});
+
+describe('the session fee amount', () => {
+  it('is the outstanding amount, post-shoot add-ons included (data-model_v2.md §6.1)', async () => {
+    const booking = await owingBooking();
+    await addPostShootAddon(booking.id, 15_000);
+
+    await startSession(stubProvider(), booking);
+
+    expect((await payments()).find((row) => row.kind === 'session_fee')?.amount_rwf).toBe(45_000);
+  });
+
+  it('counts only payments that succeeded: a failed attempt does not reduce it', async () => {
+    const booking = await owingBooking();
+    await insertPayment(prisma, booking.id, { status: 'failed', kind: 'session_fee', amountRwf: 30_000, ageSeconds: 500 });
+    await insertPayment(prisma, booking.id, { status: 'refund_due', kind: 'session_fee', amountRwf: 5_000, ageSeconds: 400 });
+
+    await startSession(stubProvider(), booking);
+
+    expect((await payments()).at(-1)).toMatchObject({ kind: 'session_fee', amount_rwf: 30_000 });
+  });
+
+  it('reuses the photographer own request row and its frozen amount, rather than repricing it', async () => {
+    const booking = await owingBooking('completed');
+    const requested = await insertPayment(prisma, booking.id, {
+      status: 'initiated',
+      kind: 'session_fee',
+      amountRwf: 30_000,
+      ageSeconds: PAYMENT_ATTEMPT_WINDOW_SECONDS + 60,
+    });
+    // The photographer adds an add-on after asking: the client still pays what they were asked.
+    await addPostShootAddon(booking.id, 15_000);
+    const provider = stubProvider();
+
+    const result = await startSession(provider, booking);
+
+    expect(result).toStrictEqual({ status: 'started', ourRef: requested.ourRef });
+    expect(provider.initiated).toStrictEqual([expect.objectContaining({ ourRef: requested.ourRef, amountRwf: 30_000 })]);
+    const rows = await payments();
+    expect(rows.filter((row) => row.kind === 'session_fee')).toHaveLength(1);
+    expect(rows.find((row) => row.id === requested.id)).toMatchObject({ status: 'pending', amount_rwf: 30_000 });
+  });
+
+  it('never attempts a row recorded against another provider (spec §6.18): it opens its own', async () => {
+    const booking = await owingBooking();
+    const foreign = await insertPayment(prisma, booking.id, {
+      status: 'initiated',
+      kind: 'session_fee',
+      amountRwf: 30_000,
+      provider: 'flutterwave',
+      ageSeconds: PAYMENT_ATTEMPT_WINDOW_SECONDS + 60,
+    });
+
+    const result = await startSession(stubProvider(), booking);
+
+    expect(result).toMatchObject({ status: 'started' });
+    if (result.status !== 'started') throw new Error('unreachable');
+    expect(result.ourRef).not.toBe(foreign.ourRef);
+    expect((await payments()).filter((row) => row.kind === 'session_fee')).toHaveLength(2);
+  });
+
+  it('is never written again once the provider has been asked', async () => {
+    const booking = await owingBooking();
+    await startSession(stubProvider(), booking);
+    const before = (await payments()).find((row) => row.kind === 'session_fee');
+
+    await addPostShootAddon(booking.id, 15_000);
+
+    expect((await payments()).find((row) => row.kind === 'session_fee')?.amount_rwf).toBe(before?.amount_rwf);
+  });
+});
+
+describe('a session fee that cannot be started', () => {
+  it('not_found for a booking id nothing matches', async () => {
+    const provider = stubProvider();
+
+    await expect(
+      startSession(provider, { id: '00000000-0000-4000-8000-000000000000', reference: 'BKY-2610-ZZZZZ' }),
+    ).resolves.toStrictEqual({ status: 'not_found' });
+    expect(provider.initiated).toEqual([]);
+    expect(await payments()).toEqual([]);
+  });
+
+  it('nothing_to_pay once the shoot is paid in full', async () => {
+    const booking = await owingBooking();
+    await insertPayment(prisma, booking.id, { status: 'succeeded', kind: 'session_fee', amountRwf: 30_000, ageSeconds: 500 });
+    const provider = stubProvider();
+
+    await expect(startSession(provider, booking)).resolves.toStrictEqual({ status: 'nothing_to_pay' });
+    expect(provider.initiated).toEqual([]);
+    expect(await payments()).toHaveLength(2);
+  });
+
+  it.each(['pending_payment', 'expired', 'no_show', 'cancelled_by_client', 'cancelled_by_admin'])(
+    'nothing_to_pay for a %s booking, which owes nothing (data-model_v2.md §6.1)',
+    async (status) => {
+      const booking = await owingBooking(status);
+      const provider = stubProvider();
+
+      await expect(startSession(provider, booking)).resolves.toStrictEqual({ status: 'nothing_to_pay' });
+      expect(provider.initiated).toEqual([]);
+      expect((await payments()).filter((row) => row.kind === 'session_fee')).toEqual([]);
+    },
+  );
+});
+
+describe('a session-fee attempt still waiting on the payer', () => {
+  it('blocks a new one while pending, answering its our_ref', async () => {
+    const booking = await owingBooking();
+    const waiting = await insertPayment(prisma, booking.id, { status: 'pending', kind: 'session_fee', amountRwf: 30_000, ageSeconds: 30 });
+    const provider = stubProvider();
+
+    await expect(startSession(provider, booking)).resolves.toStrictEqual({ status: 'in_progress', ourRef: waiting.ourRef });
+    expect(provider.initiated).toEqual([]);
+    expect((await payments()).filter((row) => row.kind === 'session_fee')).toHaveLength(1);
+  });
+
+  it('blocks a new one while initiated inside the window', async () => {
+    const booking = await owingBooking();
+    const waiting = await insertPayment(prisma, booking.id, {
+      status: 'initiated',
+      kind: 'session_fee',
+      amountRwf: 30_000,
+      ageSeconds: PAYMENT_ATTEMPT_WINDOW_SECONDS - 10,
+    });
+
+    await expect(startSession(stubProvider(), booking)).resolves.toStrictEqual({ status: 'in_progress', ourRef: waiting.ourRef });
+  });
+
+  it("blocks a new one while pending inside the window", async () => {
+    const booking = await owingBooking();
+    const waiting = await insertPayment(prisma, booking.id, {
+      status: 'pending',
+      kind: 'session_fee',
+      amountRwf: 30_000,
+      ageSeconds: PAYMENT_ATTEMPT_WINDOW_SECONDS - 10,
+    });
+
+    await expect(startSession(stubProvider(), booking)).resolves.toStrictEqual({ status: 'in_progress', ourRef: waiting.ourRef });
+  });
+
+  /**
+   * A `pending` attempt nothing ever settles -- a webhook lost, a payer who
+   * walked away -- must not lock the client out of their own payment control
+   * for good. Past the window a fresh attempt opens, exactly as the booking
+   * fee's does.
+   */
+  it("opens a new attempt when the pending one is older than the window", async () => {
+    const booking = await owingBooking();
+    const stuck = await insertPayment(prisma, booking.id, {
+      status: 'pending',
+      kind: 'session_fee',
+      amountRwf: 30_000,
+      ageSeconds: 90 * 24 * 3_600,
+    });
+    const provider = stubProvider();
+
+    const result = await startSession(provider, booking);
+
+    expect(result.status).toBe('started');
+    expect(result).not.toMatchObject({ ourRef: stuck.ourRef });
+    expect(provider.initiated).toHaveLength(1);
+    const sessionFees = (await payments()).filter((row) => row.kind === 'session_fee');
+    expect(sessionFees).toHaveLength(2);
+    // The stale one is left exactly as it was: only its own webhook settles it.
+    expect(sessionFees.find((row) => row.our_ref === stuck.ourRef)).toMatchObject({ status: 'pending' });
+  });
+
+  it('answers the most recent session-fee attempt when there are several', async () => {
+    const booking = await owingBooking();
+    await insertPayment(prisma, booking.id, { status: 'failed', kind: 'session_fee', amountRwf: 30_000, ageSeconds: 500 });
+    const newest = await insertPayment(prisma, booking.id, { status: 'pending', kind: 'session_fee', amountRwf: 30_000, ageSeconds: 10 });
+
+    await expect(startSession(stubProvider(), booking)).resolves.toStrictEqual({ status: 'in_progress', ourRef: newest.ourRef });
+  });
+
+  it('is not blocked by another booking attempt, or by a waiting booking fee', async () => {
+    const other = await owingBooking();
+    await insertPayment(prisma, other.id, { status: 'pending', kind: 'session_fee', amountRwf: 30_000, ageSeconds: 10 });
+    const booking = await owingBooking();
+    await insertPayment(prisma, booking.id, { status: 'pending', kind: 'booking_fee', amountRwf: 20_000, ageSeconds: 10 });
+
+    await expect(startSession(stubProvider(), booking)).resolves.toMatchObject({ status: 'started' });
+  });
+
+  it.each(['failed', 'refund_due', 'refunded'])('is not blocked when the newest attempt is %s', async (status) => {
+    const booking = await owingBooking();
+    await insertPayment(prisma, booking.id, { status, kind: 'session_fee', amountRwf: 5_000, ageSeconds: 10 });
+
+    await expect(startSession(stubProvider(), booking)).resolves.toMatchObject({ status: 'started' });
+  });
+
+  it('makes one payment when five taps on Pay arrive at once', async () => {
+    const booking = await owingBooking();
+    const provider = stubProvider({
+      initiate: async () => {
+        await delay(100);
+        return { outcome: 'accepted', providerRef: null };
+      },
+    });
+
+    const results = await Promise.all(Array.from({ length: 5 }, () => startSession(provider, booking)));
+
+    expect((await payments()).filter((row) => row.kind === 'session_fee')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'started')).toHaveLength(1);
+    expect(results.filter((result) => result.status === 'in_progress')).toHaveLength(4);
+    expect(provider.initiated).toHaveLength(1);
+  });
+});
+
+describe('a provider that will not start the session fee', () => {
+  it('leaves the row failed with provider_timeout and the booking untouched', async () => {
+    const booking = await owingBooking();
+    const before = await bookingState(booking.reference);
+
+    const result = await startSession(stubProvider({ initiate: () => new Promise(() => {}) }), booking, { timeoutMs: 50 });
+
+    const session = (await payments()).find((row) => row.kind === 'session_fee');
+    expect(result).toStrictEqual({ status: 'provider_failed', ourRef: session?.our_ref, outcome: 'unavailable' });
+    expect(session).toMatchObject({ status: 'failed', failure_reason: 'provider_timeout', amount_rwf: 30_000 });
+    expect(await bookingState(booking.reference)).toStrictEqual(before);
+  });
+
+  it('records a refusal with the provider own code, and frees the client to try again at once', async () => {
+    const booking = await owingBooking();
+    let fail = true;
+    const provider = stubProvider({
+      initiate: async () => (fail ? { outcome: 'rejected', reason: 'PAYER_NOT_FOUND' } : { outcome: 'accepted', providerRef: null }),
+    });
+
+    await expect(startSession(provider, booking)).resolves.toMatchObject({ status: 'provider_failed', outcome: 'rejected' });
+    expect((await payments()).find((row) => row.kind === 'session_fee')).toMatchObject({ status: 'failed', failure_reason: 'PAYER_NOT_FOUND' });
+
+    fail = false;
+    await expect(startSession(provider, booking)).resolves.toMatchObject({ status: 'started' });
+    expect((await payments()).filter((row) => row.kind === 'session_fee').map((row) => row.status)).toEqual(['failed', 'pending']);
+  });
+});
+
+describe('a second session fee after one succeeded (spec §6.15)', () => {
+  it('is a new row, not an edit of the settled one, and no unique index refuses it', async () => {
+    const booking = await owingBooking('completed');
+    const first = await insertPayment(prisma, booking.id, { status: 'succeeded', kind: 'session_fee', amountRwf: 30_000, ageSeconds: 500 });
+    await addPostShootAddon(booking.id, 15_000);
+
+    const result = await startSession(stubProvider(), booking);
+
+    expect(result).toMatchObject({ status: 'started' });
+    const sessionFees = (await payments()).filter((row) => row.kind === 'session_fee');
+    expect(sessionFees).toHaveLength(2);
+    expect(sessionFees.find((row) => row.id === first.id)).toMatchObject({ status: 'succeeded', amount_rwf: 30_000 });
+    expect(sessionFees.find((row) => row.id !== first.id)).toMatchObject({ status: 'pending', amount_rwf: 15_000 });
+  });
+
+  it('lets both session fees succeed while the booking fee partial unique index still holds', async () => {
+    const booking = await owingBooking('completed');
+    await insertPayment(prisma, booking.id, { status: 'succeeded', kind: 'session_fee', amountRwf: 30_000, ageSeconds: 500 });
+    await addPostShootAddon(booking.id, 15_000);
+    const started = await startSession(stubProvider(), booking);
+    if (started.status !== 'started') throw new Error(`Expected started, got ${started.status}`);
+
+    await raw.query(`UPDATE payment SET status = 'succeeded', settled_at = now() WHERE our_ref = $1`, [started.ourRef]);
+
+    expect((await payments()).filter((row) => row.kind === 'session_fee' && row.status === 'succeeded')).toHaveLength(2);
+    // And a second succeeded booking fee is still impossible.
+    await expect(
+      raw.query(
+        `INSERT INTO payment (booking_id, kind, provider, amount_rwf, status) VALUES ($1, 'booking_fee', 'mtn_momo_direct', 1, 'succeeded')`,
+        [booking.id],
+      ),
+    ).rejects.toMatchObject({ code: '23505' });
   });
 });

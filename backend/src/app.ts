@@ -5,6 +5,7 @@ import type { AuthDeps } from './auth/admin-auth.js';
 import type { PaymentProvider } from './payments/provider.js';
 import { adminRouter } from './routes/admin.js';
 import { healthRouter } from './routes/health.js';
+import { clientBookingRouter } from './routes/client-booking.js';
 import { type PaymentWebhooksDeps, paymentWebhooksRouter } from './routes/payment-webhooks.js';
 import { availabilityRouter } from './routes/public-availability.js';
 import { bookingsRouter } from './routes/public-bookings.js';
@@ -58,6 +59,23 @@ export function createApp(options: AppOptions = {}): Express {
     if (options.publicApi.payments) {
       app.use('/api', checkoutRouter({ prisma, ...options.publicApi.payments }));
     }
+    // The client's own booking, addressed by its access token (plan.md Task 18).
+    const clientPayments = options.publicApi.payments;
+    app.use(
+      '/api/booking',
+      clientBookingRouter({
+        prisma,
+        now,
+        ...(clientPayments === undefined
+          ? {}
+          : {
+              payments: {
+                provider: clientPayments.provider,
+                ...(clientPayments.providerTimeoutMs === undefined ? {} : { providerTimeoutMs: clientPayments.providerTimeoutMs }),
+              },
+            }),
+      }),
+    );
   }
   if (options.admin) app.use('/api/admin', adminRouter(options.admin));
 

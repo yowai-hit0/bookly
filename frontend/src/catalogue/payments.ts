@@ -16,6 +16,11 @@ export type PaymentMethod = (typeof KNOWN_METHODS)[number]
 /** Methods the payer pays from a phone, and so needs a number for. */
 export const PHONE_METHODS: ReadonlySet<PaymentMethod> = new Set(['momo_mtn', 'momo_airtel'])
 
+/** Whether the chosen method is paid from a phone, and so needs a number. */
+export function needsPhoneFor(method: PaymentMethod | null): boolean {
+  return method !== null && PHONE_METHODS.has(method)
+}
+
 export type CheckoutState = 'payable' | 'paid' | 'expired' | 'closed'
 
 export type Checkout = {
