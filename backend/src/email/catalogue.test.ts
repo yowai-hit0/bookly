@@ -89,8 +89,10 @@ describe('outbox_kind_allowed', () => {
     expect(await checkValues('outbox_kind_allowed')).toEqual([...OUTBOX_KINDS].sort());
   });
 
-  it('every template and every non-email kind has retries_exhausted copy', () => {
+  it('every template and every kind has retries_exhausted copy', () => {
     const messages = Object.keys(en.email.adminAlert.retriesExhausted.messages).sort();
-    expect(messages).toEqual([...EMAIL_TEMPLATES, ...OUTBOX_KINDS.filter((kind) => kind !== 'email')].sort());
+    // `email` itself too: an email row with no template still fails, and its alert
+    // must name the message in words, never as a translation key.
+    expect(messages).toEqual([...EMAIL_TEMPLATES, ...OUTBOX_KINDS].sort());
   });
 });

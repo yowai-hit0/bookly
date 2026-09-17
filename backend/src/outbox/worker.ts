@@ -362,7 +362,7 @@ async function withTimeout(handler: OutboxHandler, row: OutboxRow): Promise<Outb
  * recording the failure itself fail, stranding the row in `processing`.
  */
 function storableError(error: unknown): string {
-  return errorMessage(error).replaceAll(' ', '�').slice(0, LAST_ERROR_MAX_LENGTH);
+  return errorMessage(error).replaceAll('\u0000', '\uFFFD').slice(0, LAST_ERROR_MAX_LENGTH);
 }
 
 function errorMessage(error: unknown): string {

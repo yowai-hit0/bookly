@@ -23,10 +23,18 @@ export class FileMailProvider implements MailProvider {
     const id = createHash('sha256').update(message.idempotencyKey).digest('hex').slice(0, 12);
     const base = join(this.#directory, `${new Date().toISOString().slice(0, 10)}-${id}`);
     const header = `To: ${message.to}\nSubject: ${message.subject}\n\n`;
-    // Inside an HTML comment no ASCII hyphen may survive: `--->` or `--!>` in a
-    // visitor's name would close the comment and make the rest live markup.
-    await writeFile(`${base}.html`, `<!-- ${header.replaceAll('-', '‐')}-->\n${message.html}`, 'utf8');
+    await writeFile(`${base}.html`, `<!-- ${commentSafe(header)}-->\n${message.html}`, 'utf8');
     await writeFile(`${base}.txt`, `${header}${message.text}`, 'utf8');
     return { providerMessageId: `file:${id}` };
   }
+}
+
+/**
+ * Text that cannot end the HTML comment it sits in. A comment closes at `--`
+ * followed by `>` or `!>`, so every run of two or more hyphens is spaced out --
+ * `--->` in a visitor's name becomes `- - ->` -- while a single hyphen, as in a
+ * booking reference, stays as it is.
+ */
+function commentSafe(value: string): string {
+  return value.replace(/-{2,}/g, (run) => run.split('').join(' '));
 }

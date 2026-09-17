@@ -375,6 +375,56 @@ describe('claimNext', () => {
     expect(claims).toBeLessThanOrEqual(OUTBOX_MAX_ATTEMPTS);
     expect((await stateOf(id)).attempts).toBeLessThanOrEqual(OUTBOX_MAX_ATTEMPTS);
   });
+
+  it('fails a row abandoned mid-delivery on its last attempt, with one alert, instead of claiming it again', async () => {
+    await seedAdmin();
+    const bookingId = await seedBooking();
+    // Claimed for the last time, then the process died: its lease has run out.
+    const id = await seedRow({ bookingId, status: 'processing', attempts: OUTBOX_MAX_ATTEMPTS });
+    const logs: LogEntry[] = [];
+
+    // Not the abandoned row: the alert about it, which is due at once and is
+    // what the worker delivers next.
+    const claimed = await claimNext(prisma, ['email'], (entry) => logs.push(entry));
+    expect(claimed).toMatchObject({ template: 'admin_alert', recipient: ADMIN_EMAIL, attempts: 1 });
+    expect(claimed?.id).not.toBe(id);
+    // A second pass must not alert twice.
+    await expect(claimNext(prisma, ['email'], (entry) => logs.push(entry))).resolves.toBeNull();
+
+    const state = await stateOf(id);
+    expect(state).toMatchObject({ status: 'failed', attempts: OUTBOX_MAX_ATTEMPTS });
+    expect(state.last_error).toMatch(/^Abandoned mid-delivery on all \d+ attempts/);
+    const alerts = await alertRows();
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]?.payload).toMatchObject({
+      variant: 'retries_exhausted',
+      bookingReference: REFERENCE,
+      attempts: OUTBOX_MAX_ATTEMPTS,
+      lastError: state.last_error,
+    });
+    expect(logs.filter((entry) => entry.event === 'outbox_message_abandoned')).toHaveLength(1);
+    expect(JSON.stringify(logs)).not.toContain(CLIENT_EMAIL);
+  });
+
+  it('leaves an abandoned last attempt alone while its lease still runs, and claims a fresher row meanwhile', async () => {
+    const leased = await seedRow({ status: 'processing', attempts: OUTBOX_MAX_ATTEMPTS, dueInSeconds: 120 });
+    const fresh = await seedRow();
+
+    const claimed = await claimNext(prisma, ['email']);
+
+    expect(claimed?.id).toBe(fresh);
+    expect((await stateOf(leased)).status).toBe('processing');
+  });
+
+  it('fails an abandoned admin_alert without alerting about the alert', async () => {
+    await seedAdmin();
+    const id = await seedRow({ template: 'admin_alert', recipient: ADMIN_EMAIL, status: 'processing', attempts: OUTBOX_MAX_ATTEMPTS });
+
+    await claimNext(prisma, ['email']);
+
+    expect((await stateOf(id)).status).toBe('failed');
+    expect(await alertRows()).toHaveLength(1);
+  });
 });
 
 // --- Success ------------------------------------------------------------------------

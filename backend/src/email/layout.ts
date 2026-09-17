@@ -140,5 +140,5 @@ function multiline(value: string): string {
 
 /** Every line terminator, not only CR and LF: NEL and the Unicode line and paragraph separators too. */
 function singleLine(value: string): string {
-  return value.replace(/[\r\n  ]+/g, ' ').trim();
+  return value.replace(/[\r\n\u0085\u2028\u2029]+/g, ' ').trim();
 }

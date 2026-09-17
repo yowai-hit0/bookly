@@ -89,7 +89,7 @@ export function tr(ctx: EmailContext, key: string, values: Record<string, unknow
   const safeValues: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(values)) {
     if (typeof value === 'string') {
-      const marker = `${nonce}:${slots.length}`;
+      const marker = `\uE000${nonce}:${slots.length}\uE001`;
       slots.push([marker, value]);
       safeValues[name] = marker;
     } else {

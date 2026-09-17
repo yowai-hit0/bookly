@@ -132,8 +132,9 @@ describe('ResendMailProvider', () => {
     const error = await provider.send(MESSAGE).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(MailRejectedError);
-    expect((error as Error).message).toContain(`Resend answered ${status}`);
-    expect((error as Error).message).toContain('Invalid `to` field.');
+    // The status and Resend's error name, and nothing of its message: that
+    // text reaches last_error, the logs and the photographer's alert.
+    expect((error as Error).message).toBe(`Resend answered ${status} (validation_error)`);
     expect((error as Error).message).not.toContain('re_secret_key');
     expect((error as Error).message).not.toContain(MESSAGE.html);
   });
@@ -149,13 +150,29 @@ describe('ResendMailProvider', () => {
     expect((error as Error).message).toContain(`Resend answered ${status}`);
   });
 
-  it('caps the provider detail it quotes at 300 characters', async () => {
-    const { impl } = fakeFetch(() => new Response('z'.repeat(5000), { status: 500 }));
-    const provider = new ResendMailProvider({ apiKey: 'k', from: 'f@bookly.example', fetch: impl });
+  it('quotes none of what the provider said, so a recipient it echoes never reaches last_error or an alert', async () => {
+    const echoed = `Invalid \`to\` field: ${MESSAGE.to} is not allowed`;
+    const cases: Response[] = [
+      json(422, { name: 'validation_error', message: echoed }),
+      json(500, { name: 'internal_server_error', message: echoed }),
+      new Response(`${'z'.repeat(5000)} ${MESSAGE.to}`, { status: 500 }),
+      // A `name` that is not an error code is not quoted either.
+      json(500, { name: `oops ${MESSAGE.to}`, message: echoed }),
+    ];
+    const messages: string[] = [];
+    for (const response of cases) {
+      const { impl } = fakeFetch(() => response);
+      const provider = new ResendMailProvider({ apiKey: 'k', from: 'f@bookly.example', fetch: impl });
+      messages.push(((await provider.send(MESSAGE).catch((e: unknown) => e)) as Error).message);
+    }
 
-    const error = (await provider.send(MESSAGE).catch((e: unknown) => e)) as Error;
-
-    expect(error.message).toBe(`Resend answered 500: ${'z'.repeat(300)}`);
+    expect(messages).toEqual([
+      'Resend answered 422 (validation_error)',
+      'Resend answered 500 (internal_server_error)',
+      'Resend answered 500',
+      'Resend answered 500',
+    ]);
+    for (const message of messages) expect(message).not.toContain(MESSAGE.to);
   });
 
   it('lets a network failure or an abort propagate as retryable', async () => {
