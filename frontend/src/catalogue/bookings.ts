@@ -18,7 +18,7 @@ export type DetailField = (typeof DETAIL_FIELDS)[number]
 const blankToNull = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value)
 
 /** Digits and the separators people type, 7 to 15 digits: what the API accepts. */
-function isPlausiblePhone(value: string): boolean {
+export function isPlausiblePhone(value: string): boolean {
   if (!/^\+?[\d\s\-().]+$/.test(value)) return false
   const digits = value.replace(/\D/g, '').length
   return digits >= 7 && digits <= 15
@@ -78,6 +78,8 @@ export type HeldBooking = {
   bookingFeeRate: number
   bookingFeeRwf: number
   sessionFeeRwf: number
+  /** Opens this booking's checkout (plan.md Task 16). */
+  checkoutToken?: string
 }
 
 export type BookingPayload = BookingDetails & {

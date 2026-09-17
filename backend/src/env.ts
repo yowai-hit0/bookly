@@ -16,8 +16,21 @@ const schema = z.object({
   DATABASE_URL: z.url(),
   /** Public origin the site is served from. Emails link here, never at the API host. */
   WEB_ORIGIN: z.url(),
+  /** Public origin of this API. Payment providers call back on it. Defaults to
+   *  localhost on PORT outside production, where no provider can reach it anyway. */
+  API_ORIGIN: z.url().optional(),
   /** Deploy configuration, never a database row (data-model_v2.md §5.2). */
   PAYMENT_PROVIDER: z.enum(['mtn_momo_direct', 'flutterwave']).default('mtn_momo_direct'),
+  /** MTN MoMo Collections (plan.md Task 16). Sandbox by default; production
+   *  access depends on R-3. Without the three credentials, payment attempts are
+   *  recorded and fail at once. */
+  MTN_MOMO_BASE_URL: z.url().default('https://sandbox.momodeveloper.mtn.com'),
+  MTN_MOMO_TARGET_ENVIRONMENT: z.string().min(1).default('sandbox'),
+  MTN_MOMO_SUBSCRIPTION_KEY: z.string().min(1).optional(),
+  MTN_MOMO_API_USER: z.string().min(1).optional(),
+  MTN_MOMO_API_KEY: z.string().min(1).optional(),
+  /** The sandbox accepts only EUR; defaults to EUR there and RWF elsewhere. */
+  MTN_MOMO_CURRENCY: z.string().regex(/^[A-Z]{3}$/).optional(),
   /** HS256 key that signs admin bearer tokens (plan.md Task 7). jose enforces no
    *  minimum key length, so this floor is the only one. Rotating it invalidates
    *  every issued token -- the only "revoke everything" there is. */
@@ -34,7 +47,19 @@ const schema = z.object({
 }).refine((env) => env.NODE_ENV !== 'production' || env.RESEND_API_KEY !== undefined, {
   message: 'RESEND_API_KEY is required in production: without it no email would ever be sent',
   path: ['RESEND_API_KEY'],
-});
+}).refine((env) => env.NODE_ENV !== 'production' || env.API_ORIGIN !== undefined, {
+  message: 'API_ORIGIN is required in production: payment providers call back on it',
+  path: ['API_ORIGIN'],
+}).refine(
+  (env) =>
+    env.NODE_ENV !== 'production' ||
+    env.PAYMENT_PROVIDER !== 'mtn_momo_direct' ||
+    (env.MTN_MOMO_SUBSCRIPTION_KEY !== undefined && env.MTN_MOMO_API_USER !== undefined && env.MTN_MOMO_API_KEY !== undefined),
+  {
+    message: 'MTN_MOMO_SUBSCRIPTION_KEY, MTN_MOMO_API_USER and MTN_MOMO_API_KEY are required in production with PAYMENT_PROVIDER=mtn_momo_direct',
+    path: ['MTN_MOMO_API_KEY'],
+  },
+);
 
 export type Env = z.infer<typeof schema>;
 

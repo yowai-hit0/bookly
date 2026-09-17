@@ -5,6 +5,8 @@ import { createEmailHandler } from './email/handler.js';
 import { createMailProvider } from './email/mailer.js';
 import { EnvValidationError, parseEnv } from './env.js';
 import { startOutboxWorker } from './outbox/worker.js';
+import { createPaymentProviders } from './payments/providers.js';
+import { startPaymentReconciler } from './payments/reconcile.js';
 
 function boot(): void {
   let env;
@@ -18,6 +20,14 @@ function boot(): void {
     throw err;
   }
 
+  let payments;
+  try {
+    payments = createPaymentProviders(env);
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+
   const app = createApp({
     corsOrigin: env.WEB_ORIGIN,
     admin: {
@@ -26,7 +36,13 @@ function boot(): void {
       webOrigin: env.WEB_ORIGIN,
       now: () => new Date(),
     },
-    publicApi: { prisma, now: () => new Date() },
+    publicApi: {
+      prisma,
+      now: () => new Date(),
+      payments: { provider: payments.active, secret: env.SESSION_SECRET },
+    },
+    // Every provider's callbacks, not only the active one's (spec §6.18).
+    webhooks: { prisma, providers: payments.all },
   });
 
   const server = app.listen(env.PORT, () => {
@@ -37,6 +53,12 @@ function boot(): void {
   // rather than correctness -- the claim transaction expires the stale holds
   // that block it (data-model_v2.md §9.2) -- so nothing here is load-bearing.
   const holdSweeper = startHoldSweeper(prisma);
+
+  // Lost callbacks, and the MTN sandbox that sends none, settle through a status
+  // lookup. Without credentials there is nothing to ask.
+  const reconcilers = Object.values(payments.all)
+    .filter((provider) => provider.configured)
+    .map((provider) => startPaymentReconciler({ prisma, provider }));
 
   // Everything the system sends goes through the outbox (plan.md Task 14).
   // Calendar kinds get their handler with Task 22; until then they wait.
@@ -51,6 +73,7 @@ function boot(): void {
     shuttingDown = true;
     console.log(JSON.stringify({ level: 'info', event: 'shutdown', signal }));
     void holdSweeper.stop();
+    for (const reconciler of reconcilers) void reconciler.stop();
     server.close(() => {
       // The worker finishes the message in hand before the connection goes, so
       // no row is left claimed in `processing` (plan.md Task 14).

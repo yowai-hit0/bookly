@@ -1,4 +1,6 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { RouterProvider, createMemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import '@/i18n'
 import type { HeldBooking } from '@/catalogue/bookings'
@@ -11,6 +13,10 @@ import { BookingHeld } from './BookingHeld'
  * never recomputed -- with the fee's percentage read off the booking's own
  * rate, how long the hold lasts, and the non-refundable notice. Focus moves to
  * its heading, since the form the visitor submitted is gone.
+ *
+ * With the payment adapter (plan.md Task 16): the way to pay is a link to the
+ * booking’s checkout, addressed by the checkout token the API sent, and it is
+ * absent when the API sent none.
  */
 
 const HELD: HeldBooking = {
@@ -160,5 +166,55 @@ describe('the held booking', () => {
       if (original === undefined) delete process.env.TZ
       else process.env.TZ = original
     }
+  })
+})
+
+describe('the way to pay (plan.md Task 16)', () => {
+  const TOKEN = 'aB3_x-9QzT7vL4pR8sK1nB6yH3cF5dG0wJeLmNoPqRs'
+
+  function renderInRouter(booking: HeldBooking) {
+    const router = createMemoryRouter(
+      [
+        { path: '/services/portraits', element: <BookingHeld booking={booking} /> },
+        { path: '/checkout/:reference/:token', element: <h1>Checkout page</h1> },
+      ],
+      { initialEntries: ['/services/portraits'] },
+    )
+    render(<RouterProvider router={router} />)
+    return router
+  }
+
+  it('links to the booking’s checkout, /checkout/<reference>/<token>, when the API sent a checkout token', () => {
+    renderInRouter({ ...HELD, checkoutToken: TOKEN })
+
+    expect(screen.getByRole('link', { name: 'Pay the booking fee' })).toHaveAttribute('href', `/checkout/BKY-2610-7K3QX/${TOKEN}`)
+  })
+
+  it('offers no way to pay without a checkout token', () => {
+    renderInRouter(HELD)
+
+    expect(screen.queryByRole('link', { name: 'Pay the booking fee' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Pay the booking fee' })).not.toBeInTheDocument()
+  })
+
+  it('opens the checkout page when followed', async () => {
+    const router = renderInRouter({ ...HELD, checkoutToken: TOKEN })
+
+    await userEvent.setup({ delay: null }).click(screen.getByRole('link', { name: 'Pay the booking fee' }))
+
+    expect(await screen.findByRole('heading', { name: 'Checkout page' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe(`/checkout/BKY-2610-7K3QX/${TOKEN}`)
+  })
+
+  it('encodes the reference and token into the link', () => {
+    renderInRouter({ ...HELD, reference: 'BKY/2610', checkoutToken: 'a?b#c' })
+
+    expect(screen.getByRole('link', { name: 'Pay the booking fee' })).toHaveAttribute('href', '/checkout/BKY%2F2610/a%3Fb%23c')
+  })
+
+  it('still states the fee is non-refundable beside the way to pay', () => {
+    renderInRouter({ ...HELD, checkoutToken: TOKEN })
+
+    expect(screen.getByText(NOTICE)).toBeInTheDocument()
   })
 })

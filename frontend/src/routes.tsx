@@ -4,6 +4,8 @@ import { Home } from '@/pages/Home'
 import { NotFound } from '@/pages/NotFound'
 import { AdminCatalogue } from '@/pages/admin/AdminCatalogue'
 import { AdminLogin } from '@/pages/admin/AdminLogin'
+import { CheckoutPage } from '@/pages/checkout/CheckoutPage'
+import { PaymentProgressPage } from '@/pages/checkout/PaymentProgressPage'
 import { ServiceDetail } from '@/pages/services/ServiceDetail'
 import { ServiceList } from '@/pages/services/ServiceList'
 
@@ -15,6 +17,9 @@ export const routes: RouteObject[] = [
   { path: '/', element: <Home /> },
   { path: '/services', element: <ServiceList /> },
   { path: '/services/:slug', element: <ServiceDetail /> },
+  // The booking fee (plan.md Task 16): pay, then follow the payment until it settles.
+  { path: '/checkout/:reference/:token', element: <CheckoutPage /> },
+  { path: '/checkout/:reference/:token/payments/:ourRef', element: <PaymentProgressPage /> },
   { path: '/admin/login', element: <AdminLogin /> },
   {
     path: '/admin',

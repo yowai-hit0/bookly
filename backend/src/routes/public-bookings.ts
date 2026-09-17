@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { kigaliDateOf } from '../availability/engine.js';
 import { createBooking } from '../booking/create.js';
 import { normalizePhone } from '../booking/phone.js';
+import { checkoutToken } from '../payments/checkout-link.js';
 import { addonIds, kigaliDate, parseOrReject } from './validation.js';
 
 /**
@@ -13,7 +14,8 @@ import { addonIds, kigaliDate, parseOrReject } from './validation.js';
  *
  *   201 { booking: { reference, status, startsAt, endsAt, holdExpiresAt,
  *                    serviceName, packageName, packagePriceRwf, addons,
- *                    totalRwf, bookingFeeRate, bookingFeeRwf, sessionFeeRwf } }
+ *                    totalRwf, bookingFeeRate, bookingFeeRwf, sessionFeeRwf,
+ *                    checkoutToken } }
  *   400 invalid_request      malformed: wrong types, a missing id or start
  *   422 validation_failed    a rule broken, naming the fields: a blank name, an
  *                            unreadable email or phone, no consent, a package
@@ -25,6 +27,9 @@ import { addonIds, kigaliDate, parseOrReject } from './validation.js';
  * Stack decisions). Unknown keys -- a `totalRwf`, a `status` -- are stripped
  * unread: every column is built from a named field below, never spread from
  * the body.
+ *
+ * `checkoutToken` opens the booking's checkout, `/checkout/<reference>/<token>`
+ * (plan.md Task 16); it is present when the payment routes are mounted.
  *
  * Consent must be `true`. Omitting it is a 422, not a 400, so the form can
  * mark the box (plan.md Task 13); `consent_at` records when it was given,
@@ -91,7 +96,7 @@ const bookingBody = z.object({
     .refine((given) => given, 'Consent is required'),
 });
 
-export function bookingsRouter(prisma: PrismaClient, now: () => Date): Router {
+export function bookingsRouter(prisma: PrismaClient, now: () => Date, checkoutSecret?: string): Router {
   const router = Router();
 
   router.post('/', async (req, res) => {
@@ -138,6 +143,7 @@ export function bookingsRouter(prisma: PrismaClient, now: () => Date): Router {
         bookingFeeRate: booking.bookingFeeRate.toNumber(),
         bookingFeeRwf: booking.bookingFeeRwf,
         sessionFeeRwf: basket.quote.sessionFeeRwf,
+        ...(checkoutSecret === undefined ? {} : { checkoutToken: checkoutToken(checkoutSecret, booking.reference) }),
       },
     });
   });

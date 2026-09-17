@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router'
 import { kigaliDateOf } from '@/admin/calendar-dates'
 import type { HeldBooking } from '@/catalogue/bookings'
+import { checkoutPath } from '@/catalogue/payments'
+import { Button } from '@/components/ui/button'
 import { formatDate, formatMoney, formatTime } from '@/lib/format'
 import { feePercent } from '@/lib/quote'
 
@@ -11,8 +14,8 @@ import { feePercent } from '@/lib/quote'
  * them, and how long the hold lasts. Every amount here is the API's answer --
  * nothing is recomputed in the browser.
  *
- * Paying the booking fee is the next step (spec §3.1 step 9); the payment
- * control arrives with the payment adapter (plan.md Task 16).
+ * Paying the booking fee is the next step (spec §3.1 step 9): the checkout
+ * link, addressed by the booking's checkout token (plan.md Task 16).
  */
 
 export function BookingHeld({ booking }: { booking: HeldBooking }) {
@@ -82,6 +85,11 @@ export function BookingHeld({ booking }: { booking: HeldBooking }) {
           : t('services:booking.held.holdUntil', { time: formatTime(booking.holdExpiresAt), fee })}
       </p>
       <p className="text-sm font-medium">{t('services:summary.nonRefundable')}</p>
+      {booking.checkoutToken !== undefined && (
+        <Button asChild size="lg" className="self-start">
+          <Link to={checkoutPath(booking.reference, booking.checkoutToken)}>{t('services:booking.held.pay')}</Link>
+        </Button>
+      )}
     </section>
   )
 }

@@ -617,6 +617,27 @@ describe('content rules', () => {
     expect(email.text).toContain('The system does not move money. Refund the client through MTN MoMo');
   });
 
+  it.each([
+    ['admin_cancelled', 'You cancelled this booking'],
+    ['late_payment_slot_taken', 'booked by someone else'],
+    ['duplicate_payment', 'The client paid the booking fee twice. The booking stands on the first payment; this one is owed back.'],
+    ['session_fee_after_client_cancel', 'cancelled after paying the session fee'],
+  ])('refund_due explains the reason %s in words (plan.md Tasks 17, 19)', (reason, words) => {
+    const email = renderWith('admin_alert refund_due', { reason });
+
+    expect(email.text).toContain(words);
+    expect(email.html).toContain(escapeHtml(words));
+    expect([email.subject, email.text, email.html].join('\n')).not.toMatch(/reasons\.|\{\{|undefined/);
+  });
+
+  it('refund_due for a duplicate booking fee (plan.md Task 17) matches its snapshot', () => {
+    const email = renderWith('admin_alert refund_due', { reason: 'duplicate_payment', paymentReference: '4100000123' });
+
+    expect(email.subject).toMatchSnapshot('subject');
+    expect(email.text).toMatchSnapshot('text');
+    expect(email.html).toMatchSnapshot('html');
+  });
+
   it('no template mentions a processing fee', () => {
     expect(JSON.stringify(en.email)).not.toMatch(/processing fee|transaction fee|service charge/i);
     for (const fixture of EMAIL_FIXTURES) {

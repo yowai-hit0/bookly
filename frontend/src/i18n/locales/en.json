@@ -101,7 +101,8 @@
         "when": "When",
         "whenValue": "{{date}}, {{start}} to {{end}}, Kigali time",
         "holdUntil": "We are holding this time for you until {{time}}, Kigali time. Pay the booking fee of {{fee}} before then to confirm your booking; after that, the time is released for others to book.",
-        "holdUntilUnknown": "We are holding this time for you for a short while. Pay the booking fee of {{fee}} to confirm your booking."
+        "holdUntilUnknown": "We are holding this time for you for a short while. Pay the booking fee of {{fee}} to confirm your booking.",
+        "pay": "Pay the booking fee"
       }
     },
     "summary": {
@@ -232,6 +233,86 @@
         "photoCount": "Enter a whole number, 0 or more.",
         "durationMinutes": "Enter a whole number of minutes, at least 1."
       }
+    }
+  },
+  "checkout": {
+    "loading": "Loading your booking…",
+    "loadFailed": "We could not load your booking. Check your connection and try again.",
+    "retry": "Try again",
+    "invalidLink": {
+      "title": "This payment link is not valid",
+      "body": "Check that you opened the whole link. If your booking has ended, you are welcome to book again."
+    },
+    "title": "Pay the booking fee",
+    "summary": {
+      "reference": "Booking reference",
+      "service": "Service",
+      "serviceValue": "{{service}}, {{package}}",
+      "when": "When",
+      "whenValue": "{{date}}, {{start}} to {{end}}, Kigali time",
+      "fee": "Booking fee"
+    },
+    "holdUntil": "We are holding this time for you until {{time}}, Kigali time.",
+    "nonRefundable": "The booking fee is non-refundable if you cancel.",
+    "methods": {
+      "legend": "How would you like to pay?",
+      "momo_mtn": "MTN MoMo",
+      "momo_airtel": "Airtel Money",
+      "card": "Card"
+    },
+    "phone": {
+      "label": "Mobile Money number",
+      "hint": "We will send a payment request to this phone. Approve it with your Mobile Money PIN.",
+      "invalid": "Enter the phone number of your Mobile Money account."
+    },
+    "pay": "Pay {{amount}}",
+    "paying": "Sending the request…",
+    "waiting": {
+      "text": "A payment request is already waiting on your phone.",
+      "link": "Follow that payment"
+    },
+    "errors": {
+      "rejected": "Mobile Money did not accept the request. Check that the number has a Mobile Money account, then try again.",
+      "unavailable": "We could not reach Mobile Money just now. Please try again in a moment.",
+      "failed": "The payment did not start. Check your connection and try again.",
+      "noMethods": "Online payment is not available right now. Please try again later."
+    },
+    "paid": {
+      "title": "This booking is already paid",
+      "body": "Your confirmation email, with a link to your booking, is on its way."
+    },
+    "expired": {
+      "title": "Your hold on this time has ended",
+      "body": "The time was released because the booking fee was not paid in time. You are welcome to book again.",
+      "link": "Choose a time"
+    },
+    "closed": {
+      "title": "This booking cannot be paid online",
+      "body": "Please contact the photographer about this booking."
+    },
+    "progress": {
+      "pendingTitle": "Approve the payment on your phone",
+      "pendingBody": "We have sent a request for {{amount}} to your phone. Enter your Mobile Money PIN to approve it.",
+      "pendingWait": "Mobile Money can take a minute to confirm. This page updates by itself.",
+      "pendingLeave": "If you close this page, we will still email your confirmation as soon as the payment arrives.",
+      "stillWaiting": "We have not heard back yet. If you approved the payment, your confirmation email will arrive once it settles.",
+      "checkAgain": "Check again",
+      "connectionTrouble": "We are having trouble checking on the payment. We will keep trying.",
+      "confirmedTitle": "Your booking is confirmed",
+      "confirmedBody": "Thank you. Your confirmation email, with a link to your booking, is on its way.",
+      "receivedTitle": "Payment received",
+      "receivedBody": "Thank you. Your payment of {{amount}} has arrived.",
+      "failedTitle": "The payment did not go through",
+      "failedDeclined": "The payment was declined, or was not approved in time.",
+      "failedUnavailable": "We could not reach Mobile Money to start the payment.",
+      "tryAgain": "Try again",
+      "refundTitle": "Your payment arrived after your hold ended",
+      "refundBody": "The time was booked by someone else before your payment arrived. The photographer has been told and will refund your {{amount}}.",
+      "duplicateTitle": "Your booking was already paid",
+      "duplicateBody": "This second payment of {{amount}} was not needed. The photographer has been told and will refund it.",
+      "couldNotCheck": "We could not check on your payment. If you approved it, your confirmation email will arrive once it settles.",
+      "refundOtherTitle": "This payment is due a refund",
+      "refundOtherBody": "The photographer has been told and will refund your {{amount}}."
     }
   }
 }

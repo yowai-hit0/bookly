@@ -2,10 +2,13 @@ import type { PrismaClient } from '@prisma/client';
 import cors from 'cors';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import type { AuthDeps } from './auth/admin-auth.js';
+import type { PaymentProvider } from './payments/provider.js';
 import { adminRouter } from './routes/admin.js';
 import { healthRouter } from './routes/health.js';
+import { type PaymentWebhooksDeps, paymentWebhooksRouter } from './routes/payment-webhooks.js';
 import { availabilityRouter } from './routes/public-availability.js';
 import { bookingsRouter } from './routes/public-bookings.js';
+import { checkoutRouter } from './routes/public-checkout.js';
 import { publicCatalogueRouter } from './routes/public-catalogue.js';
 
 // Dev/test default, kept in sync with vite.config.ts's port and .env.example's
@@ -20,7 +23,16 @@ export type AppOptions = {
   /** Mounts the anonymous public routes (`/api/services`, `/api/quote`,
    *  `/api/availability`, `/api/bookings`). Omitted, they 404 too, for the same
    *  reason. `now` is the injected clock lead time and consent are measured by. */
-  publicApi?: { prisma: PrismaClient; now?: () => Date };
+  publicApi?: {
+    prisma: PrismaClient;
+    now?: () => Date;
+    /** Mounts the checkout (`/api/payment-methods`, `/api/checkout/*`,
+     *  `/api/payments/*`) and puts a checkout token on each created booking
+     *  (plan.md Task 16). `secret` is `SESSION_SECRET`. */
+    payments?: { provider: PaymentProvider; secret: string; providerTimeoutMs?: number };
+  };
+  /** Mounts `/api/webhooks/*` (plan.md Task 17), ahead of the JSON parser. */
+  webhooks?: PaymentWebhooksDeps;
 };
 
 export function createApp(options: AppOptions = {}): Express {
@@ -32,6 +44,9 @@ export function createApp(options: AppOptions = {}): Express {
   // bearer token in the Authorization header, not a cookie, so no request needs
   // the browser to attach credentials on its behalf (plan.md Task 7, rev 2.3).
   app.use(cors({ origin: [corsOrigin] }));
+  // Before the JSON parser, which would otherwise consume a callback's body
+  // before its signature could be checked against the bytes (plan.md Task 17).
+  if (options.webhooks) app.use('/api/webhooks', paymentWebhooksRouter(options.webhooks));
   app.use(express.json());
 
   app.use('/api', healthRouter);
@@ -39,7 +54,10 @@ export function createApp(options: AppOptions = {}): Express {
     const { prisma, now = () => new Date() } = options.publicApi;
     app.use('/api', publicCatalogueRouter(prisma));
     app.use('/api/availability', availabilityRouter(prisma, now));
-    app.use('/api/bookings', bookingsRouter(prisma, now));
+    app.use('/api/bookings', bookingsRouter(prisma, now, options.publicApi.payments?.secret));
+    if (options.publicApi.payments) {
+      app.use('/api', checkoutRouter({ prisma, ...options.publicApi.payments }));
+    }
   }
   if (options.admin) app.use('/api/admin', adminRouter(options.admin));
 

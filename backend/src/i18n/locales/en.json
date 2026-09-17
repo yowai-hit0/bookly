@@ -165,6 +165,7 @@
         "reasons": {
           "admin_cancelled": "You cancelled this booking, so the client is owed a full refund.",
           "late_payment_slot_taken": "The client's payment arrived after their hold had expired and the time had been booked by someone else.",
+          "duplicate_payment": "The client paid the booking fee twice. The booking stands on the first payment; this one is owed back.",
           "session_fee_after_client_cancel": "The client cancelled after paying the session fee, which is refunded."
         },
         "howTo": "The system does not move money. Refund the client through {{provider}}, then record the refund on the booking."
