@@ -11,6 +11,7 @@ import {
   resendAccessLink,
 } from '../booking/admin-actions.js';
 import { ADDON_MAX_QUANTITY, type AddonEditResult, addPostShootAddon, removePostShootAddon } from '../booking/addons.js';
+import { type DeliveryResult, saveDelivery, sendDelivery } from '../booking/delivery.js';
 import { BOOKINGS_MAX_PAGE_SIZE, findBookings } from '../booking/admin-list.js';
 import { type AdminBooking, adminBookingView, findAdminBooking } from '../booking/admin-view.js';
 import { BOOKING_STATUSES } from '../db/statuses.js';
@@ -46,6 +47,12 @@ import { kigaliDate, parseOrReject } from './validation.js';
  *          200 { booking } | 404 | 409 not_allowed | 409 nothing_to_pay |
  *          409 in_progress -- and 404 where no provider is configured, because
  *          a request nobody could pay is not worth sending.
+ *
+ * And the delivery (plan.md Task 21; spec §3.5 steps 5-7, §6.20):
+ *
+ *   PUT  /bookings/:id/delivery       { url, expiresOn?, note? }
+ *        200 { booking } | 404 | 409 not_allowed | 422
+ *   POST /bookings/:id/delivery/send  200 | 404 | 409 not_allowed | 409 no_link
  *
  * A 409 carries the booking as it now stands, so a screen acting on a stale
  * view -- a booking cancelled in another tab, a slot taken while he chose --
@@ -104,6 +111,25 @@ const addonBody = z.strictObject({
   /** A catalogue add-on; what it costs is read from the catalogue, never sent. */
   addonId: z.guid(),
   quantity: z.int().min(1).max(ADDON_MAX_QUANTITY).default(1),
+});
+
+/** Free text under the link in the delivery email (`delivery_note`). */
+const DELIVERY_NOTE_MAX_LENGTH = 2000;
+const DELIVERY_URL_MAX_LENGTH = 2000;
+
+const deliveryBody = z.strictObject({
+  /**
+   * The external host's link (spec A-7). A malformed URL is a 400; a
+   * well-formed `http:` one is a 422, and the column CHECK refuses it again.
+   */
+  url: z
+    .url()
+    .max(DELIVERY_URL_MAX_LENGTH)
+    // The parsed scheme, so `HTTPS://` counts as https too.
+    .refine((value) => !URL.canParse(value) || new URL(value).protocol === 'https:', 'Must be an https URL'),
+  /** Omitted, the API dates it: today plus `delivery_expiry_days` (spec A-8). */
+  expiresOn: kigaliDate.optional(),
+  note: storableText(1, DELIVERY_NOTE_MAX_LENGTH).nullable().optional(),
 });
 
 const refundBody = z.strictObject({
@@ -212,6 +238,34 @@ export function adminBookingsRouter(deps: AdminBookingsDeps): Router {
     });
   }
 
+  // --- Delivery (Task 21) ----------------------------------------------------
+
+  router.put('/bookings/:id/delivery', async (req, res) => {
+    const id = parseOrReject(rowId, req.params.id, res);
+    if (id === undefined) return;
+    const body = parseOrReject(deliveryBody, req.body, res);
+    if (body === undefined) return;
+
+    await answer(
+      prisma,
+      now,
+      res,
+      await saveDelivery({ prisma, now }, id, {
+        url: body.url,
+        ...(body.expiresOn === undefined ? {} : { expiresOn: body.expiresOn }),
+        ...(body.note === undefined ? {} : { note: body.note }),
+      }),
+      id,
+    );
+  });
+
+  router.post('/bookings/:id/delivery/send', async (req, res) => {
+    const id = parseOrReject(rowId, req.params.id, res);
+    if (id === undefined) return;
+
+    await answer(prisma, now, res, await sendDelivery({ prisma, now }, id), id);
+  });
+
   router.post('/payments/:id/refund', async (req, res) => {
     const id = parseOrReject(rowId, req.params.id, res);
     if (id === undefined) return;
@@ -245,7 +299,7 @@ export function adminBookingsRouter(deps: AdminBookingsDeps): Router {
 }
 
 /** Everything an action can answer with: the booking, or the reason it refused. */
-type ActionAnswer = AdminActionResult | RescheduleResult | AddonEditResult | SessionFeeResult;
+type ActionAnswer = AdminActionResult | RescheduleResult | AddonEditResult | SessionFeeResult | DeliveryResult;
 
 /** One shape for every action: the booking as it now stands, or why not. */
 async function answer(

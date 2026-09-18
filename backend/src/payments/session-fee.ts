@@ -3,7 +3,7 @@ import { accessTokenExpiry, generateAccessToken } from '../booking/access-token.
 import { type AdminBooking, findAdminBooking } from '../booking/admin-view.js';
 import { bookingTotals } from '../booking/totals.js';
 import { enqueue } from '../outbox/enqueue.js';
-import { PAYMENT_ATTEMPT_WINDOW_SECONDS } from './initiate.js';
+import { CALL_IN_FLIGHT_SECONDS, PAYMENT_ATTEMPT_WINDOW_SECONDS } from './initiate.js';
 import type { PaymentProviderId } from './provider.js';
 
 /**
@@ -67,7 +67,16 @@ type BookingRow = {
   ends_at: Date;
 };
 
-type AttemptRow = { id: string; status: string; amount_rwf: number; provider: string; recent: boolean };
+type AttemptRow = {
+  id: string;
+  status: string;
+  amount_rwf: number;
+  provider: string;
+  recent: boolean;
+  in_flight: boolean;
+  /** An ask of ours, already emailed -- not an attempt somebody started. */
+  requested: boolean;
+};
 
 export async function requestSessionFee(deps: SessionFeeDeps, bookingId: string): Promise<SessionFeeResult> {
   const { prisma, providerId } = deps;
@@ -101,16 +110,33 @@ export async function requestSessionFee(deps: SessionFeeDeps, bookingId: string)
     // The window is the database's, as everywhere money is claimed: an app
     // clock that drifts must not decide whether a prompt is still live.
     const attempts = await tx.$queryRaw<AttemptRow[]>`
-      SELECT id::text AS id, status, amount_rwf, provider,
-             initiated_at > now() - make_interval(secs => ${PAYMENT_ATTEMPT_WINDOW_SECONDS}::double precision) AS recent
-        FROM payment
-       WHERE booking_id = ${booking.id}::uuid
-         AND kind = 'session_fee'
-       ORDER BY initiated_at DESC
+      SELECT p.id::text AS id, p.status, p.amount_rwf, p.provider,
+             p.initiated_at > now() - make_interval(secs => ${PAYMENT_ATTEMPT_WINDOW_SECONDS}::double precision) AS recent,
+             p.initiated_at > now() - make_interval(secs => ${CALL_IN_FLIGHT_SECONDS}::double precision) AS in_flight,
+             EXISTS (
+               SELECT 1
+                 FROM outbox o
+                WHERE o.booking_id = p.booking_id
+                  AND o.template = 'session_fee_request'
+                  AND o.payload->>'paymentId' = p.id::text
+             ) AS requested
+        FROM payment p
+       WHERE p.booking_id = ${booking.id}::uuid
+         AND p.kind = 'session_fee'
+       ORDER BY p.initiated_at DESC
        LIMIT 1
-         FOR UPDATE`;
+         FOR UPDATE OF p`;
     const latest = attempts[0];
-    if (latest !== undefined && latest.recent && latest.status === 'pending') return 'in_progress';
+    // Money may be moving: a prompt on the payer's phone, or an attempt whose
+    // provider call has not answered yet (payments/initiate.ts). Asking now
+    // would rotate the token out from under the page they are paying on, so
+    // the ask waits for that attempt to end. An ask of our own blocks nothing:
+    // asking twice is a reminder, and the client has not started anything.
+    const moving =
+      latest !== undefined &&
+      ((latest.recent && latest.status === 'pending') ||
+        (latest.in_flight && latest.status === 'initiated' && !latest.requested));
+    if (moving) return 'in_progress';
 
     // Asking again for the same amount is a reminder, not a second bill: the
     // row the client was already sent is the one the email points at. A row for
@@ -145,6 +171,10 @@ export async function requestSessionFee(deps: SessionFeeDeps, bookingId: string)
         endsAt: booking.ends_at.toISOString(),
         // The amount asked for, not the amount outstanding when it is read.
         amountRwf: payment.amount_rwf,
+        // Which row this ask is for: how both readers tell an ask waiting to be
+        // paid from an attempt whose provider call is still running. Not
+        // rendered -- the template keeps only the fields it draws.
+        paymentId: payment.id,
         // The only place this plaintext exists (data-model_v2.md §5.9).
         accessToken: token,
       },

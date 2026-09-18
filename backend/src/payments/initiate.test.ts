@@ -18,6 +18,7 @@ import {
 } from '../test/payment-fixtures.js';
 import { PAYMENT_ATTEMPT_WINDOW_SECONDS, startBookingFeePayment, startSessionFeePayment } from './initiate.js';
 import { type PaymentProvider, PaymentProviderError } from './provider.js';
+import { requestSessionFee } from './session-fee.js';
 import { receiveWebhook } from './webhooks.js';
 
 /**
@@ -952,5 +953,146 @@ describe('a second session fee after one succeeded (spec §6.15)', () => {
         [booking.id],
       ),
     ).rejects.toMatchObject({ code: '23505' });
+  });
+});
+
+// --- The photographer asks, the client pays (plan.md Task 20, spec §3.5 steps 3-4) ------------------
+
+/**
+ * The two halves joined. `requestSessionFee` writes an `initiated` row for the
+ * amount outstanding when he asks and freezes it; `startSessionFeePayment`
+ * finds that row and pays it, at that amount and against that `our_ref`,
+ * whatever the add-ons have done since.
+ *
+ * The rows are aged first, and deliberately so: an `initiated` session fee
+ * younger than `CALL_IN_FLIGHT_SECONDS` (30 s) is indistinguishable from an
+ * attempt whose provider call has not answered, and prompting again there is
+ * how a fee gets paid twice. A photographer's request the client pays seconds
+ * later is not a case that exists -- the client has to read the email first.
+ */
+describe('a request made from the admin screen, then paid by the client', () => {
+  const ASK_CLOCK = new Date('2026-10-01T06:00:00Z');
+
+  /** Past the in-flight window, so the request reads as a request rather than a call in progress. */
+  async function ageSessionFees(): Promise<void> {
+    await prisma.$executeRaw`UPDATE payment SET initiated_at = initiated_at - interval '5 minutes' WHERE kind = 'session_fee'`;
+  }
+
+  async function ask(bookingId: string, providerId: 'mtn_momo_direct' | 'flutterwave' = 'mtn_momo_direct') {
+    const result = await requestSessionFee({ prisma, providerId, now: () => ASK_CLOCK }, bookingId);
+    if (result.status !== 'ok') throw new Error(`Expected the request to be made, got ${result.status}`);
+  }
+
+  it('calls the provider with the frozen amount and the same our_ref the request opened', async () => {
+    const booking = await owingBooking('completed');
+    await ask(booking.id);
+    const requested = (await payments()).find((row) => row.kind === 'session_fee');
+    // He remembers another add-on after asking: the client still pays what they were asked.
+    await addPostShootAddon(booking.id, 15_000);
+    await ageSessionFees();
+    const provider = stubProvider();
+
+    const result = await startSession(provider, booking);
+
+    expect(result).toStrictEqual({ status: 'started', ourRef: requested?.our_ref });
+    expect(provider.initiated).toStrictEqual([
+      {
+        ourRef: requested?.our_ref,
+        amountRwf: 30_000,
+        method: 'momo_mtn',
+        payerPhone: '+250788123456',
+        kind: 'session_fee',
+        bookingReference: booking.reference,
+      },
+    ]);
+    // One row, at the amount asked for, now waiting on the payer.
+    const sessionFees = (await payments()).filter((row) => row.kind === 'session_fee');
+    expect(sessionFees).toHaveLength(1);
+    expect(sessionFees[0]).toMatchObject({ id: requested?.id, amount_rwf: 30_000, status: 'pending' });
+  });
+
+  it('is payable the instant it is asked for, because an ask is not a call in flight', async () => {
+    // The email arrives in seconds and the client taps Pay: nothing is in
+    // progress, and the row they are paying is the one the ask opened.
+    const booking = await owingBooking('completed');
+    await ask(booking.id);
+    const requested = (await payments()).find((row) => row.kind === 'session_fee');
+    const provider = stubProvider();
+
+    const result = await startSession(provider, booking);
+
+    expect(result).toStrictEqual({ status: 'started', ourRef: requested?.our_ref });
+    expect(provider.initiated).toStrictEqual([expect.objectContaining({ amountRwf: 30_000 })]);
+    expect((await payments()).filter((row) => row.kind === 'session_fee')).toHaveLength(1);
+  });
+
+  it('still answers in_progress for an attempt nobody asked for, which may be a call in flight', async () => {
+    // Same age, no ask behind it: this is a second tap, and a second prompt
+    // on the same phone is how one fee gets paid twice.
+    const booking = await owingBooking('completed');
+    const tapped = await insertPayment(prisma, booking.id, {
+      status: 'initiated',
+      kind: 'session_fee',
+      amountRwf: 30_000,
+      ageSeconds: 5,
+    });
+    const provider = stubProvider();
+
+    const result = await startSession(provider, booking);
+
+    expect(result).toStrictEqual({ status: 'in_progress', ourRef: tapped.ourRef });
+    expect(provider.initiated).toEqual([]);
+    expect((await payments()).filter((row) => row.kind === 'session_fee')).toHaveLength(1);
+  });
+
+  it('lets a newer request supersede an older one: the client pays the latest amount asked for', async () => {
+    const booking = await owingBooking('completed');
+    await ask(booking.id);
+    const first = (await payments()).find((row) => row.kind === 'session_fee');
+    await addPostShootAddon(booking.id, 15_000);
+    await ask(booking.id);
+    const rows = (await payments()).filter((row) => row.kind === 'session_fee');
+    const second = rows.find((row) => row.id !== first?.id);
+    expect(rows).toHaveLength(2);
+    // Distinctly aged, so "the newest request" is a fact and not a tie.
+    await prisma.$executeRaw`UPDATE payment SET initiated_at = now() - interval '10 minutes' WHERE id = ${first?.id}::uuid`;
+    await prisma.$executeRaw`UPDATE payment SET initiated_at = now() - interval '5 minutes' WHERE id = ${second?.id}::uuid`;
+    const provider = stubProvider();
+
+    const result = await startSession(provider, booking);
+
+    expect(result).toStrictEqual({ status: 'started', ourRef: second?.our_ref });
+    expect(provider.initiated).toStrictEqual([expect.objectContaining({ ourRef: second?.our_ref, amountRwf: 45_000 })]);
+    // The superseded ask is left exactly as it was: only its own webhook settles it.
+    expect((await payments()).find((row) => row.id === first?.id)).toMatchObject({ status: 'initiated', amount_rwf: 30_000 });
+  });
+
+  it('opens its own row when the request was recorded against another provider (spec §6.18)', async () => {
+    const booking = await owingBooking('completed');
+    await ask(booking.id, 'flutterwave');
+    const foreign = (await payments()).find((row) => row.kind === 'session_fee');
+    await ageSessionFees();
+
+    const result = await startSession(stubProvider(), booking);
+
+    expect(result).toMatchObject({ status: 'started' });
+    if (result.status !== 'started') throw new Error('unreachable');
+    expect(result.ourRef).not.toBe(foreign?.our_ref);
+    expect((await payments()).filter((row) => row.kind === 'session_fee')).toHaveLength(2);
+  });
+
+  it('settles the frozen amount, leaving the booking paid in full for what was asked', async () => {
+    const booking = await owingBooking('completed');
+    await ask(booking.id);
+    await ageSessionFees();
+    const started = await startSession(stubProvider(), booking);
+    if (started.status !== 'started') throw new Error(`Expected started, got ${started.status}`);
+
+    await raw.query(`UPDATE payment SET status = 'succeeded', settled_at = now() WHERE our_ref = $1`, [started.ourRef]);
+
+    const sessionFee = (await payments()).find((row) => row.kind === 'session_fee');
+    expect(sessionFee).toMatchObject({ amount_rwf: 30_000, status: 'succeeded' });
+    // And a second attempt now has nothing to collect.
+    await expect(startSession(stubProvider(), booking)).resolves.toStrictEqual({ status: 'nothing_to_pay' });
   });
 });

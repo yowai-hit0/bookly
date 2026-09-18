@@ -1423,3 +1423,273 @@ describe('bodies PostgreSQL would refuse, and bodies that are not JSON', () => {
     expect((await events()).length).toBe(1);
   });
 });
+
+// --- A session fee settling (plan.md Task 20; spec §3.5 step 4) ---------------------------------
+
+/**
+ * What a succeeded session fee sends (spec §3.5 step 4, §6.15). The client is
+ * receipted and the photographer told, both keyed on the payment, so a
+ * redelivered event adds nothing and a second session fee on the same booking
+ * is its own receipt.
+ *
+ * The receipt carries no booking link: the plaintext of the client's token was
+ * never stored (data-model_v2.md §5.9), and `accessToken: null` makes the email
+ * name the link they already have rather than replacing a working one. Its
+ * amounts are `bookingTotals()` as the transaction leaves them -- the payment is
+ * already `succeeded`, so `paidRwf` includes it and `outstandingRwf` is what is
+ * genuinely left. A booking fee is not receipted here: its confirmation email is
+ * its receipt.
+ */
+describe('a succeeded session fee', () => {
+  /** A completed shoot: 50,000 owed, 20,000 booking fee collected, the rest asked for. */
+  async function askedFor(amountRwf = 30_000) {
+    const booking = await insertBooking(prisma, world, { status: 'completed' });
+    const bookingFee = await insertPayment(prisma, booking.id, { status: 'succeeded' });
+    const sessionFee = await insertPayment(prisma, booking.id, { status: 'pending', kind: 'session_fee', amountRwf });
+    return { booking, bookingFee, sessionFee };
+  }
+
+  function renderReceipt(payload: Record<string, unknown>) {
+    return renderEmail('payment_receipt', payload, { webOrigin: WEB_ORIGIN, locale: 'en' });
+  }
+
+  it('enqueues exactly one receipt to the client and one alert to the photographer', async () => {
+    const { booking, sessionFee } = await askedFor();
+
+    await deliver(statusDelivery(sessionFee.ourRef, 'SUCCESSFUL', { amount: '30000', financialTransactionId: '5551234' }));
+
+    const messages = await outbox();
+    expect(messages.map((row) => row.template)).toEqual(['admin_alert', 'payment_receipt']);
+    expect(messages.filter((row) => row.template === 'payment_receipt')).toHaveLength(1);
+    const [alert, receipt] = messages;
+    expect(alert).toMatchObject({
+      kind: 'email',
+      recipient: ADMIN_EMAIL,
+      dedupe_key: `email:admin_alert:payment_received:${sessionFee.id}`,
+      payload: {
+        variant: 'payment_received',
+        reference: booking.reference,
+        clientName: CLIENT.name,
+        kind: 'session_fee',
+        amountRwf: 30_000,
+        paidAt: NOW.toISOString(),
+        outstandingRwf: 0,
+      },
+    });
+    expect(receipt).toMatchObject({
+      kind: 'email',
+      // The booking's own contact address, not the client record's.
+      recipient: CLIENT.email,
+      booking_id: booking.id,
+      dedupe_key: `email:payment_receipt:${sessionFee.id}`,
+    });
+  });
+
+  it('carries the totals bookingTotals leaves behind, with no link and no token', async () => {
+    const { booking, sessionFee } = await askedFor();
+
+    await deliver(statusDelivery(sessionFee.ourRef, 'SUCCESSFUL', { amount: '30000', financialTransactionId: '5551235' }));
+
+    const receipt = (await outbox()).find((row) => row.template === 'payment_receipt');
+    expect(receipt?.payload).toStrictEqual({
+      locale: 'en',
+      reference: booking.reference,
+      clientName: CLIENT.name,
+      serviceName: 'Portraits',
+      packageName: 'Standard',
+      startsAt: booking.startsAt.toISOString(),
+      endsAt: booking.endsAt.toISOString(),
+      kind: 'session_fee',
+      amountRwf: 30_000,
+      paidAt: NOW.toISOString(),
+      paymentReference: '5551235',
+      totalRwf: 50_000,
+      paidRwf: 50_000,
+      outstandingRwf: 0,
+      overpaidRwf: 0,
+      accessToken: null,
+    });
+  });
+
+  it('names the provider’s reference when one is reported', async () => {
+    const { sessionFee } = await askedFor();
+
+    await deliver(statusDelivery(sessionFee.ourRef, 'SUCCESSFUL', { amount: '30000', financialTransactionId: '5559999' }));
+
+    expect((await outbox()).find((row) => row.template === 'payment_receipt')?.payload.paymentReference).toBe('5559999');
+  });
+
+  it('falls back to our own reference when the provider reports none', async () => {
+    const { sessionFee } = await askedFor();
+
+    await recordEvent(deps(), 'mtn_momo_direct', {
+      signatureValid: true,
+      event: event({ eventId: `${sessionFee.ourRef}:SUCCESSFUL`, ourRef: sessionFee.ourRef, providerRef: null }),
+      payload: {},
+    });
+
+    expect((await outbox()).find((row) => row.template === 'payment_receipt')?.payload.paymentReference).toBe(sessionFee.ourRef);
+  });
+
+  it('renders to an email that says paid in full and offers no booking link at all', async () => {
+    const { sessionFee } = await askedFor();
+    await deliver(statusDelivery(sessionFee.ourRef, 'SUCCESSFUL', { amount: '30000' }));
+
+    const payload = (await outbox()).find((row) => row.template === 'payment_receipt')?.payload ?? {};
+    const email = renderReceipt(payload);
+
+    expect(email.text).toContain('paid in full');
+    expect(email.text).toContain('Your booking link has not changed');
+    expect(email.html).not.toContain('/booking/');
+    expect(email.text).not.toContain('/booking/');
+    for (const part of [email.subject, email.text, email.html]) {
+      expect(part).not.toMatch(/accessToken|access_token/i);
+      expect(part).not.toContain('null');
+    }
+  });
+
+  it('adds nothing on a redelivered event: both keys are the payment’s own', async () => {
+    const { sessionFee } = await askedFor();
+    const body = mtnStatusBody(sessionFee.ourRef, 'SUCCESSFUL', { amount: '30000' });
+
+    const first = await deliver(mtnDelivery(provider, sessionFee.ourRef, body));
+    const before = await outbox();
+    const second = await deliver(mtnDelivery(provider, sessionFee.ourRef, body));
+
+    expect([first.status, second.status]).toEqual(['applied', 'ignored']);
+    expect(await outbox()).toStrictEqual(before);
+    expect(before).toHaveLength(2);
+  });
+
+  it('gives a second session fee on the same booking its own receipt and its own alert (spec §6.15)', async () => {
+    const { booking, sessionFee } = await askedFor();
+    await deliver(statusDelivery(sessionFee.ourRef, 'SUCCESSFUL', { amount: '30000' }));
+    // An add-on afterwards, and a second request for the difference.
+    await prisma.bookingAddon.create({
+      data: {
+        bookingId: booking.id,
+        addonId: world.sharedAddonId,
+        nameSnapshot: 'Rush edit',
+        unitPriceRwf: 15_000,
+        amountRwf: 15_000,
+        stage: 'post_shoot',
+      },
+    });
+    const second = await insertPayment(prisma, booking.id, { status: 'pending', kind: 'session_fee', amountRwf: 15_000 });
+
+    await deliver(statusDelivery(second.ourRef, 'SUCCESSFUL', { amount: '15000' }));
+
+    const receipts = (await outbox()).filter((row) => row.template === 'payment_receipt');
+    expect(receipts).toHaveLength(2);
+    expect(new Set(receipts.map((row) => row.dedupe_key)).size).toBe(2);
+    expect(receipts.map((row) => row.payload.amountRwf).sort()).toEqual([15_000, 30_000]);
+    // The second receipt is the one that closes the booking.
+    const closing = receipts.find((row) => row.dedupe_key.endsWith(second.id));
+    expect(closing?.payload).toMatchObject({ totalRwf: 65_000, paidRwf: 65_000, outstandingRwf: 0 });
+  });
+
+  it('claims nothing is left only when nothing is: a part payment leaves the rest outstanding', async () => {
+    const { sessionFee } = await askedFor(10_000);
+
+    await deliver(statusDelivery(sessionFee.ourRef, 'SUCCESSFUL', { amount: '10000' }));
+
+    const messages = await outbox();
+    const receipt = messages.find((row) => row.template === 'payment_receipt');
+    const alert = messages.find((row) => row.template === 'admin_alert');
+    expect(receipt?.payload).toMatchObject({ amountRwf: 10_000, totalRwf: 50_000, paidRwf: 30_000, outstandingRwf: 20_000 });
+    expect(alert?.payload).toMatchObject({ amountRwf: 10_000, outstandingRwf: 20_000 });
+
+    const email = renderReceipt(receipt?.payload ?? {});
+    expect(email.text).toContain('20,000 RWF');
+    expect(email.text).not.toMatch(/paid in full/i);
+    expect(email.html).not.toMatch(/paid in full/i);
+  });
+
+  it('leaves the booking exactly as it was: a session fee moves no status and no token', async () => {
+    const { booking, sessionFee } = await askedFor();
+    const before = await rowJson('booking', booking.id);
+
+    await deliver(statusDelivery(sessionFee.ourRef, 'SUCCESSFUL', { amount: '30000' }));
+
+    expect(await rowJson('booking', booking.id)).toBe(before);
+    expect(tokens).toEqual([]);
+  });
+
+  it('receipts an overpaid session fee as well as flagging it — the code does not skip it', async () => {
+    // 40,000 arriving against 30,000 outstanding: 10,000 more than the booking
+    // is worth. `flagOverpayment` alerts the photographer and `receipt` still
+    // runs, so the client is told what arrived rather than hearing nothing.
+    const { sessionFee } = await askedFor(40_000);
+
+    await deliver(statusDelivery(sessionFee.ourRef, 'SUCCESSFUL', { amount: '40000' }));
+
+    const messages = await outbox();
+    expect(messages.map((row) => row.template).sort()).toEqual(['admin_alert', 'admin_alert', 'payment_receipt']);
+    expect(messages.find((row) => row.dedupe_key === `email:admin_alert:overpayment:${sessionFee.id}`)?.payload).toMatchObject({
+      variant: 'refund_due',
+      reason: 'overpayment',
+      amountRwf: 10_000,
+    });
+    const receipt = messages.find((row) => row.template === 'payment_receipt');
+    expect(receipt?.payload).toMatchObject({ amountRwf: 40_000, totalRwf: 50_000, paidRwf: 60_000, outstandingRwf: 0 });
+    expect(sink.entries).toContainEqual(expect.objectContaining({ event: 'booking_overpaid', overpaidRwf: 10_000 }));
+  });
+
+  /**
+   * And what that receipt says. `outstandingRwf` is floored at nought
+   * (booking/totals.ts), so "paid in full" beside a Paid line above the Total
+   * would be the wrong conclusion drawn for them. The payload carries
+   * `overpaidRwf` as well, and the difference the photographer has been told to
+   * refund is named in the client’s own email too (spec §6.16).
+   */
+  it('names the money owed back to that overpaying client, rather than calling it paid in full', async () => {
+    const { sessionFee } = await askedFor(40_000);
+    await deliver(statusDelivery(sessionFee.ourRef, 'SUCCESSFUL', { amount: '40000' }));
+
+    const payload = (await outbox()).find((row) => row.template === 'payment_receipt')?.payload ?? {};
+    expect(payload).toMatchObject({ overpaidRwf: 10_000 });
+    const email = renderReceipt(payload);
+
+    expect(email.text).not.toContain('paid in full');
+    expect(email.text).toContain('Total: 50,000 RWF');
+    expect(email.text).toContain('Paid: 60,000 RWF');
+    expect(email.text).toContain('Still to pay: 0 RWF');
+    // And the difference is named, in words they can act on.
+    expect(email.text).toContain('10,000 RWF more than your booking');
+    expect(email.text).toMatch(/refund/i);
+    expect(email.html).toMatch(/refund/i);
+  });
+
+  it('still receipts the client when there is no admin account to alert, and logs the skip', async () => {
+    const { sessionFee } = await askedFor();
+    await prisma.adminUser.deleteMany();
+
+    await deliver(statusDelivery(sessionFee.ourRef, 'SUCCESSFUL', { amount: '30000' }));
+
+    const messages = await outbox();
+    expect(messages.map((row) => row.template)).toEqual(['payment_receipt']);
+    expect(messages[0]).toMatchObject({ recipient: CLIENT.email, payload: { outstandingRwf: 0, accessToken: null } });
+    expect(sink.entries).toContainEqual(
+      expect.objectContaining({ level: 'error', event: 'payment_received_alert_skipped', reason: 'no_admin_user' }),
+    );
+  });
+
+  it('receipts nothing for a booking fee: its confirmation email is its receipt', async () => {
+    const { payment } = await waitingBooking();
+
+    await deliver(statusDelivery(payment.ourRef, 'SUCCESSFUL'));
+
+    const messages = await outbox();
+    expect(messages.map((row) => row.template).sort()).toEqual(['admin_new_booking', 'booking_confirmation']);
+    expect(messages.filter((row) => row.template === 'payment_receipt')).toEqual([]);
+  });
+
+  it('receipts nothing for a session fee that failed, and nothing for one still pending', async () => {
+    const { sessionFee } = await askedFor();
+
+    await deliver(statusDelivery(sessionFee.ourRef, 'FAILED'));
+
+    expect(await paymentRow(sessionFee.id)).toMatchObject({ status: 'failed' });
+    expect(await outbox()).toEqual([]);
+  });
+});

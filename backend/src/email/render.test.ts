@@ -17,6 +17,7 @@ import {
 import { escapeHtml } from './layout.js';
 import { TEMPLATES, renderEmail } from './render.js';
 import { adminAlert } from './templates/admin-alert.js';
+import { paymentReceipt } from './templates/payment-receipt.js';
 import { reschedule } from './templates/reschedule.js';
 import { EmailPayloadError } from './templates/shared.js';
 
@@ -776,6 +777,250 @@ describe('the registry', () => {
     for (const definition of Object.values(TEMPLATES)) {
       expect(typeof definition.payload.safeParse).toBe('function');
       expect(typeof definition.compose).toBe('function');
+    }
+  });
+});
+
+// --- The receipt's link, and the request that asks for money (plan.md Task 20) ------------
+
+/**
+ * A session fee's receipt is enqueued by the webhook, which has no plaintext
+ * token to give it: the client's own was never stored (data-model_v2.md §5.9),
+ * and minting a new one would kill the link they are already using. So
+ * `accessToken` is nullable, and null means "the link you have still works"
+ * with no button and no URL anywhere in the email -- a "view booking" link with
+ * no token would 404 the client on their own booking.
+ *
+ * The session-fee request is the opposite case: it exists to be paid, so it
+ * always carries a token and always shows the button (spec §3.5 step 3).
+ */
+describe('payment_receipt with and without an access token', () => {
+  const NO_TOKEN = { accessToken: null };
+
+  it('shows the booking-link button when a plaintext token is given', () => {
+    const email = renderFixture(emailFixture('payment_receipt'));
+
+    expect(hrefs(email.html)).toContain(`${FIXTURE_WEB_ORIGIN}/booking/${FIXTURE_ACCESS_TOKEN}`);
+    expect(email.text).toContain(`${FIXTURE_WEB_ORIGIN}/booking/${FIXTURE_ACCESS_TOKEN}`);
+    expect(email.html).toContain('View your booking');
+    expect(email.text).not.toContain('Your booking link has not changed');
+  });
+
+  it('says the link has not changed when there is no token, and offers none', () => {
+    const email = renderWith('payment_receipt', NO_TOKEN);
+
+    expect(email.text).toContain('Your booking link has not changed: the one in your confirmation email still opens this booking.');
+    expect(email.html).toContain(escapeHtml('Your booking link has not changed'));
+    expect(email.html).not.toContain('View your booking');
+    expect(hrefs(email.html).filter((href) => href.includes('/booking/'))).toEqual([]);
+    expect(urlsIn(email.text).filter((url) => url.includes('/booking/'))).toEqual([]);
+  });
+
+  it('carries no token anywhere in the subject, the text or the HTML', () => {
+    const email = renderWith('payment_receipt', NO_TOKEN);
+
+    for (const part of [email.subject, email.text, email.html]) {
+      expect(part).not.toContain(FIXTURE_ACCESS_TOKEN);
+      expect(part).not.toMatch(/accessToken|access_token/i);
+      expect(part).not.toContain('null');
+    }
+  });
+
+  it('still receipts the payment in full without a token: amount, reference, date and totals', () => {
+    const email = renderWith('payment_receipt', NO_TOKEN);
+
+    expect(email.subject).toContain(FIXTURE_REFERENCE);
+    expect(email.text).toContain('27,000 RWF');
+    expect(email.text).toContain('PAY-7F3K9Q');
+    expect(email.text).toContain('15 Jan 2026, 23:30');
+    expect(email.text).toContain('45,000 RWF');
+  });
+
+  it('defaults a missing accessToken to null, so the payload webhooks.ts enqueues parses', () => {
+    const { payload } = withPayload('payment_receipt', {});
+    const { accessToken: _dropped, ...withoutToken } = payload;
+
+    const parsed = paymentReceipt.payload.parse(withoutToken) as { accessToken: unknown };
+
+    expect(parsed.accessToken).toBeNull();
+    expect(render('payment_receipt', withoutToken).text).toContain('Your booking link has not changed');
+  });
+
+  it('refuses an accessToken that is neither a token nor null', () => {
+    expect(payloadError(() => renderWith('payment_receipt', { accessToken: 'has spaces in it' }))).toBeInstanceOf(EmailPayloadError);
+    expect(payloadError(() => renderWith('payment_receipt', { accessToken: 42 }))).toBeInstanceOf(EmailPayloadError);
+  });
+
+  it('says paid in full only when nothing is outstanding, with a token or without one', () => {
+    for (const token of [{}, NO_TOKEN]) {
+      expect(renderWith('payment_receipt', { ...token, outstandingRwf: 0 }).text).toContain('paid in full');
+      const partial = renderWith('payment_receipt', { ...token, outstandingRwf: 5_000, paidRwf: 40_000 });
+      expect(partial.text).not.toMatch(/paid in full/i);
+      expect(partial.html).not.toMatch(/paid in full/i);
+      expect(partial.text).toContain('5,000 RWF');
+    }
+  });
+
+  it('renders both shapes with no placeholder or missing translation left behind', () => {
+    for (const email of [renderFixture(emailFixture('payment_receipt')), renderWith('payment_receipt', NO_TOKEN)]) {
+      expect([email.subject, email.text, email.html].join('\n')).not.toMatch(
+        /\{\{|\}\}|\bundefined\b|\bNaN\b|\[object Object\]|\b(email|common):[a-z]/,
+      );
+    }
+  });
+
+  it('matches its snapshot without a token', () => {
+    const email = renderWith('payment_receipt', NO_TOKEN);
+
+    expect(email.subject).toMatchSnapshot('subject');
+    expect(email.text).toMatchSnapshot('text');
+    expect(email.html).toMatchSnapshot('html');
+  });
+
+  it('matches its snapshot for a part payment that leaves money outstanding', () => {
+    const email = renderWith('payment_receipt', { ...NO_TOKEN, amountRwf: 20_000, paidRwf: 38_000, outstandingRwf: 7_000 });
+
+    expect(email.subject).toMatchSnapshot('subject');
+    expect(email.text).toMatchSnapshot('text');
+    expect(email.html).toMatchSnapshot('html');
+  });
+});
+
+describe('session_fee_request asks for an amount and offers a way to pay it', () => {
+  it('names the amount asked for and points the pay button at the booking link', () => {
+    const email = renderFixture(emailFixture('session_fee_request'));
+
+    expect(email.subject).toContain(FIXTURE_REFERENCE);
+    expect(email.text).toContain('27,000 RWF');
+    expect(email.html).toContain('27,000 RWF');
+    expect(email.html).toContain('Pay the session fee');
+    expect(hrefs(email.html)).toContain(`${FIXTURE_WEB_ORIGIN}/booking/${FIXTURE_ACCESS_TOKEN}`);
+    expect(email.text).toContain(`${FIXTURE_WEB_ORIGIN}/booking/${FIXTURE_ACCESS_TOKEN}`);
+  });
+
+  it('names the amount it was given, whatever it is', () => {
+    const email = renderWith('session_fee_request', { amountRwf: 45_000 });
+
+    expect(email.text).toContain('45,000 RWF');
+    expect(email.text).not.toContain('27,000 RWF');
+  });
+
+  it('requires a token: a request for money with no way to pay it is not a request', () => {
+    expect(payloadError(() => renderWith('session_fee_request', { accessToken: null }))).toBeInstanceOf(EmailPayloadError);
+  });
+
+  it('promises a receipt once the money arrives, which is the email above', () => {
+    expect(renderFixture(emailFixture('session_fee_request')).text).toContain(
+      'We will email you a receipt once your payment has arrived.',
+    );
+  });
+});
+
+// --- photo_delivery: the one email that points off the site (plan.md Task 21) -----------
+
+/**
+ * The delivery email (spec §3.5 steps 6-7, §6.20, A-7). The files live on the
+ * photographer's own host, so this is the only template whose button leaves the
+ * site -- and the only one that must state a date the client can read without
+ * following anything, because the link dies on it (§6.5). A link that is not
+ * https never renders at all: the payload is refused the way the column refuses
+ * it.
+ */
+describe('photo_delivery', () => {
+  const LINK = 'https://photos.example-host.com/s/abc123';
+  /** The note's own wrapper, so its absence can be asserted rather than guessed at. */
+  const NOTE_PREFIX = 'A note from your photographer:';
+
+  it('makes the external host’s link its button', () => {
+    const email = renderFixture(emailFixture('photo_delivery'));
+
+    expect(hrefs(email.html)).toContain(LINK);
+    expect(email.html).toContain('Download your photos');
+    expect(email.text).toContain(LINK);
+  });
+
+  it('is the only email whose links leave the site', () => {
+    const email = renderFixture(emailFixture('photo_delivery'));
+    const offSite = [...new Set([...hrefs(email.html), ...urlsIn(email.text)])].filter(
+      (url) => !url.startsWith(`${FIXTURE_WEB_ORIGIN}/`) && url !== FIXTURE_WEB_ORIGIN,
+    );
+
+    expect(offSite).toEqual([LINK]);
+  });
+
+  it('follows the link the payload carries, whatever host it names', () => {
+    const elsewhere = 'https://wetransfer.example/download/9f2c';
+
+    const email = renderWith('photo_delivery', { deliveryUrl: elsewhere });
+
+    expect(hrefs(email.html)).toContain(elsewhere);
+    expect(email.html).not.toContain(LINK);
+  });
+
+  it('states the expiry date as text in both bodies', () => {
+    const email = renderWith('photo_delivery', { expiresOn: '2027-03-15' });
+
+    expect(email.text).toContain('The download link works until the end of Monday, 15 March 2027 (Kigali time).');
+    expect(email.html).toContain('Monday, 15 March 2027');
+    expect(email.subject).not.toContain('2027-03-15');
+    expect(email.text).not.toContain('2027-03-15');
+  });
+
+  it('includes the photographer’s note when he wrote one', () => {
+    const email = renderWith('photo_delivery', { note: 'The raw files are in the second folder.' });
+
+    expect(email.text).toContain(`${NOTE_PREFIX} The raw files are in the second folder.`);
+    expect(email.html).toContain('The raw files are in the second folder.');
+  });
+
+  it('omits that paragraph entirely when he wrote none', () => {
+    const email = renderWith('photo_delivery', { note: null });
+
+    expect(email.text).not.toContain(NOTE_PREFIX);
+    expect(email.html).not.toContain(NOTE_PREFIX);
+    // And the rest of the email is still whole.
+    expect(hrefs(email.html)).toContain(LINK);
+    expect(email.text).toContain('until the end of Friday, 1 January 2027 (Kigali time)');
+  });
+
+  it('treats a missing note as no note at all', () => {
+    const { payload } = withPayload('photo_delivery', {});
+    delete payload.note;
+
+    const email = render('photo_delivery', payload);
+
+    expect(email.text).not.toContain(NOTE_PREFIX);
+  });
+
+  it.each([
+    ['plain http', 'http://photos.example-host.com/s/abc123'],
+    ['http on the same host as the site', 'http://bookly.example/photos'],
+    ['a javascript: URL', 'javascript:alert(document.cookie)'],
+    ['an ftp URL', 'ftp://photos.example-host.com/s/abc123'],
+    ['a data: URL', 'data:text/html,<script>alert(1)</script>'],
+    ['a file: URL', 'file:///C:/photos'],
+    ['not a URL at all', 'photos.example-host.com/s/abc123'],
+  ])('refuses to send %s rather than putting it in front of the client', (_case, deliveryUrl) => {
+    const error = payloadError(() => renderWith('photo_delivery', { deliveryUrl }));
+
+    expect(error).toBeInstanceOf(EmailPayloadError);
+    // The link is the client's, and a rejection is logged: it never repeats it.
+    expect(error.message).not.toContain('abc123');
+  });
+
+  it('refuses a missing link, naming the field', () => {
+    const { payload } = withPayload('photo_delivery', {});
+    delete payload.deliveryUrl;
+
+    expect(payloadError(() => render('photo_delivery', payload)).message).toContain('deliveryUrl');
+  });
+
+  it('counts nothing: no download total appears anywhere in it (data-model_v2.md §5.9)', () => {
+    const email = renderFixture(emailFixture('photo_delivery'));
+
+    for (const part of [email.subject, email.text, email.html]) {
+      expect(part).not.toMatch(/\b\d+\s+(downloads|times)\b/i);
+      expect(part).not.toMatch(/downloaded\s+\d/i);
     }
   });
 });

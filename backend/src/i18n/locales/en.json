@@ -72,7 +72,8 @@
       "heading": "Thank you, your payment has arrived",
       "intro": "This email is your receipt for the {{kind}} of {{amount}}.",
       "paidInFull": "Your booking is now paid in full.",
-      "sameLink": "Your booking link has not changed: the one in your confirmation email still opens this booking."
+      "sameLink": "Your booking link has not changed: the one in your confirmation email still opens this booking.",
+      "overpaid": "This is {{amount}} more than your booking comes to. We will refund the difference to you."
     },
     "photoDelivery": {
       "subject": "Your photos are ready ({{reference}})",

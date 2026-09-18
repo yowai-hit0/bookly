@@ -13,6 +13,7 @@ import {
 } from '../test/payment-fixtures.js';
 import type { AccessedBooking } from './access.js';
 import { canCancel, clientBookingView } from './client-view.js';
+import { saveDelivery, sendDelivery } from './delivery.js';
 
 /**
  * The booking a client sees (plan.md Task 18; spec §3.9, §6.10, §6.20;
@@ -426,6 +427,109 @@ describe('the delivery (spec §6.5, §6.20)', () => {
 
     expect(view.delivery?.url).toBeNull();
     expect(JSON.stringify(view)).not.toContain('photos.example-host.com');
+  });
+});
+
+// --- Delivery, as Task 21 actually writes it ---------------------------------------------------
+
+/**
+ * The same §6.20 behaviour, but driven by the real editor rather than by a raw
+ * `UPDATE`: what `saveDelivery` and `sendDelivery` leave on the booking is
+ * exactly what the client's page then shows, and when it stops showing it.
+ */
+describe('the delivery the photographer actually saved (plan.md Task 21)', () => {
+  const LINK = 'https://photos.example-host.com/s/abc123';
+  const NOTE = 'Thank you for a lovely morning!';
+
+  /** A completed shoot the delivery editor will accept. */
+  async function completed() {
+    return insertBooking(prisma, world, { status: 'completed' });
+  }
+
+  function deps(now: Date = NOW) {
+    return { prisma, now: () => now };
+  }
+
+  it('shows nothing at all while the link is saved but unsent', async () => {
+    const booking = await completed();
+    await saveDelivery(deps(), booking.id, { url: LINK, note: NOTE });
+
+    const view = await viewOf(booking.id);
+
+    expect(view.delivery).toBeNull();
+    expect(JSON.stringify(view)).not.toContain(LINK);
+    expect(JSON.stringify(view)).not.toContain(NOTE);
+  });
+
+  it('stays hidden even after the unsent link’s own date has passed', async () => {
+    const booking = await completed();
+    await saveDelivery(deps(), booking.id, { url: LINK, expiresOn: '2026-10-02' });
+
+    expect((await viewOf(booking.id, new Date('2027-05-01T06:00:00Z'))).delivery).toBeNull();
+  });
+
+  it('appears the moment he sends it, with the link, the note and the default date', async () => {
+    const booking = await completed();
+    await saveDelivery(deps(), booking.id, { url: LINK, note: NOTE });
+
+    await sendDelivery(deps(), booking.id);
+
+    // NOW is 1 October 2026 in Kigali; spec A-8's ninety days land on 30 December.
+    expect((await viewOf(booking.id)).delivery).toStrictEqual({
+      url: LINK,
+      expiresOn: '2026-12-30',
+      expired: false,
+      note: NOTE,
+    });
+  });
+
+  /** The link it wrote, as the clock crosses the end of its last day in Kigali. */
+  async function deliveryAt(instant: string) {
+    const booking = await completed();
+    await saveDelivery(deps(), booking.id, { url: LINK });
+    await sendDelivery(deps(), booking.id);
+    return (await viewOf(booking.id, new Date(instant))).delivery;
+  }
+
+  it.each([
+    ['the morning it was sent', '2026-10-01T06:00:00Z'],
+    ['the middle of its last day', '2026-12-30T10:00:00Z'],
+    ['23:59 Kigali on its last day', '2026-12-30T21:59:00Z'],
+    ['the last second of its last day', '2026-12-30T21:59:59Z'],
+  ])('still offers the link at %s', async (_case, instant) => {
+    expect(await deliveryAt(instant)).toMatchObject({ expiresOn: '2026-12-30', expired: false, url: LINK });
+  });
+
+  it.each([
+    ['midnight Kigali the next day', '2026-12-30T22:00:00Z'],
+    ['the following morning in Kigali', '2026-12-31T06:00:00Z'],
+    ['months later', '2027-05-01T06:00:00Z'],
+  ])('withholds it and says so at %s', async (_case, instant) => {
+    expect(await deliveryAt(instant)).toStrictEqual({ url: null, expiresOn: '2026-12-30', expired: true, note: null });
+  });
+
+  it('shows the replaced link, not the one the first email named', async () => {
+    const booking = await completed();
+    await saveDelivery(deps(), booking.id, { url: LINK });
+    await sendDelivery(deps(), booking.id);
+
+    const replacement = 'https://wetransfer.example/download/9f2c';
+    await saveDelivery(deps(new Date('2026-10-05T06:00:00Z')), booking.id, { url: replacement });
+
+    const view = await viewOf(booking.id, new Date('2026-10-05T07:00:00Z'));
+    expect(view.delivery).toMatchObject({ url: replacement, expired: false });
+    expect(JSON.stringify(view)).not.toContain('photos.example-host.com');
+  });
+
+  it('never reports how many times the photos were fetched (data-model_v2.md §5.9)', async () => {
+    const booking = await completed();
+    await saveDelivery(deps(), booking.id, { url: LINK, note: NOTE });
+    await sendDelivery(deps(), booking.id);
+
+    const view = await viewOf(booking.id);
+
+    expect(Object.keys(view.delivery ?? {}).sort()).toEqual(['expired', 'expiresOn', 'note', 'url']);
+    expect(JSON.stringify(view)).not.toMatch(/download/i);
   });
 });
 

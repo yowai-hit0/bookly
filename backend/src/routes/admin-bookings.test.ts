@@ -16,6 +16,7 @@ import {
   insertBookingWithToken,
   insertPayment,
   seedWorld,
+  stubProvider,
 } from '../test/payment-fixtures.js';
 
 /**
@@ -43,6 +44,8 @@ let admin: AdminUser;
 let token: string;
 let clock: Date;
 let app: Express;
+/** The same app with a payment provider configured (plan.md Task 20). */
+let paidApp: Express;
 
 const SECRET = 'admin-bookings-test-secret-at-least-32-characters';
 const OTHER_SECRET = 'a-different-secret-that-is-also-at-least-32-chars';
@@ -55,6 +58,8 @@ const HOUR_MS = 3_600_000;
 
 const BOOKINGS = '/api/admin/bookings';
 const UNKNOWN_ID = '3f1b9c2a-0000-4000-8000-00000000abcd';
+/** The external host's link, as Task 21's routes take it (spec A-7). */
+const DELIVERY_LINK = 'https://photos.example-host.com/s/abc123';
 
 const WEDNESDAY_0900 = new Date('2027-01-06T07:00:00Z');
 const WEDNESDAY_1400 = new Date('2027-01-06T12:00:00Z');
@@ -82,6 +87,14 @@ beforeEach(async () => {
     corsOrigin: WEB_ORIGIN,
     admin: { prisma, sessionSecret: SECRET, webOrigin: WEB_ORIGIN, now: () => clock },
   });
+  // The same app with a payment provider configured, which is what mounts the
+  // session-fee route (plan.md Task 20): without one there is nothing for the
+  // client to pay through, so the route does not exist.
+  paidApp = createApp({
+    corsOrigin: WEB_ORIGIN,
+    admin: { prisma, sessionSecret: SECRET, webOrigin: WEB_ORIGIN, now: () => clock },
+    publicApi: { prisma, now: () => clock, payments: { provider: stubProvider(), secret: SECRET } },
+  });
 });
 
 // --- Helpers ----------------------------------------------------------------------------
@@ -93,6 +106,22 @@ function get(path: string, bearer: string | null = token) {
 
 function post(path: string, body: unknown = {}, bearer: string | null = token) {
   const call = request(app).post(path).send(body as object);
+  return bearer === null ? call : call.set('Authorization', `Bearer ${bearer}`);
+}
+
+function del(path: string, bearer: string | null = token) {
+  const call = request(app).delete(path);
+  return bearer === null ? call : call.set('Authorization', `Bearer ${bearer}`);
+}
+
+function put(path: string, body: unknown = {}, bearer: string | null = token) {
+  const call = request(app).put(path).send(body as object);
+  return bearer === null ? call : call.set('Authorization', `Bearer ${bearer}`);
+}
+
+/** A POST to the app that has a payment provider, where the session-fee route lives. */
+function postPaid(path: string, body: unknown = {}, bearer: string | null = token) {
+  const call = request(paidApp).post(path).send(body as object);
   return bearer === null ? call : call.set('Authorization', `Bearer ${bearer}`);
 }
 
@@ -136,6 +165,20 @@ describe('every route is behind requireAdmin (spec §2.2)', () => {
       { label: 'POST /bookings/:id/complete', call: (bearer) => post(`${BOOKINGS}/${booking.id}/complete`, {}, bearer) },
       { label: 'POST /bookings/:id/no-show', call: (bearer) => post(`${BOOKINGS}/${booking.id}/no-show`, {}, bearer) },
       { label: 'POST /bookings/:id/resend-link', call: (bearer) => post(`${BOOKINGS}/${booking.id}/resend-link`, {}, bearer) },
+      // Task 20. The session-fee route is asked of the app that mounts it, so
+      // its 401 is the guard's and not the absence of a route.
+      {
+        label: 'POST /bookings/:id/addons',
+        call: (bearer) => post(`${BOOKINGS}/${booking.id}/addons`, { addonId: world.sharedAddonId }, bearer),
+      },
+      { label: 'DELETE /bookings/:id/addons/:addonId', call: (bearer) => del(`${BOOKINGS}/${booking.id}/addons/${UNKNOWN_ID}`, bearer) },
+      { label: 'POST /bookings/:id/session-fee', call: (bearer) => postPaid(`${BOOKINGS}/${booking.id}/session-fee`, {}, bearer) },
+      // Task 21.
+      {
+        label: 'PUT /bookings/:id/delivery',
+        call: (bearer) => put(`${BOOKINGS}/${booking.id}/delivery`, { url: DELIVERY_LINK }, bearer),
+      },
+      { label: 'POST /bookings/:id/delivery/send', call: (bearer) => post(`${BOOKINGS}/${booking.id}/delivery/send`, {}, bearer) },
       {
         label: 'POST /payments/:id/refund',
         call: (bearer) => post(`/api/admin/payments/${payment.id}/refund`, { reference: 'MOMO-1' }, bearer),
@@ -747,5 +790,674 @@ describe('every answer is the same booking shape', () => {
       expect([res.status, Object.keys(res.body.booking).sort()]).toEqual([res.status, keys]);
     }
     expect(answers.map((res) => res.status)).toEqual([200, 200, 200, 409]);
+  });
+});
+
+// --- Post-shoot add-ons (plan.md Task 20) ----------------------------------------------------
+
+/**
+ * The HTTP contract of the three post-shoot routes (spec §3.5 steps 2-3,
+ * §6.15). What each does is proven in booking/addons.test.ts and
+ * payments/session-fee.test.ts; what is proven here is the shape: the body is
+ * parsed by the one admin rule (400 for a malformed request, 422 for a value
+ * outside its range), an unknown row is 404 and a malformed id is 400, every
+ * refusal is a 409 carrying the booking as it now stands, and every success is
+ * the whole `adminBookingView`.
+ */
+describe('POST /bookings/:id/addons', () => {
+  /** A completed shoot with a live link and a settled booking fee: 50,000 owed, 20,000 paid. */
+  async function completedBooking(startsAt: Date = WEDNESDAY_0900) {
+    const { booking } = await confirmedBooking(startsAt);
+    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'completed', completedAt: START } });
+    return booking;
+  }
+
+  it('adds the add-on and answers the whole booking as adminBookingView renders it', async () => {
+    const booking = await completedBooking();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/addons`, { addonId: world.sharedAddonId, quantity: 2 });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual({ booking: await renderedBooking(booking.id) });
+    expect(res.body.booking.addons.at(-1)).toMatchObject({
+      name: 'Rush edit',
+      unitPriceRwf: 5_000,
+      quantity: 2,
+      amountRwf: 10_000,
+      stage: 'post_shoot',
+      canRemove: true,
+    });
+    expect(res.body.booking.money.totals).toMatchObject({ quotedTotalRwf: 50_000, grandTotalRwf: 60_000, outstandingRwf: 40_000 });
+  });
+
+  it('defaults the quantity to one when the body leaves it out', async () => {
+    const booking = await completedBooking();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/addons`, { addonId: world.ownAddonId });
+
+    expect(res.status).toBe(200);
+    expect(res.body.booking.addons.at(-1)).toMatchObject({ quantity: 1, amountRwf: 10_000, stage: 'post_shoot' });
+  });
+
+  it.each([
+    ['no body at all', {}, 400],
+    ['an addonId that is not a uuid', { addonId: 'extra-hour' }, 400],
+    ['an addonId that is not a string', { addonId: 42 }, 400],
+    ['an unknown key beside it', { addonId: UNKNOWN_ID, note: 'free' }, 400],
+    ['a price the caller invented', { addonId: UNKNOWN_ID, amountRwf: 1 }, 400],
+    ['a quantity that is not a number', { addonId: UNKNOWN_ID, quantity: 'two' }, 400],
+    ['a quantity that is not an integer', { addonId: UNKNOWN_ID, quantity: 1.5 }, 400],
+    ['a quantity of zero', { addonId: UNKNOWN_ID, quantity: 0 }, 422],
+    ['a negative quantity', { addonId: UNKNOWN_ID, quantity: -1 }, 422],
+    ['a quantity of 100', { addonId: UNKNOWN_ID, quantity: 100 }, 422],
+  ])('refuses %s and adds nothing', async (_case, body, status) => {
+    const booking = await completedBooking();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/addons`, body);
+
+    expect([res.status, res.body.error]).toEqual([status, status === 400 ? 'invalid_request' : 'validation_failed']);
+    expect((await adminBooking(booking.id)).addons.filter((addon) => addon.stage === 'post_shoot')).toEqual([]);
+  });
+
+  it('answers 404 for a booking that does not exist', async () => {
+    const res = await post(`${BOOKINGS}/${UNKNOWN_ID}/addons`, { addonId: world.sharedAddonId });
+
+    expect([res.status, res.body]).toEqual([404, { error: 'not_found' }]);
+  });
+
+  it('answers 404 for an add-on that does not exist', async () => {
+    const booking = await completedBooking();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/addons`, { addonId: UNKNOWN_ID });
+
+    expect([res.status, res.body]).toEqual([404, { error: 'not_found' }]);
+  });
+
+  it('answers 400 for a booking id that is not a uuid: a malformed request, not a missing row', async () => {
+    const res = await post(`${BOOKINGS}/not-a-uuid/addons`, { addonId: world.sharedAddonId });
+
+    expect([res.status, res.body]).toEqual([400, { error: 'invalid_request' }]);
+  });
+
+  it('answers 409 not_allowed carrying the booking when the shoot is not completed', async () => {
+    const { booking } = await confirmedBooking();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/addons`, { addonId: world.sharedAddonId });
+
+    expect([res.status, res.body.error]).toEqual([409, 'not_allowed']);
+    expect(res.body.booking).toStrictEqual(await renderedBooking(booking.id));
+    expect(res.body.booking).toMatchObject({ status: 'confirmed', actions: { canEditAddons: false } });
+  });
+
+  it('answers 409 not_allowed for an add-on of another service', async () => {
+    const booking = await completedBooking();
+    const other = await prisma.service.create({ data: { slug: 'weddings', nameEn: 'Weddings' } });
+    const theirs = await prisma.addon.create({ data: { serviceId: other.id, nameEn: 'Second shooter', priceRwf: 20_000 } });
+
+    const res = await post(`${BOOKINGS}/${booking.id}/addons`, { addonId: theirs.id });
+
+    expect([res.status, res.body.error]).toEqual([409, 'not_allowed']);
+    expect(res.body.booking.money.totals.grandTotalRwf).toBe(50_000);
+  });
+});
+
+describe('DELETE /bookings/:id/addons/:addonId', () => {
+  async function completedWithLine(startsAt: Date = WEDNESDAY_0900) {
+    const { booking } = await confirmedBooking(startsAt);
+    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'completed', completedAt: START } });
+    const added = await post(`${BOOKINGS}/${booking.id}/addons`, { addonId: world.sharedAddonId, quantity: 3 });
+    const line = added.body.booking.addons.find((addon: { stage: string }) => addon.stage === 'post_shoot');
+    return { booking, lineId: line.id as string };
+  }
+
+  it('removes the line and answers the whole booking, both totals down', async () => {
+    const { booking, lineId } = await completedWithLine();
+
+    const res = await del(`${BOOKINGS}/${booking.id}/addons/${lineId}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual({ booking: await renderedBooking(booking.id) });
+    expect(res.body.booking.addons.map((addon: { stage: string }) => addon.stage)).toEqual(['at_booking']);
+    expect(res.body.booking.money.totals).toMatchObject({ grandTotalRwf: 50_000, outstandingRwf: 30_000 });
+  });
+
+  it('answers 404 for an add-on row that does not exist', async () => {
+    const { booking } = await completedWithLine();
+
+    const res = await del(`${BOOKINGS}/${booking.id}/addons/${UNKNOWN_ID}`);
+
+    expect([res.status, res.body]).toEqual([404, { error: 'not_found' }]);
+  });
+
+  it('answers 404 for a line belonging to another booking, and leaves that booking alone', async () => {
+    const mine = await completedWithLine();
+    const theirs = await completedWithLine(THURSDAY_0900);
+
+    const res = await del(`${BOOKINGS}/${mine.booking.id}/addons/${theirs.lineId}`);
+
+    expect([res.status, res.body]).toEqual([404, { error: 'not_found' }]);
+    expect((await adminBooking(theirs.booking.id)).addons).toHaveLength(2);
+  });
+
+  it.each([
+    ['the booking id', (_bookingId: string, lineId: string) => `${BOOKINGS}/not-a-uuid/addons/${lineId}`],
+    ['the add-on id', (bookingId: string) => `${BOOKINGS}/${bookingId}/addons/not-a-uuid`],
+  ])('answers 400 when %s is not a uuid', async (_case, path) => {
+    const { booking, lineId } = await completedWithLine();
+
+    const res = await del(path(booking.id, lineId));
+
+    expect([res.status, res.body]).toEqual([400, { error: 'invalid_request' }]);
+    expect((await adminBooking(booking.id)).addons).toHaveLength(2);
+  });
+
+  it('answers 409 not_allowed carrying the booking for an at_booking line', async () => {
+    const { booking } = await completedWithLine();
+    const quoted = (await adminBooking(booking.id)).addons.find((addon) => addon.stage === 'at_booking');
+
+    const res = await del(`${BOOKINGS}/${booking.id}/addons/${quoted?.id}`);
+
+    expect([res.status, res.body.error]).toEqual([409, 'not_allowed']);
+    expect(res.body.booking).toStrictEqual(await renderedBooking(booking.id));
+    expect(res.body.booking.addons).toHaveLength(2);
+  });
+
+  it('answers 409 not_allowed on a booking whose editor is shut', async () => {
+    const { booking, lineId } = await completedWithLine();
+    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'no_show' } });
+
+    const res = await del(`${BOOKINGS}/${booking.id}/addons/${lineId}`);
+
+    expect([res.status, res.body.error]).toEqual([409, 'not_allowed']);
+    expect(res.body.booking).toMatchObject({ status: 'no_show', actions: { canEditAddons: false } });
+  });
+
+  it('answers 409 already_paid carrying the booking once the client has paid for it', async () => {
+    const { booking, lineId } = await completedWithLine();
+    await insertPayment(prisma, booking.id, { status: 'succeeded', kind: 'session_fee', amountRwf: 45_000, ageSeconds: 300 });
+
+    const res = await del(`${BOOKINGS}/${booking.id}/addons/${lineId}`);
+
+    expect([res.status, res.body.error]).toEqual([409, 'already_paid']);
+    expect(res.body.booking).toStrictEqual(await renderedBooking(booking.id));
+    expect(res.body.booking.money.totals).toMatchObject({ grandTotalRwf: 65_000, collectedRwf: 65_000, outstandingRwf: 0 });
+    expect(res.body.booking.addons.every((addon: { canRemove: boolean }) => !addon.canRemove)).toBe(true);
+  });
+});
+
+describe('POST /bookings/:id/session-fee', () => {
+  async function completedBooking() {
+    const { booking } = await confirmedBooking();
+    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'completed', completedAt: START } });
+    return booking;
+  }
+
+  it('opens the request and answers the whole booking, the new payment listed', async () => {
+    const booking = await completedBooking();
+
+    const res = await postPaid(`${BOOKINGS}/${booking.id}/session-fee`, {});
+
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual({ booking: await renderedBooking(booking.id) });
+    expect(res.body.booking.payments.at(-1)).toMatchObject({
+      kind: 'session_fee',
+      provider: 'mtn_momo_direct',
+      amountRwf: 30_000,
+      status: 'initiated',
+      canRecordRefund: false,
+    });
+    expect(res.body.booking.messages.map((message: { template: string }) => message.template)).toContain('session_fee_request');
+  });
+
+  it('leaks no access token through the API, though the email carries one', async () => {
+    const booking = await completedBooking();
+
+    const res = await postPaid(`${BOOKINGS}/${booking.id}/session-fee`, {});
+
+    const queued = await prisma.outbox.findFirstOrThrow({ where: { bookingId: booking.id, template: 'session_fee_request' } });
+    const plaintext = (queued.payload as { accessToken: string }).accessToken;
+    expect(plaintext).toEqual(expect.any(String));
+    expect(JSON.stringify(res.body)).not.toContain(plaintext);
+  });
+
+  it('answers 409 nothing_to_pay carrying the booking when it is paid in full', async () => {
+    const booking = await completedBooking();
+    await insertPayment(prisma, booking.id, { status: 'succeeded', kind: 'session_fee', amountRwf: 30_000, ageSeconds: 500 });
+
+    const res = await postPaid(`${BOOKINGS}/${booking.id}/session-fee`, {});
+
+    expect([res.status, res.body.error]).toEqual([409, 'nothing_to_pay']);
+    expect(res.body.booking).toStrictEqual(await renderedBooking(booking.id));
+    expect(res.body.booking).toMatchObject({ actions: { canRequestSessionFee: false } });
+  });
+
+  it('answers 409 not_allowed carrying the booking once it has been cancelled', async () => {
+    const booking = await completedBooking();
+    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'cancelled_by_admin', cancelledAt: START } });
+
+    const res = await postPaid(`${BOOKINGS}/${booking.id}/session-fee`, {});
+
+    expect([res.status, res.body.error]).toEqual([409, 'not_allowed']);
+    expect(res.body.booking).toMatchObject({ status: 'cancelled_by_admin', actions: { canRequestSessionFee: false } });
+  });
+
+  it('answers 409 in_progress carrying the booking while the client is paying', async () => {
+    const booking = await completedBooking();
+    await insertPayment(prisma, booking.id, { status: 'pending', kind: 'session_fee', amountRwf: 30_000, ageSeconds: 10 });
+
+    const res = await postPaid(`${BOOKINGS}/${booking.id}/session-fee`, {});
+
+    expect([res.status, res.body.error]).toEqual([409, 'in_progress']);
+    expect(res.body.booking).toStrictEqual(await renderedBooking(booking.id));
+    expect(res.body.booking.payments.filter((payment: { kind: string }) => payment.kind === 'session_fee')).toHaveLength(1);
+  });
+
+  it('answers 404 for a booking that does not exist', async () => {
+    const res = await postPaid(`${BOOKINGS}/${UNKNOWN_ID}/session-fee`, {});
+
+    expect([res.status, res.body]).toEqual([404, { error: 'not_found' }]);
+  });
+
+  it('answers 400 for a booking id that is not a uuid', async () => {
+    const res = await postPaid(`${BOOKINGS}/not-a-uuid/session-fee`, {});
+
+    expect([res.status, res.body]).toEqual([400, { error: 'invalid_request' }]);
+  });
+
+  it('does not exist at all where no payment provider is configured', async () => {
+    const booking = await completedBooking();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/session-fee`, {});
+
+    expect([res.status, res.body]).toEqual([404, { error: 'not_found' }]);
+    expect(await prisma.payment.count({ where: { bookingId: booking.id, kind: 'session_fee' } })).toBe(0);
+    expect(await prisma.outbox.count({ where: { template: 'session_fee_request' } })).toBe(0);
+  });
+});
+
+// --- The post-shoot journey over HTTP ----------------------------------------------------------
+
+describe('the whole post-shoot sequence (spec §3.5 steps 1-3)', () => {
+  it('completes the shoot, adds an add-on, and asks for the new total', async () => {
+    const { booking } = await confirmedBooking();
+    await travelTo(AFTER_THE_SHOOT);
+
+    const completed = await postPaid(`${BOOKINGS}/${booking.id}/complete`, {});
+    expect(completed.body.booking).toMatchObject({
+      status: 'completed',
+      actions: { canEditAddons: true, canRequestSessionFee: true },
+    });
+
+    const added = await postPaid(`${BOOKINGS}/${booking.id}/addons`, { addonId: world.sharedAddonId, quantity: 3 });
+    expect(added.body.booking.money.totals).toMatchObject({ grandTotalRwf: 65_000, outstandingRwf: 45_000 });
+
+    const asked = await postPaid(`${BOOKINGS}/${booking.id}/session-fee`, {});
+    expect(asked.status).toBe(200);
+    expect(asked.body.booking.payments.at(-1)).toMatchObject({ kind: 'session_fee', amountRwf: 45_000, status: 'initiated' });
+
+    // Every answer along the way is the same booking shape.
+    const keys = Object.keys(completed.body.booking).sort();
+    for (const res of [added, asked]) expect(Object.keys(res.body.booking).sort()).toEqual(keys);
+  });
+});
+
+// --- A price and a quantity the column cannot hold ---------------------------------------------
+
+describe('POST /bookings/:id/addons with a product larger than an integer', () => {
+  /** The ceiling the catalogue itself allows for an add-on price (routes/validation.ts). */
+  const INT4_MAX = 2_147_483_647;
+
+  /**
+   * The catalogue accepts a price up to `INT4_MAX` and the editor a quantity up
+   * to 99, so a legal pair can multiply past what `booking_addon.amount_rwf`
+   * holds. That is a value outside its rules, and the rule of this API is that
+   * such a value is answered, never left to surface as a 500 from the database
+   * (routes/validation.ts).
+   */
+  it('answers a 4xx rather than a 500', async () => {
+    const { booking } = await confirmedBooking();
+    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'completed', completedAt: START } });
+    const expensive = await prisma.addon.create({
+      data: { serviceId: world.serviceId, nameEn: 'A price the catalogue allows', priceRwf: INT4_MAX },
+    });
+
+    const res = await post(`${BOOKINGS}/${booking.id}/addons`, { addonId: expensive.id, quantity: 2 });
+
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ error: 'too_large' });
+    // And the refusal carries the booking, as every other refusal does.
+    expect(res.body.booking.addons.filter((a: { stage: string }) => a.stage === 'post_shoot')).toEqual([]);
+  });
+});
+
+// --- Asking before the shoot has happened ---------------------------------------------------
+
+/**
+ * Tested as the code behaves, and flagged rather than "fixed". Spec §3.5 runs
+ * complete → add-ons → request, and plan.md Task 20 frames the session fee as
+ * the post-shoot half. `adminBookingView` gates the button on
+ * `outstandingRwf > 0 && (confirmed || completed)` with no reference to the
+ * shoot date, so a booking confirmed months in advance already offers
+ * "Request … session fee" -- and the route grants it.
+ *
+ * That agrees with the client's own side, which lets a `confirmed` booking pay
+ * its session fee (payments/initiate.ts, spec §3.9), so it may well be intended.
+ * It is recorded here so the disagreement with §3.5's sequence is visible.
+ */
+describe('the session fee before the shoot', () => {
+  it('is offered and granted on a booking whose shoot is still months away', async () => {
+    const { booking } = await confirmedBooking();
+    // The clock is October 2026; the shoot is January 2027.
+    const before = await get(`${BOOKINGS}/${booking.id}`);
+    expect(before.body.booking).toMatchObject({
+      status: 'confirmed',
+      actions: { canComplete: false, canEditAddons: false, canRequestSessionFee: true },
+    });
+
+    const res = await postPaid(`${BOOKINGS}/${booking.id}/session-fee`, {});
+
+    expect(res.status).toBe(200);
+    expect(res.body.booking.payments.at(-1)).toMatchObject({ kind: 'session_fee', amountRwf: 30_000, status: 'initiated' });
+  });
+
+  it('is not offered on a booking still waiting for its booking fee', async () => {
+    const booking = await insertBooking(prisma, world, { status: 'pending_payment', startsAt: THURSDAY_0900 });
+
+    const res = await postPaid(`${BOOKINGS}/${booking.id}/session-fee`, {});
+
+    expect([res.status, res.body.error]).toEqual([409, 'not_allowed']);
+    expect(res.body.booking).toMatchObject({ actions: { canRequestSessionFee: false } });
+  });
+});
+
+// --- Photo delivery (plan.md Task 21) -----------------------------------------------------------
+
+/**
+ * The HTTP contract of the two delivery routes (spec §3.5 steps 5-7, §6.20,
+ * A-7, A-8). What each does is proven in booking/delivery.test.ts; what is
+ * proven here is the shape: the body is parsed by the one admin rule (400 for a
+ * malformed request, 422 for a value outside its rules), an unknown booking is
+ * 404 and a malformed id is 400, every refusal is a 409 carrying the booking as
+ * it now stands, and every success is the whole `adminBookingView` with the
+ * delivery block and the two new action flags on it.
+ */
+describe('PUT /bookings/:id/delivery', () => {
+  /** A completed shoot with a live link and a settled booking fee. */
+  async function completedBooking() {
+    const { booking } = await confirmedBooking();
+    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'completed', completedAt: START } });
+    return booking;
+  }
+
+  it('saves the link and answers the whole booking as adminBookingView renders it', async () => {
+    const booking = await completedBooking();
+
+    const res = await put(`${BOOKINGS}/${booking.id}/delivery`, { url: DELIVERY_LINK, note: 'Thank you!' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual({ booking: await renderedBooking(booking.id) });
+    expect(res.body.booking.delivery).toStrictEqual({
+      url: DELIVERY_LINK,
+      // START is 1 October 2026 in Kigali; spec A-8's ninety days land here.
+      expiresOn: '2026-12-30',
+      sentAt: null,
+      note: 'Thank you!',
+    });
+    expect(res.body.booking.actions).toMatchObject({ canEditDelivery: true, canSendDelivery: true });
+  });
+
+  it('takes the date he typed, and leaves the note out when the body omits it', async () => {
+    const booking = await completedBooking();
+
+    const res = await put(`${BOOKINGS}/${booking.id}/delivery`, { url: DELIVERY_LINK, expiresOn: '2027-03-15' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.booking.delivery).toMatchObject({ expiresOn: '2027-03-15', note: null });
+  });
+
+  it('clears the note when the body sends null for it', async () => {
+    const booking = await completedBooking();
+    await put(`${BOOKINGS}/${booking.id}/delivery`, { url: DELIVERY_LINK, note: 'Thank you!' });
+
+    const res = await put(`${BOOKINGS}/${booking.id}/delivery`, { url: DELIVERY_LINK, note: null });
+
+    expect(res.status).toBe(200);
+    expect(res.body.booking.delivery.note).toBeNull();
+  });
+
+  it('sends nothing: saving a link is not writing to the client', async () => {
+    const booking = await completedBooking();
+
+    await put(`${BOOKINGS}/${booking.id}/delivery`, { url: DELIVERY_LINK });
+
+    expect(await prisma.outbox.count({ where: { template: 'photo_delivery' } })).toBe(0);
+    expect((await adminBooking(booking.id)).deliverySentAt).toBeNull();
+  });
+
+  it.each([
+    ['no body at all', {}, 400],
+    ['a url that is not a URL at all', { url: 'photos.example-host.com/s/abc' }, 400],
+    ['a url that is not a string', { url: 42 }, 400],
+    ['an unknown key beside it', { url: DELIVERY_LINK, host: 'Drive' }, 400],
+    ['an expiresOn that is not a date at all', { url: DELIVERY_LINK, expiresOn: '01-01-2027' }, 400],
+    ['an expiresOn that is an instant', { url: DELIVERY_LINK, expiresOn: '2027-01-01T00:00:00Z' }, 400],
+    ['an expiresOn that is not a string', { url: DELIVERY_LINK, expiresOn: 20_270_101 }, 400],
+    ['a note that is not a string', { url: DELIVERY_LINK, note: 42 }, 400],
+    ['a plain http link', { url: 'http://photos.example-host.com/s/abc' }, 422],
+    ['a javascript: link', { url: 'javascript:alert(1)' }, 422],
+    ['an ftp link', { url: 'ftp://photos.example-host.com/s/abc' }, 422],
+    ['a year the engine refuses', { url: DELIVERY_LINK, expiresOn: '0050-01-01' }, 422],
+    ['an empty note', { url: DELIVERY_LINK, note: '   ' }, 422],
+  ])('refuses %s and saves nothing', async (_case, body, status) => {
+    const booking = await completedBooking();
+
+    const res = await put(`${BOOKINGS}/${booking.id}/delivery`, body);
+
+    expect([res.status, res.body.error]).toEqual([status, status === 400 ? 'invalid_request' : 'validation_failed']);
+    expect((await adminBooking(booking.id)).deliveryUrl).toBeNull();
+  });
+
+  it('refuses a URL longer than the column allows, naming the field', async () => {
+    const booking = await completedBooking();
+    const tooLong = `https://photos.example-host.com/s/${'a'.repeat(2_000)}`;
+    expect(tooLong.length).toBeGreaterThan(2_000);
+
+    const res = await put(`${BOOKINGS}/${booking.id}/delivery`, { url: tooLong });
+
+    expect([res.status, res.body.error]).toEqual([422, 'validation_failed']);
+    expect(res.body.fields).toEqual(['url']);
+    expect((await adminBooking(booking.id)).deliveryUrl).toBeNull();
+  });
+
+  it('takes a URL right on the length cap', async () => {
+    const booking = await completedBooking();
+    const head = 'https://photos.example-host.com/s/';
+    const exactly = head + 'a'.repeat(2_000 - head.length);
+
+    const res = await put(`${BOOKINGS}/${booking.id}/delivery`, { url: exactly });
+
+    expect(res.status).toBe(200);
+    expect(res.body.booking.delivery.url).toBe(exactly);
+  });
+
+  it('answers 404 for a booking that does not exist', async () => {
+    const res = await put(`${BOOKINGS}/${UNKNOWN_ID}/delivery`, { url: DELIVERY_LINK });
+
+    expect([res.status, res.body]).toEqual([404, { error: 'not_found' }]);
+  });
+
+  it('answers 400 for a booking id that is not a uuid: a malformed request, not a missing row', async () => {
+    const res = await put(`${BOOKINGS}/not-a-uuid/delivery`, { url: DELIVERY_LINK });
+
+    expect([res.status, res.body]).toEqual([400, { error: 'invalid_request' }]);
+  });
+
+  it('answers 409 not_allowed carrying the booking when the shoot is not completed', async () => {
+    const { booking } = await confirmedBooking();
+
+    const res = await put(`${BOOKINGS}/${booking.id}/delivery`, { url: DELIVERY_LINK });
+
+    expect([res.status, res.body.error]).toEqual([409, 'not_allowed']);
+    expect(res.body.booking).toStrictEqual(await renderedBooking(booking.id));
+    expect(res.body.booking).toMatchObject({
+      status: 'confirmed',
+      delivery: { url: null, expiresOn: null, sentAt: null, note: null },
+      actions: { canEditDelivery: false, canSendDelivery: false },
+    });
+  });
+
+  /**
+   * The schema reads the scheme through `new URL()`, so `HTTPS://` parses as
+   * https and passes it through unchanged. The column's CHECK is the literal
+   * regex `^https://`, which refuses it -- and the route has no answer for that,
+   * so the write surfaces as a 500. `routes/validation.ts` states the rule this
+   * breaks: a value outside its rules is answered there, "so the database's
+   * CHECK never surfaces as a 500".
+   */
+  it('answers a 4xx, not a 500, for a scheme the CHECK spells differently', async () => {
+    const booking = await completedBooking();
+
+    const res = await put(`${BOOKINGS}/${booking.id}/delivery`, { url: 'HTTPS://photos.example-host.com/s/abc123' });
+
+    // Nothing was stored either way -- the CHECK saw to that.
+    expect((await adminBooking(booking.id)).deliveryUrl).toBeNull();
+    // Either normalise the scheme before storing it, or refuse it in the
+    // schema; what it must not do is hand the photographer a 500.
+    expect([res.status, res.body.error]).not.toEqual([500, 'internal_error']);
+    expect(res.status).toBeLessThan(500);
+  });
+});
+
+describe('POST /bookings/:id/delivery/send', () => {
+  async function completedBooking() {
+    const { booking } = await confirmedBooking();
+    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'completed', completedAt: START } });
+    return booking;
+  }
+
+  async function withLink() {
+    const booking = await completedBooking();
+    const saved = await put(`${BOOKINGS}/${booking.id}/delivery`, {
+      url: DELIVERY_LINK,
+      expiresOn: '2027-01-01',
+      note: 'Thank you!',
+    });
+    expect(saved.status).toBe(200);
+    return booking;
+  }
+
+  it('sends the email and answers the whole booking, now stamped', async () => {
+    const booking = await withLink();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/delivery/send`, {});
+
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual({ booking: await renderedBooking(booking.id) });
+    expect(res.body.booking.delivery).toStrictEqual({
+      url: DELIVERY_LINK,
+      expiresOn: '2027-01-01',
+      sentAt: START.toISOString(),
+      note: 'Thank you!',
+    });
+    expect(res.body.booking.messages.map((message: { template: string }) => message.template)).toContain('photo_delivery');
+  });
+
+  it('puts the link and the expiry on the outbox, addressed to the client', async () => {
+    const booking = await withLink();
+
+    await post(`${BOOKINGS}/${booking.id}/delivery/send`, {});
+
+    const queued = await prisma.outbox.findFirstOrThrow({ where: { bookingId: booking.id, template: 'photo_delivery' } });
+    expect(queued.recipient).toBe(CLIENT.email);
+    expect(queued.payload).toMatchObject({ deliveryUrl: DELIVERY_LINK, expiresOn: '2027-01-01' });
+  });
+
+  it('answers 409 no_link carrying the booking when nothing has been saved', async () => {
+    const booking = await completedBooking();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/delivery/send`, {});
+
+    expect([res.status, res.body.error]).toEqual([409, 'no_link']);
+    expect(res.body.booking).toStrictEqual(await renderedBooking(booking.id));
+    expect(res.body.booking.actions).toMatchObject({ canEditDelivery: true, canSendDelivery: false });
+    expect(await prisma.outbox.count({ where: { template: 'photo_delivery' } })).toBe(0);
+  });
+
+  it('answers 409 not_allowed carrying the booking once it has been cancelled', async () => {
+    const booking = await withLink();
+    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'cancelled_by_admin', cancelledAt: START } });
+
+    const res = await post(`${BOOKINGS}/${booking.id}/delivery/send`, {});
+
+    expect([res.status, res.body.error]).toEqual([409, 'not_allowed']);
+    expect(res.body.booking).toMatchObject({
+      status: 'cancelled_by_admin',
+      actions: { canEditDelivery: false, canSendDelivery: false },
+    });
+    expect(await prisma.outbox.count({ where: { template: 'photo_delivery' } })).toBe(0);
+  });
+
+  it('answers 404 for a booking that does not exist', async () => {
+    const res = await post(`${BOOKINGS}/${UNKNOWN_ID}/delivery/send`, {});
+
+    expect([res.status, res.body]).toEqual([404, { error: 'not_found' }]);
+  });
+
+  it('answers 400 for a booking id that is not a uuid', async () => {
+    const res = await post(`${BOOKINGS}/not-a-uuid/delivery/send`, {});
+
+    expect([res.status, res.body]).toEqual([400, { error: 'invalid_request' }]);
+  });
+
+  it('sends again on a second call, a second message with its own key (spec §6.20)', async () => {
+    const booking = await withLink();
+
+    await post(`${BOOKINGS}/${booking.id}/delivery/send`, {});
+    await travelTo(new Date(START.getTime() + HOUR_MS));
+    const again = await post(`${BOOKINGS}/${booking.id}/delivery/send`, {});
+
+    expect(again.status).toBe(200);
+    const queued = await prisma.outbox.findMany({ where: { bookingId: booking.id, template: 'photo_delivery' } });
+    expect(queued).toHaveLength(2);
+    expect(new Set(queued.map((row) => row.dedupeKey)).size).toBe(2);
+    expect(again.body.booking.delivery.sentAt).toBe(new Date(START.getTime() + HOUR_MS).toISOString());
+  });
+});
+
+// --- The delivery half of the post-shoot journey, over HTTP ----------------------------------------
+
+describe('the whole delivery sequence (spec §3.5 steps 5-7)', () => {
+  it('completes the shoot, saves the link, sends it, and never reports a download count', async () => {
+    const { booking } = await confirmedBooking();
+    await travelTo(AFTER_THE_SHOOT);
+
+    const completed = await post(`${BOOKINGS}/${booking.id}/complete`, {});
+    expect(completed.body.booking.actions).toMatchObject({ canEditDelivery: true, canSendDelivery: false });
+
+    const saved = await put(`${BOOKINGS}/${booking.id}/delivery`, { url: DELIVERY_LINK });
+    expect(saved.body.booking.actions).toMatchObject({ canEditDelivery: true, canSendDelivery: true });
+    expect(saved.body.booking.delivery.sentAt).toBeNull();
+
+    const sent = await post(`${BOOKINGS}/${booking.id}/delivery/send`, {});
+    expect(sent.status).toBe(200);
+    expect(sent.body.booking.delivery.sentAt).toBe(AFTER_THE_SHOOT.toISOString());
+
+    // Every answer along the way is the same booking shape.
+    const keys = Object.keys(completed.body.booking).sort();
+    for (const res of [saved, sent]) expect(Object.keys(res.body.booking).sort()).toEqual(keys);
+
+    // plan.md Task 21: no download count exists -- the files sit on someone
+    // else's host (A-7), so the site cannot know (data-model_v2.md §5.9).
+    expect(JSON.stringify(sent.body)).not.toMatch(/download/i);
+    expect(Object.keys(sent.body.booking.delivery).sort()).toEqual(['expiresOn', 'note', 'sentAt', 'url']);
+  });
+
+  it('offers no route that would report one', async () => {
+    const { booking } = await confirmedBooking();
+
+    for (const path of [`${BOOKINGS}/${booking.id}/delivery`, `${BOOKINGS}/${booking.id}/delivery/downloads`]) {
+      const res = await get(path);
+      expect([path, res.status]).toEqual([path, 404]);
+    }
   });
 });

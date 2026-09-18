@@ -4,6 +4,7 @@ import { RouterProvider, createMemoryRouter } from 'react-router'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@/i18n'
 import type { AdminBooking, AdminPayment } from '@/admin/bookings'
+import type { AdminAddon, CatalogueData, CatalogueService } from '@/admin/catalogue'
 import { readSession, saveSession } from '@/admin/session'
 import { routes } from '@/routes'
 
@@ -95,13 +96,13 @@ const BOOKING: AdminBooking = {
       completedAt: '2026-10-01T06:05:30.000Z',
     },
   ],
-  actions: { canReschedule: true, canCancel: true, canComplete: false, canMarkNoShow: false, canResendLink: true, canEditAddons: false, canRequestSessionFee: false },
+  actions: { canReschedule: true, canCancel: true, canComplete: false, canMarkNoShow: false, canResendLink: true, canEditAddons: false, canRequestSessionFee: false, canEditDelivery: false, canSendDelivery: false },
 }
 
 /** The same booking with a shoot that has begun: every action is open. */
 const STARTED: AdminBooking = {
   ...BOOKING,
-  actions: { canReschedule: true, canCancel: true, canComplete: true, canMarkNoShow: true, canResendLink: true, canEditAddons: false, canRequestSessionFee: false },
+  actions: { canReschedule: true, canCancel: true, canComplete: true, canMarkNoShow: true, canResendLink: true, canEditAddons: false, canRequestSessionFee: false, canEditDelivery: false, canSendDelivery: false },
 }
 
 const CANCELLED: AdminBooking = {
@@ -110,7 +111,51 @@ const CANCELLED: AdminBooking = {
   lifecycle: { ...BOOKING.lifecycle, cancelledAt: '2026-10-02T09:00:00.000Z', cancellationReason: 'Studio flooded.' },
   money: { ...BOOKING.money, totals: { ...BOOKING.money.totals, collectedRwf: 0, refundDueRwf: 20_000, outstandingRwf: 0 } },
   payments: [{ ...BOOKING_FEE, status: 'refund_due', canRecordRefund: true }],
-  actions: { canReschedule: false, canCancel: false, canComplete: false, canMarkNoShow: false, canResendLink: true, canEditAddons: false, canRequestSessionFee: false },
+  actions: { canReschedule: false, canCancel: false, canComplete: false, canMarkNoShow: false, canResendLink: true, canEditAddons: false, canRequestSessionFee: false, canEditDelivery: false, canSendDelivery: false },
+}
+
+// --- The catalogue the post-shoot picker loads (plan.md Task 20) --------------------
+
+const OWN_ADDON_ID = 'ad000001-0000-4000-8000-000000000001'
+const SHARED_ADDON_ID = 'ad000002-0000-4000-8000-000000000002'
+const RETIRED_ADDON_ID = 'ad000003-0000-4000-8000-000000000003'
+const OTHER_SERVICE_ADDON_ID = 'ad000004-0000-4000-8000-000000000004'
+const RETIRED_SHARED_ADDON_ID = 'ad000005-0000-4000-8000-000000000005'
+
+function addon(id: string, serviceId: string | null, nameEn: string, priceRwf: number, isActive = true): AdminAddon {
+  return { id, serviceId, nameEn, nameFr: null, priceRwf, isActive, sortOrder: 0 }
+}
+
+function service(id: string, slug: string, nameEn: string, addons: AdminAddon[]): CatalogueService {
+  return {
+    id,
+    slug,
+    nameEn,
+    nameFr: null,
+    descriptionEn: null,
+    descriptionFr: null,
+    coverImageUrl: null,
+    bookingFeeRateOverride: null,
+    isActive: true,
+    sortOrder: 0,
+    packages: [],
+    addons,
+  }
+}
+
+/** Portraits sells two add-ons and has retired a third; Weddings sells its own. */
+const CATALOGUE: CatalogueData = {
+  services: [
+    service('s1', 'portraits', 'Portraits', [
+      addon(OWN_ADDON_ID, 's1', 'Twenty prints', 15_000),
+      addon(RETIRED_ADDON_ID, 's1', 'Polaroid pack', 8_000, false),
+    ]),
+    service('s2', 'weddings', 'Weddings', [addon(OTHER_SERVICE_ADDON_ID, 's2', 'Second shooter', 20_000)]),
+  ],
+  sharedAddons: [
+    addon(SHARED_ADDON_ID, null, 'Rush edit', 5_000),
+    addon(RETIRED_SHARED_ADDON_ID, null, 'Photo book', 30_000, false),
+  ],
 }
 
 type Sent = { method: string; url: string; body: unknown }
@@ -123,7 +168,14 @@ function json(body: unknown, status = 200): Response {
  * A `fetch` for the admin API: GET answers whatever `current.value` holds, and
  * every POST goes to `onPost`, which by default answers the same booking back.
  */
-function stubApi(options: { booking?: AdminBooking; onPost?: (call: Sent, current: { value: AdminBooking }) => Response } = {}) {
+function stubApi(
+  options: {
+    booking?: AdminBooking
+    onPost?: (call: Sent, current: { value: AdminBooking }) => Response
+    /** The catalogue the add-on picker loads (plan.md Task 20); null makes that load fail. */
+    catalogue?: CatalogueData | null
+  } = {},
+) {
   const current = { value: options.booking ?? BOOKING }
   const sent: Sent[] = []
   const mock = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
@@ -133,6 +185,10 @@ function stubApi(options: { booking?: AdminBooking; onPost?: (call: Sent, curren
       body: typeof init.body === 'string' ? (JSON.parse(init.body) as unknown) : undefined,
     }
     sent.push(call)
+    if (call.url === '/api/admin/catalogue') {
+      const catalogue = options.catalogue === undefined ? CATALOGUE : options.catalogue
+      return catalogue === null ? json({ error: 'internal_error' }, 500) : json(catalogue)
+    }
     if (call.method === 'GET') return json({ booking: current.value })
     return options.onPost === undefined ? json({ booking: current.value }) : options.onPost(call, current)
   })
@@ -729,5 +785,734 @@ describe('when the API refuses an action', () => {
     await user().click(screen.getByRole('button', { name: 'Send a new booking link' }))
 
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+  })
+})
+
+// --- The post-shoot add-on editor and the session fee (plan.md Task 20) ------------------
+
+/**
+ * The post-shoot half of the screen (spec §3.5 steps 2-3, §6.15).
+ *
+ * The editor appears only when the API says `canEditAddons`, and it offers what
+ * the photographer actually sells for this service: its own add-ons and the
+ * ones shared with every service, never one he has retired and never another
+ * service's. Only an id and a quantity travel -- no price is typed here, so
+ * nothing in the browser can decide what a client owes. The remove link follows
+ * the API's per-line `canRemove`, and the "Request … session fee" button
+ * follows `canRequestSessionFee` and names the amount the API derived.
+ *
+ * Each of the three new refusals shows its own words. "The client has already
+ * paid for this" is a different problem from "something went wrong", and the
+ * screen catches up with the booking the 409 carried.
+ */
+
+/** A completed shoot with the editor open: 50,000 owed, 20,000 paid, 30,000 outstanding. */
+const COMPLETED: AdminBooking = {
+  ...BOOKING,
+  status: 'completed',
+  lifecycle: { ...BOOKING.lifecycle, completedAt: '2027-01-06T09:00:00.000Z' },
+  actions: {
+    canReschedule: false,
+    canCancel: false,
+    canComplete: false,
+    canMarkNoShow: false,
+    canResendLink: true,
+    canEditAddons: true,
+    canRequestSessionFee: true,
+    canEditDelivery: true,
+    canSendDelivery: false,
+  },
+}
+
+/** The same booking once a 15,000 post-shoot line has been added. */
+const WITH_POST_SHOOT: AdminBooking = {
+  ...COMPLETED,
+  addons: [
+    ...COMPLETED.addons,
+    { id: 'ba2', name: 'Twenty prints', unitPriceRwf: 15_000, quantity: 1, amountRwf: 15_000, stage: 'post_shoot', canRemove: true },
+  ],
+  money: {
+    ...COMPLETED.money,
+    totals: { quotedTotalRwf: 50_000, grandTotalRwf: 65_000, collectedRwf: 20_000, refundDueRwf: 0, outstandingRwf: 45_000 },
+  },
+}
+
+describe('the post-shoot add-on editor', () => {
+  it('does not render at all while the shoot is not completed', async () => {
+    stubApi()
+    await renderLoaded()
+
+    expect(screen.queryByText('Add-ons from the shoot')).toBeNull()
+    expect(screen.queryByLabelText('Add-on')).toBeNull()
+  })
+
+  it('renders once the API says the add-ons may be edited', async () => {
+    stubApi({ booking: COMPLETED })
+    await renderLoaded()
+
+    expect(await screen.findByLabelText('Add-on')).toBeInTheDocument()
+    expect(section('Money')).toHaveTextContent('Add-ons from the shoot')
+    expect(screen.getByRole('button', { name: 'Add to the booking' })).toBeInTheDocument()
+  })
+
+  it('asks the catalogue for what he sells, once', async () => {
+    const { sent } = stubApi({ booking: COMPLETED })
+    await renderLoaded()
+    await screen.findByLabelText('Add-on')
+
+    expect(gets(sent).filter((call) => call.url === '/api/admin/catalogue')).toHaveLength(1)
+  })
+
+  it('offers this service’s own add-ons and the shared ones, and nothing else', async () => {
+    stubApi({ booking: COMPLETED })
+    await renderLoaded()
+
+    const select = await screen.findByLabelText('Add-on')
+    const options = within(select).getAllByRole('option').map((option) => (option as HTMLOptionElement).value)
+    expect(options).toEqual(['', OWN_ADDON_ID, SHARED_ADDON_ID])
+    expect(select).toHaveTextContent('Twenty prints · 15,000 RWF')
+    expect(select).toHaveTextContent('Rush edit · 5,000 RWF')
+  })
+
+  it('never offers an add-on he has retired, nor one belonging to another service', async () => {
+    stubApi({ booking: COMPLETED })
+    await renderLoaded()
+
+    const select = await screen.findByLabelText('Add-on')
+    const options = within(select).getAllByRole('option').map((option) => (option as HTMLOptionElement).value)
+    expect(options).not.toContain(RETIRED_ADDON_ID)
+    expect(options).not.toContain(RETIRED_SHARED_ADDON_ID)
+    expect(options).not.toContain(OTHER_SERVICE_ADDON_ID)
+    expect(select).not.toHaveTextContent('Polaroid pack')
+    expect(select).not.toHaveTextContent('Second shooter')
+    expect(select).not.toHaveTextContent('Photo book')
+  })
+
+  it('posts the id and the quantity, and re-renders from what the API answered', async () => {
+    const { sent, current } = stubApi({
+      booking: COMPLETED,
+      onPost: (_call, state) => {
+        state.value = WITH_POST_SHOOT
+        return json({ booking: WITH_POST_SHOOT })
+      },
+    })
+    await renderLoaded()
+    await screen.findByLabelText('Add-on')
+
+    await user().selectOptions(screen.getByLabelText('Add-on'), OWN_ADDON_ID)
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '2' } })
+    await user().click(screen.getByRole('button', { name: 'Add to the booking' }))
+
+    await waitFor(() => expect(section('Money')).toHaveTextContent('Total65,000 RWF'))
+    expect(writes(sent)).toEqual([
+      { method: 'POST', url: `/api/admin/bookings/${BOOKING_ID}/addons`, body: { addonId: OWN_ADDON_ID, quantity: 2 } },
+    ])
+    expect(section('Money')).toHaveTextContent('Twenty prints (added after the shoot)')
+    expect(section('Money')).toHaveTextContent('Still to pay45,000 RWF')
+    expect(current.value).toBe(WITH_POST_SHOOT)
+  })
+
+  it('sends a quantity of one when the field is left as it opens', async () => {
+    const { sent } = stubApi({ booking: COMPLETED })
+    await renderLoaded()
+    await screen.findByLabelText('Add-on')
+
+    await user().selectOptions(screen.getByLabelText('Add-on'), SHARED_ADDON_ID)
+    await user().click(screen.getByRole('button', { name: 'Add to the booking' }))
+
+    await waitFor(() => expect(writes(sent)).toHaveLength(1))
+    expect(writes(sent)[0]?.body).toEqual({ addonId: SHARED_ADDON_ID, quantity: 1 })
+  })
+
+  it('posts nothing at all while no add-on has been chosen', async () => {
+    const { sent } = stubApi({ booking: COMPLETED })
+    await renderLoaded()
+    await screen.findByLabelText('Add-on')
+
+    await user().click(screen.getByRole('button', { name: 'Add to the booking' }))
+
+    expect(writes(sent)).toEqual([])
+  })
+
+  it('never sends a price: only an id and a quantity decide what is charged', async () => {
+    const { sent } = stubApi({ booking: COMPLETED })
+    await renderLoaded()
+    await screen.findByLabelText('Add-on')
+
+    await user().selectOptions(screen.getByLabelText('Add-on'), OWN_ADDON_ID)
+    await user().click(screen.getByRole('button', { name: 'Add to the booking' }))
+
+    await waitFor(() => expect(writes(sent)).toHaveLength(1))
+    expect(Object.keys(writes(sent)[0]?.body as object).sort()).toEqual(['addonId', 'quantity'])
+  })
+
+  it('says so when the catalogue has nothing to sell for this service', async () => {
+    stubApi({ booking: COMPLETED, catalogue: { services: [], sharedAddons: [] } })
+    await renderLoaded()
+
+    expect(await screen.findByText('No add-ons are on sale for this service.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Add-on')).toBeNull()
+  })
+
+  it('says the add-ons would not load, and leaves the rest of the page usable', async () => {
+    const { sent } = stubApi({ booking: COMPLETED, catalogue: null })
+    await renderLoaded()
+
+    // Not "no add-ons are on sale": he sells them, we could not read them.
+    expect(await screen.findByRole('alert')).toHaveTextContent('We could not load the add-ons.')
+    expect(screen.queryByText('No add-ons are on sale for this service.')).toBeNull()
+    // The money, the payments and the actions are all still there.
+    expect(section('Money')).toHaveTextContent('Total50,000 RWF')
+    expect(section('Payments')).toHaveTextContent('Booking fee')
+    expect(screen.getByRole('button', { name: 'Request 30,000 RWF session fee' })).toBeInTheDocument()
+
+    // And the session fee can still be asked for.
+    await user().click(screen.getByRole('button', { name: 'Request 30,000 RWF session fee' }))
+    await waitFor(() => expect(writes(sent)).toHaveLength(1))
+  })
+})
+
+describe('removing a post-shoot add-on', () => {
+  it('offers Remove only on the lines the API marked canRemove', async () => {
+    stubApi({ booking: WITH_POST_SHOOT })
+    await renderLoaded()
+
+    const money = section('Money')
+    expect(within(money).getAllByRole('button', { name: 'Remove' })).toHaveLength(1)
+    // The at-booking line has no remove link: it is not his to delete.
+    expect(money).toHaveTextContent('Extra hour10,000 RWF')
+  })
+
+  it('offers none when nothing may be removed', async () => {
+    const paid: AdminBooking = {
+      ...WITH_POST_SHOOT,
+      addons: WITH_POST_SHOOT.addons.map((line) => ({ ...line, canRemove: false })),
+    }
+    stubApi({ booking: paid })
+    await renderLoaded()
+
+    expect(within(section('Money')).queryByRole('button', { name: 'Remove' })).toBeNull()
+  })
+
+  it('posts the DELETE for that line and re-renders from the answer', async () => {
+    const { sent } = stubApi({
+      booking: WITH_POST_SHOOT,
+      onPost: (_call, state) => {
+        state.value = COMPLETED
+        return json({ booking: COMPLETED })
+      },
+    })
+    await renderLoaded()
+
+    await user().click(within(section('Money')).getByRole('button', { name: 'Remove' }))
+
+    await waitFor(() => expect(section('Money')).toHaveTextContent('Total50,000 RWF'))
+    expect(writes(sent)).toEqual([
+      { method: 'DELETE', url: `/api/admin/bookings/${BOOKING_ID}/addons/ba2`, body: undefined },
+    ])
+    // The line is gone with its remove link; only the picker still names it.
+    expect(within(section('Money')).queryByRole('button', { name: 'Remove' })).toBeNull()
+    expect(section('Money')).toHaveTextContent('Still to pay30,000 RWF')
+  })
+
+  it('shows the already_paid refusal in words, and catches up with the booking it carried', async () => {
+    stubApi({
+      booking: WITH_POST_SHOOT,
+      onPost: () =>
+        json(
+          {
+            error: 'already_paid',
+            booking: {
+              ...WITH_POST_SHOOT,
+              addons: WITH_POST_SHOOT.addons.map((line) => ({ ...line, canRemove: false })),
+              money: { ...WITH_POST_SHOOT.money, totals: { ...WITH_POST_SHOOT.money.totals, collectedRwf: 65_000, outstandingRwf: 0 } },
+            },
+          },
+          409,
+        ),
+    })
+    await renderLoaded()
+
+    await user().click(within(section('Money')).getByRole('button', { name: 'Remove' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The client has already paid for this. Refund it rather than removing it.')
+    // The screen corrected itself: the line stays, and its remove link is gone.
+    expect(section('Money')).toHaveTextContent('Twenty prints')
+    expect(within(section('Money')).queryByRole('button', { name: 'Remove' })).toBeNull()
+    expect(section('Money')).toHaveTextContent('Collected65,000 RWF')
+  })
+})
+
+describe('requesting the session fee', () => {
+  it('names the outstanding amount the API derived', async () => {
+    stubApi({ booking: COMPLETED })
+    await renderLoaded()
+
+    expect(screen.getByRole('button', { name: 'Request 30,000 RWF session fee' })).toBeInTheDocument()
+    expect(screen.getByText(/The amount is fixed when you ask/)).toBeInTheDocument()
+  })
+
+  it('names whatever the add-ons have made it', async () => {
+    stubApi({ booking: WITH_POST_SHOOT })
+    await renderLoaded()
+
+    expect(screen.getByRole('button', { name: 'Request 45,000 RWF session fee' })).toBeInTheDocument()
+  })
+
+  it('does not appear when the API says there is nothing to ask for', async () => {
+    stubApi({ booking: BOOKING })
+    await renderLoaded()
+
+    expect(screen.queryByRole('button', { name: /session fee/ })).toBeNull()
+  })
+
+  it('posts the request and re-renders from the booking the API answered with', async () => {
+    const asked: AdminBooking = {
+      ...COMPLETED,
+      payments: [
+        ...COMPLETED.payments,
+        {
+          id: 'pay2',
+          kind: 'session_fee',
+          provider: 'mtn_momo_direct',
+          ourRef: 'f00dcafe',
+          providerRef: null,
+          method: null,
+          amountRwf: 30_000,
+          status: 'initiated',
+          failureReason: null,
+          initiatedAt: '2027-01-06T10:00:00.000Z',
+          settledAt: null,
+          refundedAt: null,
+          refundReference: null,
+          canRecordRefund: false,
+        },
+      ],
+      messages: [
+        ...COMPLETED.messages,
+        {
+          id: 'm2',
+          kind: 'email',
+          template: 'session_fee_request',
+          recipient: 'aline@example.com',
+          status: 'queued',
+          attempts: 0,
+          lastError: null,
+          createdAt: '2027-01-06T10:00:00.000Z',
+          completedAt: null,
+        },
+      ],
+    }
+    const { sent } = stubApi({
+      booking: COMPLETED,
+      onPost: (_call, state) => {
+        state.value = asked
+        return json({ booking: asked })
+      },
+    })
+    await renderLoaded()
+
+    await user().click(screen.getByRole('button', { name: 'Request 30,000 RWF session fee' }))
+
+    await waitFor(() => expect(section('Payments')).toHaveTextContent('Session fee'))
+    expect(writes(sent)).toEqual([{ method: 'POST', url: `/api/admin/bookings/${BOOKING_ID}/session-fee`, body: {} }])
+    expect(section('Payments')).toHaveTextContent('30,000 RWF')
+    expect(section('Messages sent')).toHaveTextContent('Session fee request')
+  })
+
+  it.each([
+    ['nothing_to_pay', 'There is nothing left to pay on this booking.'],
+    ['in_progress', 'The client is paying right now. Wait for that to finish.'],
+    ['not_allowed', 'That is not possible for this booking any more. The booking below is up to date.'],
+  ])('shows the %s refusal in its own words', async (code, words) => {
+    stubApi({ booking: COMPLETED, onPost: () => json({ error: code, booking: COMPLETED }, 409) })
+    await renderLoaded()
+
+    await user().click(screen.getByRole('button', { name: 'Request 30,000 RWF session fee' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(words)
+    expect(screen.getByRole('alert')).not.toHaveTextContent('That did not work.')
+  })
+
+  it('shows the not_allowed refusal for an add-on the API will not take, and stays usable', async () => {
+    stubApi({ booking: COMPLETED, onPost: () => json({ error: 'not_allowed', booking: COMPLETED }, 409) })
+    await renderLoaded()
+    await screen.findByLabelText('Add-on')
+
+    await user().selectOptions(screen.getByLabelText('Add-on'), OWN_ADDON_ID)
+    await user().click(screen.getByRole('button', { name: 'Add to the booking' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('That is not possible for this booking any more.')
+    expect(screen.getByRole('button', { name: 'Add to the booking' })).toBeInTheDocument()
+    expect(section('Money')).toHaveTextContent('Total50,000 RWF')
+  })
+})
+
+
+// --- What the quantity field sends ---------------------------------------------------------
+
+/**
+ * The field is `type="number" min={1} max={99}` inside a real form, so the
+ * browser's own constraint validation refuses a zero or a hundred before any
+ * submit handler runs -- nothing is sent, and the API's 422 is a second line of
+ * defence rather than the first. An emptied field is valid HTML, and
+ * `AddonForm`'s `Number(quantity) || 1` reads it as one.
+ */
+describe('the quantity the add-on form sends', () => {
+  it.each([
+    ['a zero', '0'],
+    ['a hundred', '100'],
+    ['a negative', '-3'],
+  ])('sends nothing at all for %s: the field refuses it first', async (_case, value) => {
+    const { sent } = stubApi({ booking: COMPLETED })
+    await renderLoaded()
+    await screen.findByLabelText('Add-on')
+
+    await user().selectOptions(screen.getByLabelText('Add-on'), OWN_ADDON_ID)
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value } })
+    await user().click(screen.getByRole('button', { name: 'Add to the booking' }))
+
+    expect(writes(sent)).toEqual([])
+    expect(screen.getByLabelText('Quantity')).toBeInvalid()
+  })
+
+  it('reads an emptied field as one', async () => {
+    const { sent } = stubApi({ booking: COMPLETED })
+    await renderLoaded()
+    await screen.findByLabelText('Add-on')
+
+    await user().selectOptions(screen.getByLabelText('Add-on'), OWN_ADDON_ID)
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '' } })
+    await user().click(screen.getByRole('button', { name: 'Add to the booking' }))
+
+    await waitFor(() => expect(writes(sent)).toHaveLength(1))
+    expect(writes(sent)[0]?.body).toEqual({ addonId: OWN_ADDON_ID, quantity: 1 })
+  })
+
+  it('sends the highest quantity the API takes', async () => {
+    const { sent } = stubApi({ booking: COMPLETED })
+    await renderLoaded()
+    await screen.findByLabelText('Add-on')
+
+    await user().selectOptions(screen.getByLabelText('Add-on'), OWN_ADDON_ID)
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '99' } })
+    await user().click(screen.getByRole('button', { name: 'Add to the booking' }))
+
+    await waitFor(() => expect(writes(sent)).toHaveLength(1))
+    expect(writes(sent)[0]?.body).toEqual({ addonId: OWN_ADDON_ID, quantity: 99 })
+  })
+})
+
+// --- The photos (plan.md Task 21) ------------------------------------------------------------
+
+/**
+ * The delivery section (spec §3.5 steps 5-6, §6.20, A-7, A-8).
+ *
+ * It is not on the page at all until there is something to show: an open editor
+ * or a link already saved. With the editor open it is a form -- the link, the
+ * day it stops working, and a line for the client -- prefilled from the booking
+ * and sending only the fields he filled in, because a blank date means "date it
+ * for me" (spec A-8) and a blank note means none. With the editor shut but a
+ * link on file it is two lines of text and nothing to press.
+ *
+ * Saving and sending are separate buttons because they are separate acts: he
+ * can paste a link, check it opens, and write to the client afterwards. "Send
+ * the photos" appears only once the API says there is a link to send, and reads
+ * "Send again" after the first one, which is how §6.20's lost email is answered.
+ * Its own refusal -- there is no link yet -- has its own words.
+ */
+
+const DELIVERY_LINK = 'https://photos.example-host.com/s/abc123'
+const DELIVERY_NOTE = 'The raw files are in the second folder.'
+
+/** A completed shoot with the delivery editor open and nothing saved yet. */
+const DELIVERABLE: AdminBooking = {
+  ...COMPLETED,
+  actions: { ...COMPLETED.actions, canEditDelivery: true, canSendDelivery: false },
+}
+
+/** The same, with a link saved but never sent. */
+const WITH_LINK: AdminBooking = {
+  ...DELIVERABLE,
+  delivery: { url: DELIVERY_LINK, expiresOn: '2027-03-15', sentAt: null, note: DELIVERY_NOTE },
+  actions: { ...DELIVERABLE.actions, canSendDelivery: true },
+}
+
+/** And once the email has gone. */
+const DELIVERY_SENT: AdminBooking = {
+  ...WITH_LINK,
+  delivery: { ...WITH_LINK.delivery, sentAt: '2027-01-07T09:15:00.000Z' },
+}
+
+/** A link on a booking whose editor the API has closed: text, and nothing to press. */
+const READ_ONLY_DELIVERY: AdminBooking = {
+  ...BOOKING,
+  delivery: { url: DELIVERY_LINK, expiresOn: '2027-03-15', sentAt: '2027-01-07T09:15:00.000Z', note: DELIVERY_NOTE },
+  actions: { ...BOOKING.actions, canEditDelivery: false, canSendDelivery: false },
+}
+
+function deliverySection(): HTMLElement {
+  return section('The photos')
+}
+
+function linkField(): HTMLElement {
+  return screen.getByLabelText('Link to the photos')
+}
+
+describe('the delivery section', () => {
+  it('is not on the page at all with neither an editor nor a link', async () => {
+    stubApi()
+    await renderLoaded()
+
+    expect(screen.queryByRole('heading', { level: 2, name: 'The photos' })).toBeNull()
+    expect(screen.queryByLabelText('Link to the photos')).toBeNull()
+  })
+
+  it('is read-only when there is a link but the editor is shut', async () => {
+    stubApi({ booking: READ_ONLY_DELIVERY })
+    await renderLoaded()
+
+    const photos = deliverySection()
+    expect(photos).toHaveTextContent(DELIVERY_LINK)
+    expect(photos).toHaveTextContent('Monday, 15 March 2027')
+    expect(screen.queryByLabelText('Link to the photos')).toBeNull()
+    expect(within(photos).queryByRole('button')).toBeNull()
+  })
+
+  it('is a form once the API says the delivery may be edited', async () => {
+    stubApi({ booking: DELIVERABLE })
+    await renderLoaded()
+
+    expect(linkField()).toBeInTheDocument()
+    expect(screen.getByLabelText('Link expires')).toBeInTheDocument()
+    expect(screen.getByLabelText('A line for the client (optional)')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save the link' })).toBeInTheDocument()
+    expect(deliverySection()).toHaveTextContent('Left blank, the client gets 90 days from today.')
+    expect(deliverySection()).toHaveTextContent('Saving only stores the link. The client hears nothing until you send it.')
+  })
+
+  it('starts empty on a booking with nothing saved', async () => {
+    stubApi({ booking: DELIVERABLE })
+    await renderLoaded()
+
+    expect(linkField()).toHaveValue('')
+    expect(screen.getByLabelText('Link expires')).toHaveValue('')
+    expect(screen.getByLabelText('A line for the client (optional)')).toHaveValue('')
+  })
+
+  it('prefills every field from the booking', async () => {
+    stubApi({ booking: WITH_LINK })
+    await renderLoaded()
+
+    expect(linkField()).toHaveValue(DELIVERY_LINK)
+    expect(screen.getByLabelText('Link expires')).toHaveValue('2027-03-15')
+    expect(screen.getByLabelText('A line for the client (optional)')).toHaveValue(DELIVERY_NOTE)
+  })
+
+  it('says nothing has been sent until something has', async () => {
+    stubApi({ booking: WITH_LINK })
+    await renderLoaded()
+
+    expect(deliverySection()).toHaveTextContent('Nothing has been sent to the client yet.')
+    expect(deliverySection()).not.toHaveTextContent('Last sent')
+  })
+
+  it('renders the moment it was last sent, in Kigali time', async () => {
+    stubApi({ booking: DELIVERY_SENT })
+    await renderLoaded()
+
+    expect(deliverySection()).toHaveTextContent('Last sent')
+    // 09:15Z is 11:15 in Kigali (spec §6.5).
+    expect(deliverySection()).toHaveTextContent('7 Jan 2027, 11:15')
+    expect(deliverySection()).not.toHaveTextContent('Nothing has been sent')
+  })
+})
+
+describe('saving the link', () => {
+  it('sends the link, the date he chose and the note he wrote', async () => {
+    const { sent } = stubApi({ booking: DELIVERABLE })
+    await renderLoaded()
+
+    await user().type(linkField(), DELIVERY_LINK)
+    fireEvent.change(screen.getByLabelText('Link expires'), { target: { value: '2027-03-15' } })
+    await user().type(screen.getByLabelText('A line for the client (optional)'), DELIVERY_NOTE)
+    await user().click(screen.getByRole('button', { name: 'Save the link' }))
+
+    await waitFor(() => expect(writes(sent)).toHaveLength(1))
+    expect(writes(sent)[0]).toEqual({
+      method: 'PUT',
+      url: `/api/admin/bookings/${BOOKING_ID}/delivery`,
+      body: { url: DELIVERY_LINK, expiresOn: '2027-03-15', note: DELIVERY_NOTE },
+    })
+  })
+
+  it('leaves the date out when the field is blank, so the API dates it (spec A-8)', async () => {
+    const { sent } = stubApi({ booking: DELIVERABLE })
+    await renderLoaded()
+
+    await user().type(linkField(), DELIVERY_LINK)
+    await user().click(screen.getByRole('button', { name: 'Save the link' }))
+
+    await waitFor(() => expect(writes(sent)).toHaveLength(1))
+    expect(writes(sent)[0]?.body).toEqual({ url: DELIVERY_LINK, note: null })
+    expect(Object.keys(writes(sent)[0]?.body as object)).not.toContain('expiresOn')
+  })
+
+  it('sends a null note when the box is empty or only spaces', async () => {
+    const { sent } = stubApi({ booking: DELIVERABLE })
+    await renderLoaded()
+
+    await user().type(linkField(), DELIVERY_LINK)
+    fireEvent.change(screen.getByLabelText('A line for the client (optional)'), { target: { value: '   ' } })
+    await user().click(screen.getByRole('button', { name: 'Save the link' }))
+
+    await waitFor(() => expect(writes(sent)).toHaveLength(1))
+    expect(writes(sent)[0]?.body).toMatchObject({ url: DELIVERY_LINK, note: null })
+  })
+
+  it('sends the link and the note without the whitespace around them', async () => {
+    const { sent } = stubApi({ booking: DELIVERABLE })
+    await renderLoaded()
+
+    fireEvent.change(linkField(), { target: { value: `  ${DELIVERY_LINK}  ` } })
+    fireEvent.change(screen.getByLabelText('A line for the client (optional)'), { target: { value: `  ${DELIVERY_NOTE}  ` } })
+    await user().click(screen.getByRole('button', { name: 'Save the link' }))
+
+    await waitFor(() => expect(writes(sent)).toHaveLength(1))
+    expect(writes(sent)[0]?.body).toEqual({ url: DELIVERY_LINK, note: DELIVERY_NOTE })
+  })
+
+  it('sends nothing at all when there is no link to save', async () => {
+    const { sent } = stubApi({ booking: DELIVERABLE })
+    await renderLoaded()
+
+    await user().click(screen.getByRole('button', { name: 'Save the link' }))
+    fireEvent.change(linkField(), { target: { value: '   ' } })
+    await user().click(screen.getByRole('button', { name: 'Save the link' }))
+
+    expect(writes(sent)).toEqual([])
+  })
+
+  it('re-renders from the booking the save answered with', async () => {
+    stubApi({
+      booking: DELIVERABLE,
+      onPost: (_call, state) => {
+        state.value = WITH_LINK
+        return json({ booking: WITH_LINK })
+      },
+    })
+    await renderLoaded()
+
+    await user().type(linkField(), DELIVERY_LINK)
+    await user().click(screen.getByRole('button', { name: 'Save the link' }))
+
+    expect(await screen.findByRole('button', { name: 'Send the photos' })).toBeInTheDocument()
+  })
+})
+
+describe('sending the photos', () => {
+  it('offers no send button until the API says there is a link to send', async () => {
+    stubApi({ booking: DELIVERABLE })
+    await renderLoaded()
+
+    expect(screen.queryByRole('button', { name: 'Send the photos' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Send again' })).toBeNull()
+  })
+
+  it('offers "Send the photos" once there is one, and sends an empty body', async () => {
+    const { sent } = stubApi({ booking: WITH_LINK })
+    await renderLoaded()
+
+    await user().click(screen.getByRole('button', { name: 'Send the photos' }))
+
+    await waitFor(() => expect(writes(sent)).toHaveLength(1))
+    expect(writes(sent)[0]).toEqual({ method: 'POST', url: `/api/admin/bookings/${BOOKING_ID}/delivery/send`, body: {} })
+  })
+
+  it('reads "Send again" once it has been sent (spec §6.20)', async () => {
+    stubApi({ booking: DELIVERY_SENT })
+    await renderLoaded()
+
+    expect(screen.getByRole('button', { name: 'Send again' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Send the photos' })).toBeNull()
+  })
+
+  it('becomes "Send again" the moment the first send answers', async () => {
+    stubApi({
+      booking: WITH_LINK,
+      onPost: (_call, state) => {
+        state.value = DELIVERY_SENT
+        return json({ booking: DELIVERY_SENT })
+      },
+    })
+    await renderLoaded()
+
+    await user().click(screen.getByRole('button', { name: 'Send the photos' }))
+
+    expect(await screen.findByRole('button', { name: 'Send again' })).toBeInTheDocument()
+    expect(deliverySection()).toHaveTextContent('7 Jan 2027, 11:15')
+  })
+
+  it('shows the no_link refusal in its own words', async () => {
+    stubApi({ booking: WITH_LINK, onPost: () => json({ error: 'no_link', booking: DELIVERABLE }, 409) })
+    await renderLoaded()
+
+    await user().click(screen.getByRole('button', { name: 'Send the photos' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Save a link to the photos first.')
+    expect(screen.getByRole('alert')).not.toHaveTextContent('That did not work.')
+  })
+
+  it('shows the not_allowed refusal for a booking that moved on, and catches up with it', async () => {
+    stubApi({ booking: WITH_LINK, onPost: () => json({ error: 'not_allowed', booking: CANCELLED }, 409) })
+    await renderLoaded()
+
+    await user().click(screen.getByRole('button', { name: 'Send the photos' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('That is not possible for this booking any more.')
+    expect(document.body).toHaveTextContent('Cancelled by you')
+    // The delivery section is gone with it: no editor, and no link to show.
+    expect(screen.queryByRole('heading', { level: 2, name: 'The photos' })).toBeNull()
+  })
+
+  it('reports no download count: the section is the link, the date, the note and when it went', async () => {
+    stubApi({ booking: DELIVERY_SENT })
+    await renderLoaded()
+
+    expect(deliverySection().textContent ?? '').not.toMatch(/download|opened|viewed/i)
+  })
+})
+
+/**
+ * Tested as the code behaves, and flagged rather than "fixed". `DeliveryForm`
+ * seeds its three fields with `useState` and never re-seeds them, so the
+ * booking the API answers with does not reach the inputs. After a save that
+ * took the API's default date (spec A-8), the date field is still blank -- and
+ * a second save therefore sends no date again, so the API re-dates the link
+ * from *that* day rather than leaving the date the client was already told.
+ */
+describe('what the form does with the booking it gets back', () => {
+  it('leaves the date field blank after the API has dated the link', async () => {
+    const dated: AdminBooking = { ...WITH_LINK, delivery: { ...WITH_LINK.delivery, expiresOn: '2027-04-06', note: null } }
+    const { sent } = stubApi({
+      booking: DELIVERABLE,
+      onPost: (_call, state) => {
+        state.value = dated
+        return json({ booking: dated })
+      },
+    })
+    await renderLoaded()
+
+    await user().type(linkField(), DELIVERY_LINK)
+    await user().click(screen.getByRole('button', { name: 'Save the link' }))
+    await screen.findByRole('button', { name: 'Send the photos' })
+
+    // The booking now carries a date; the field he would edit does not.
+    expect(screen.getByLabelText('Link expires')).toHaveValue('')
+
+    await user().click(screen.getByRole('button', { name: 'Save the link' }))
+
+    await waitFor(() => expect(writes(sent)).toHaveLength(2))
+    expect(Object.keys(writes(sent)[1]?.body as object)).not.toContain('expiresOn')
   })
 })

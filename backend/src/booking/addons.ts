@@ -29,11 +29,24 @@ export type AddonEditDeps = { prisma: PrismaClient };
 /** Enough for "20 extra prints"; a typo of 10,000 is not an add-on. */
 export const ADDON_MAX_QUANTITY = 99;
 
+/**
+ * The largest amount the money columns hold: `booking_addon.amount_rwf` and
+ * `payment.amount_rwf` are both `integer`.
+ *
+ * The catalogue accepts a price up to this on its own, and a quantity up to 99
+ * is legal, so the product of two legal values is not. Refused here, where it
+ * can be answered, rather than reaching PostgreSQL as a 22003 and surfacing as
+ * a 500 (routes/validation.ts).
+ */
+const MAX_AMOUNT_RWF = 2_147_483_647;
+
 export type AddonEditResult =
   | { status: 'ok'; booking: AdminBooking }
   | { status: 'not_found' }
   /** Not a completed booking, not a post-shoot line, or not an add-on he sells. */
   | { status: 'not_allowed' }
+  /** The line, or the booking it would make, is worth more than the money columns hold. */
+  | { status: 'too_large' }
   /** Removing it would leave the client having paid more than the booking is worth. */
   | { status: 'already_paid' };
 
@@ -63,6 +76,13 @@ export async function addPostShootAddon(
     if (addon.serviceId !== null && addon.serviceId !== booking.serviceId) return 'not_allowed';
     if (request.quantity < 1 || request.quantity > ADDON_MAX_QUANTITY) return 'not_allowed';
 
+    const amountRwf = addon.priceRwf * request.quantity;
+    const lines = await tx.bookingAddon.findMany({ where: { bookingId: booking.id }, select: { amountRwf: true } });
+    const total = lines.reduce((sum, line) => sum + line.amountRwf, booking.packagePriceRwf);
+    // Neither the line nor the booking it makes may outgrow the columns that
+    // have to hold them -- including the payment that would collect it.
+    if (amountRwf > MAX_AMOUNT_RWF || total + amountRwf > MAX_AMOUNT_RWF) return 'too_large';
+
     await tx.bookingAddon.create({
       data: {
         bookingId: booking.id,
@@ -71,7 +91,7 @@ export async function addPostShootAddon(
         nameSnapshot: addon.nameEn,
         unitPriceRwf: addon.priceRwf,
         quantity: request.quantity,
-        amountRwf: addon.priceRwf * request.quantity,
+        amountRwf,
         stage: 'post_shoot',
       },
     });

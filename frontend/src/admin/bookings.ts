@@ -112,6 +112,10 @@ export type AdminBooking = {
     canEditAddons: boolean
     /** There is money left to ask the client for (spec §3.5 step 3). */
     canRequestSessionFee: boolean
+    /** The delivery link and its expiry, once the shoot has happened (spec §3.5 step 5). */
+    canEditDelivery: boolean
+    /** There is a link to send (spec §3.5 step 6, §6.20). */
+    canSendDelivery: boolean
   }
 }
 
@@ -178,6 +182,20 @@ export const bookingsApi = {
   /** Asks the client for what is outstanding, and emails them a link (spec §3.5 step 3). */
   requestSessionFee(bookingId: string): Promise<{ booking: AdminBooking }> {
     return post(`/admin/bookings/${bookingId}/session-fee`, {})
+  },
+
+  /** The link to the photos on their own host, and the day it stops working (spec A-7, A-8). */
+  saveDelivery(bookingId: string, body: { url: string; expiresOn?: string; note?: string | null }): Promise<{ booking: AdminBooking }> {
+    return adminFetch<{ booking: AdminBooking }>(`/admin/bookings/${bookingId}/delivery`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  },
+
+  /** Emails that link to the client, and records that it went (spec §3.5 step 6). */
+  sendDelivery(bookingId: string): Promise<{ booking: AdminBooking }> {
+    return post(`/admin/bookings/${bookingId}/delivery/send`, {})
   },
 
   /** Records a refund the photographer has already sent (spec §6.16). */

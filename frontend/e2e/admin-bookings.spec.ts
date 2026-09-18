@@ -21,6 +21,10 @@ const MINUTE_MS = 60_000
 /** 09:00 to 10:30 Kigali on Wednesday 6 January 2027. */
 const STARTS_AT = '2027-01-06T07:00:00.000Z'
 
+/** The external host's link, and the date NOW plus ninety days lands on (plan.md Task 21, spec A-7, A-8). */
+const DELIVERY_LINK = 'https://photos.example-host.com/s/abc123'
+const DEFAULT_EXPIRY = '2027-01-05'
+
 test.use({ timezoneId: 'America/New_York' })
 
 type Booking = Record<string, unknown> & { id: string; reference: string; status: string }
@@ -74,7 +78,7 @@ function booking(id: string, reference: string, status: string, startsAt: string
     access: { hasLink: true, expiresAt: '2027-10-01T06:05:00.000Z', lastUsedAt: null },
     delivery: { url: null, expiresOn: null, sentAt: null, note: null },
     messages: [],
-    actions: { canReschedule: true, canCancel: true, canComplete: false, canMarkNoShow: false, canResendLink: true, canEditAddons: false, canRequestSessionFee: false },
+    actions: { canReschedule: true, canCancel: true, canComplete: false, canMarkNoShow: false, canResendLink: true, canEditAddons: false, canRequestSessionFee: false, canEditDelivery: false, canSendDelivery: false },
   }
 }
 
@@ -101,12 +105,56 @@ function row(entry: Booking) {
   }
 }
 
-/** Answers `/api/*` in the page; returns the writes as they arrive. */
-async function mockApi(page: Page) {
+/** The add-on Portraits sells after a shoot (plan.md Task 20). */
+const PRINTS_ID = 'ad000001-0000-4000-8000-000000000001'
+
+const CATALOGUE = {
+  services: [
+    {
+      id: 's1',
+      slug: 'portraits',
+      nameEn: 'Portraits',
+      nameFr: null,
+      descriptionEn: null,
+      descriptionFr: null,
+      coverImageUrl: null,
+      bookingFeeRateOverride: null,
+      isActive: true,
+      sortOrder: 0,
+      packages: [],
+      addons: [{ id: PRINTS_ID, serviceId: 's1', nameEn: 'Twenty prints', nameFr: null, priceRwf: 15_000, isActive: true, sortOrder: 0 }],
+    },
+  ],
+  sharedAddons: [],
+}
+
+/**
+ * Answers `/api/*` in the page; returns the writes as they arrive.
+ *
+ * `completed` opens the post-shoot half of the screen (plan.md Task 20): the
+ * add-on editor and the session-fee request, which only a completed booking has.
+ */
+async function mockApi(page: Page, options: { completed?: boolean } = {}) {
   const bookings: Booking[] = [
     booking('b1', 'BKY-2701-00042', 'confirmed', STARTS_AT, 'Aline Uwase'),
     booking('b2', 'BKY-2701-00043', 'cancelled_by_client', '2027-01-05T12:00:00.000Z', 'Eric Habimana'),
   ]
+  if (options.completed === true) {
+    const first = bookings[0] as Booking
+    first.status = 'completed'
+    first.lifecycle = { confirmedAt: '2026-10-01T06:05:00.000Z', completedAt: NOW.toISOString(), cancelledAt: null, cancellationReason: null }
+    first.actions = {
+      canReschedule: false,
+      canCancel: false,
+      canComplete: false,
+      canMarkNoShow: false,
+      canResendLink: true,
+      canEditAddons: true,
+      canRequestSessionFee: true,
+    canEditDelivery: true,
+    canSendDelivery: false,
+    }
+  }
   const writes: Write[] = []
 
   await page.route(
@@ -126,6 +174,10 @@ async function mockApi(page: Page) {
       }
       if (method === 'GET' && path === '/api/admin/calendar') {
         await route.fulfill({ json: { bookings: [], blocks: [] } })
+        return
+      }
+      if (method === 'GET' && path === '/api/admin/catalogue') {
+        await route.fulfill({ json: CATALOGUE })
         return
       }
       if (method === 'GET' && path === '/api/admin/bookings') {
@@ -173,8 +225,83 @@ async function mockApi(page: Page) {
           bookingFeeRwf: 16_000,
           totals: { quotedTotalRwf: 40_000, grandTotalRwf: 40_000, collectedRwf: 0, refundDueRwf: 20_000, outstandingRwf: 0 },
         }
-        entry.actions = { canReschedule: false, canCancel: false, canComplete: false, canMarkNoShow: false, canResendLink: true, canEditAddons: false, canRequestSessionFee: false }
+        entry.actions = { canReschedule: false, canCancel: false, canComplete: false, canMarkNoShow: false, canResendLink: true, canEditAddons: false, canRequestSessionFee: false, canEditDelivery: false, canSendDelivery: false }
         await route.fulfill({ json: { booking: entry } })
+        return
+      }
+
+      // Task 20: a post-shoot add-on, priced from the catalogue by the API.
+      if (entry !== undefined && action?.[2] === 'addons') {
+        const chosen = CATALOGUE.services[0]?.addons.find((candidate) => candidate.id === String(body?.addonId))
+        const quantity = Number(body?.quantity ?? 1)
+        const amountRwf = (chosen?.priceRwf ?? 0) * quantity
+        const totals = (entry.money as { totals: Record<string, number> }).totals
+        entry.addons = [
+          ...(entry.addons as Record<string, unknown>[]),
+          {
+            id: `ba${(entry.addons as unknown[]).length + 1}`,
+            name: chosen?.nameEn ?? 'Unknown',
+            unitPriceRwf: chosen?.priceRwf ?? 0,
+            quantity,
+            amountRwf,
+            stage: 'post_shoot',
+            canRemove: true,
+          },
+        ]
+        entry.money = {
+          bookingFeeRate: 0.4,
+          bookingFeeRwf: 16_000,
+          totals: { ...totals, grandTotalRwf: totals.grandTotalRwf + amountRwf, outstandingRwf: totals.outstandingRwf + amountRwf },
+        }
+        await route.fulfill({ json: { booking: entry } })
+        return
+      }
+      // Task 20: the request is the payment row, frozen at what is outstanding now.
+      if (entry !== undefined && action?.[2] === 'session-fee') {
+        const totals = (entry.money as { totals: Record<string, number> }).totals
+        entry.payments = [
+          ...(entry.payments as Record<string, unknown>[]),
+          {
+            id: 'pay2',
+            kind: 'session_fee',
+            provider: 'mtn_momo_direct',
+            ourRef: 'f00dcafe-0000-4000-8000-000000000002',
+            providerRef: null,
+            method: null,
+            amountRwf: totals.outstandingRwf,
+            status: 'initiated',
+            failureReason: null,
+            initiatedAt: NOW.toISOString(),
+            settledAt: null,
+            refundedAt: null,
+            refundReference: null,
+            canRecordRefund: false,
+          },
+        ]
+        await route.fulfill({ json: { booking: entry } })
+        return
+      }
+
+      // Task 21: the link on his own host, and the email that hands it over.
+      // `/delivery/send` has a slash in it, so it is matched on its own.
+      const delivery = /^\/api\/admin\/bookings\/([^/]+)\/delivery(\/send)?$/.exec(path)
+      const deliverable = delivery === null ? undefined : find(delivery[1] ?? '')
+      if (deliverable !== undefined && method === 'PUT') {
+        const current = deliverable.delivery as { sentAt: string | null }
+        deliverable.delivery = {
+          url: String(body?.url ?? ''),
+          // Omitted, the API dates it: NOW plus ninety days (spec A-8).
+          expiresOn: body?.expiresOn === undefined ? DEFAULT_EXPIRY : String(body.expiresOn),
+          sentAt: current.sentAt,
+          note: body?.note === undefined ? null : (body.note as string | null),
+        }
+        deliverable.actions = { ...(deliverable.actions as Record<string, unknown>), canSendDelivery: true }
+        await route.fulfill({ json: { booking: deliverable } })
+        return
+      }
+      if (deliverable !== undefined && method === 'POST' && delivery?.[2] !== undefined) {
+        deliverable.delivery = { ...(deliverable.delivery as Record<string, unknown>), sentAt: NOW.toISOString() }
+        await route.fulfill({ json: { booking: deliverable } })
         return
       }
 
@@ -182,6 +309,15 @@ async function mockApi(page: Page) {
     },
   )
   return writes
+}
+
+/** Signs in and lands on the admin area, session in sessionStorage. */
+async function signIn(page: Page) {
+  await page.goto('/admin/login')
+  await page.getByLabel('Email').fill('photographer@bookly.example')
+  await page.getByLabel('Password').fill('dev-only-change-me-123')
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await page.getByRole('navigation', { name: 'Admin' }).waitFor()
 }
 
 test.beforeEach(async ({ page }) => {
@@ -252,4 +388,86 @@ test('signs in, filters the list, moves a booking and then cancels it', async ({
   // And the list shows the money owed back.
   await page.getByRole('link', { name: 'All bookings' }).click()
   await expect(page.getByText('20,000 RWF to refund')).toBeVisible()
+})
+
+/**
+ * The post-shoot sequence (plan.md Task 20; spec §3.5 steps 2-3): the shoot is
+ * done, an add-on goes on, the total and what is outstanding both rise by it,
+ * and the session fee is requested for that new figure.
+ */
+test('adds a post-shoot add-on to a completed booking and requests the session fee', async ({ page }) => {
+  const writes = await mockApi(page, { completed: true })
+  await signIn(page)
+
+  await page.goto('/admin/bookings/b1')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('BKY-2701-00042')
+
+  const money = page.locator('section').filter({ has: page.getByRole('heading', { level: 2, name: 'Money' }) })
+  await expect(money).toContainText('Total40,000 RWF')
+  await expect(money).toContainText('Still to pay20,000 RWF')
+
+  // The picker offers what the catalogue sells for this service.
+  const picker = page.getByLabel('Add-on')
+  await expect(picker).toBeVisible()
+  await picker.selectOption(PRINTS_ID)
+  await page.getByRole('button', { name: 'Add to the booking' }).click()
+
+  await expect(money).toContainText('Twenty prints (added after the shoot)15,000 RWF')
+  await expect(money).toContainText('Total55,000 RWF')
+  await expect(money).toContainText('Still to pay35,000 RWF')
+  expect(writes.at(-1)).toMatchObject({
+    method: 'POST',
+    path: '/api/admin/bookings/b1/addons',
+    body: { addonId: PRINTS_ID, quantity: 1 },
+  })
+
+  // And the request is made for the figure the add-on left behind.
+  await page.getByRole('button', { name: 'Request 35,000 RWF session fee' }).click()
+
+  const payments = page.locator('section').filter({ has: page.getByRole('heading', { level: 2, name: 'Payments' }) })
+  await expect(payments).toContainText('Session fee')
+  await expect(payments).toContainText('35,000 RWF')
+  await expect(payments).toContainText('Started')
+  expect(writes.at(-1)).toMatchObject({ method: 'POST', path: '/api/admin/bookings/b1/session-fee', body: {} })
+})
+
+/**
+ * The delivery (plan.md Task 21; spec §3.5 steps 5-6, §6.20): the link on his
+ * own host goes on the booking, and sending it is a second, separate act --
+ * which the screen then offers again, for the email that never arrived.
+ */
+test('saves the delivery link on a completed booking and sends the photos', async ({ page }) => {
+  const writes = await mockApi(page, { completed: true })
+  await signIn(page)
+
+  await page.goto('/admin/bookings/b1')
+  const photos = page.locator('section').filter({ has: page.getByRole('heading', { level: 2, name: 'The photos' }) })
+  await expect(photos).toContainText('Nothing has been sent to the client yet.')
+  // Nothing to send until a link is saved.
+  await expect(page.getByRole('button', { name: 'Send the photos' })).toHaveCount(0)
+
+  await page.getByLabel('Link to the photos').fill(DELIVERY_LINK)
+  await page.getByLabel('A line for the client (optional)').fill('The raw files are in the second folder.')
+  await page.getByRole('button', { name: 'Save the link' }).click()
+
+  await expect(page.getByRole('button', { name: 'Send the photos' })).toBeVisible()
+  expect(writes.at(-1)).toMatchObject({
+    method: 'PUT',
+    path: '/api/admin/bookings/b1/delivery',
+    body: { url: DELIVERY_LINK, note: 'The raw files are in the second folder.' },
+    authorization: `Bearer ${TOKEN}`,
+  })
+  // The date was left blank, so the API dated it rather than the browser.
+  expect(writes.at(-1)?.body).not.toHaveProperty('expiresOn')
+
+  await page.getByRole('button', { name: 'Send the photos' }).click()
+
+  // NOW is 08:00Z, which is 10:00 in Kigali, though the browser is in New York.
+  await expect(photos).toContainText('Last sent')
+  await expect(photos).toContainText('7 Oct 2026, 10:00')
+  await expect(page.getByRole('button', { name: 'Send again' })).toBeVisible()
+  expect(writes.at(-1)).toMatchObject({ method: 'POST', path: '/api/admin/bookings/b1/delivery/send', body: {} })
+
+  // And nothing anywhere claims to know how often the photos were fetched.
+  await expect(photos).not.toContainText(/downloaded|downloads/i)
 })

@@ -281,7 +281,8 @@
         "money": "Money",
         "payments": "Payments",
         "actions": "Actions",
-        "messages": "Messages sent"
+        "messages": "Messages sent",
+        "delivery": "The photos"
       },
       "labels": {
         "when": "When",
@@ -372,7 +373,9 @@
         "validation_failed": "Check what you entered and try again.",
         "already_paid": "The client has already paid for this. Refund it rather than removing it.",
         "nothing_to_pay": "There is nothing left to pay on this booking.",
-        "in_progress": "The client is paying right now. Wait for that to finish."
+        "in_progress": "The client is paying right now. Wait for that to finish.",
+        "too_large": "That would make the booking worth more than the system can hold.",
+        "no_link": "Save a link to the photos first."
       },
       "addons": {
         "title": "Add-ons from the shoot",
@@ -383,11 +386,24 @@
         "remove": "Remove",
         "loading": "Loading the add-ons…",
         "none": "No add-ons are on sale for this service.",
-        "note": "Adding one raises what the client owes. Ask for it with the session fee below."
+        "note": "Adding one raises what the client owes. Ask for it with the session fee below.",
+        "loadFailed": "We could not load the add-ons. Check your connection and try again."
       },
       "sessionFee": {
         "request": "Request {{amount}} session fee",
         "note": "Emails the client the amount and a fresh link to pay it. The amount is fixed when you ask, so add every add-on first."
+      },
+      "delivery": {
+        "url": "Link to the photos",
+        "expires": "Link expires",
+        "expiresHint": "Left blank, the client gets 90 days from today.",
+        "note": "A line for the client (optional)",
+        "note_hint": "Saving only stores the link. The client hears nothing until you send it.",
+        "save": "Save the link",
+        "send": "Send the photos",
+        "sendAgain": "Send again",
+        "sent": "Last sent",
+        "unsent": "Nothing has been sent to the client yet."
       }
     }
   },

@@ -59,6 +59,10 @@ export type AdminBookingView = {
     canEditAddons: boolean;
     /** There is money left to ask for, on a booking that can still owe it. */
     canRequestSessionFee: boolean;
+    /** The delivery link and its expiry, once the shoot has happened (spec §3.5 step 5). */
+    canEditDelivery: boolean;
+    /** There is a link to send (spec §3.5 step 6, §6.20). */
+    canSendDelivery: boolean;
   };
 };
 
@@ -178,6 +182,8 @@ export function adminBookingView(booking: AdminBooking, now: Date): AdminBooking
       canResendLink: booking.confirmedAt !== null,
       canEditAddons: editableAddons,
       canRequestSessionFee: totals.outstandingRwf > 0 && (booking.status === 'confirmed' || booking.status === 'completed'),
+      canEditDelivery: editableAddons,
+      canSendDelivery: editableAddons && booking.deliveryUrl !== null,
     },
   };
 }

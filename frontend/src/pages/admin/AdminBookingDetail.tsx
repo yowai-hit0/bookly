@@ -208,6 +208,15 @@ export function AdminBookingDetail() {
 
       <Payments booking={booking} busy={busy} onRefund={(paymentId, reference) => act(() => bookingsApi.recordRefund(paymentId, reference))} />
 
+      {(actions.canEditDelivery || booking.delivery.url !== null) && (
+        <DeliveryForm
+          booking={booking}
+          busy={busy}
+          onSave={(body) => act(() => bookingsApi.saveDelivery(booking.id, body))}
+          onSend={() => act(() => bookingsApi.sendDelivery(booking.id))}
+        />
+      )}
+
       <Section title={t('admin:booking.sections.actions')}>
         <div className="flex flex-col gap-4">
           {actions.canReschedule && <RescheduleForm booking={booking} busy={busy} onSubmit={(startsAt) => act(() => bookingsApi.reschedule(booking.id, startsAt))} />}
@@ -380,6 +389,106 @@ function RefundForm({
 }
 
 /**
+ * The photos, once the shoot is done (plan.md Task 21; spec §3.5 steps 5-7,
+ * §6.20): the link on his own host, the day it stops working, and the email
+ * that hands the client both.
+ *
+ * Saving is not sending. He pastes the link, checks it opens, and sends when
+ * he is ready -- and can send again whenever a link is replaced or an email
+ * goes astray. The date is left blank to take the default the API dates it
+ * with (today plus 90 days, spec A-8).
+ */
+function DeliveryForm({
+  booking,
+  busy,
+  onSave,
+  onSend,
+}: {
+  booking: AdminBooking
+  busy: boolean
+  onSave: (body: { url: string; expiresOn?: string; note?: string | null }) => Promise<void>
+  onSend: () => Promise<void>
+}) {
+  const { t } = useTranslation()
+  const fieldId = useId()
+  const { delivery, actions } = booking
+  const [url, setUrl] = useState(delivery.url ?? '')
+  const [expiresOn, setExpiresOn] = useState(delivery.expiresOn ?? '')
+  const [note, setNote] = useState(delivery.note ?? '')
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (url.trim() === '') return
+    void onSave({
+      url: url.trim(),
+      ...(expiresOn === '' ? {} : { expiresOn }),
+      note: note.trim() === '' ? null : note.trim(),
+    })
+  }
+
+  return (
+    <Section title={t('admin:booking.sections.delivery')}>
+      {delivery.sentAt === null ? (
+        <p className="text-muted-foreground text-sm">{t('admin:booking.delivery.unsent')}</p>
+      ) : (
+        <Line term={t('admin:booking.delivery.sent')}>{formatDateTime(delivery.sentAt)}</Line>
+      )}
+
+      {actions.canEditDelivery ? (
+        <form onSubmit={submit} className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`${fieldId}url`}>{t('admin:booking.delivery.url')}</Label>
+            <Input
+              id={`${fieldId}url`}
+              type="url"
+              inputMode="url"
+              placeholder="https://"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={`${fieldId}expires`}>{t('admin:booking.delivery.expires')}</Label>
+              <Input
+                id={`${fieldId}expires`}
+                type="date"
+                value={expiresOn}
+                onChange={(event) => setExpiresOn(event.target.value)}
+                className="w-44"
+              />
+            </div>
+            <p className="text-muted-foreground text-xs">{t('admin:booking.delivery.expiresHint')}</p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`${fieldId}note`}>{t('admin:booking.delivery.note')}</Label>
+            <Textarea id={`${fieldId}note`} rows={2} value={note} onChange={(event) => setNote(event.target.value)} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" variant="outline" size="sm" aria-disabled={busy}>
+              {t('admin:booking.delivery.save')}
+            </Button>
+            {actions.canSendDelivery && (
+              <Button type="button" size="sm" aria-disabled={busy} onClick={() => void onSend()}>
+                {t(delivery.sentAt === null ? 'admin:booking.delivery.send' : 'admin:booking.delivery.sendAgain')}
+              </Button>
+            )}
+          </div>
+          <p className="text-muted-foreground text-xs">{t('admin:booking.delivery.note_hint')}</p>
+        </form>
+      ) : (
+        <>
+          <Line term={t('admin:booking.delivery.url')}>{delivery.url}</Line>
+          {delivery.expiresOn !== null && (
+            <Line term={t('admin:booking.delivery.expires')}>{formatDate(delivery.expiresOn)}</Line>
+          )}
+        </>
+      )}
+    </Section>
+  )
+}
+
+/**
  * The post-shoot add-on picker: what he sells for this service, priced by the
  * catalogue. The API prices it again from the same rows -- a quantity and an id
  * are all that travel, so no amount typed here can decide what a client owes.
@@ -395,7 +504,7 @@ function AddonForm({
 }) {
   const { t } = useTranslation()
   const fieldId = useId()
-  const [choices, setChoices] = useState<AdminAddon[] | null>(null)
+  const [choices, setChoices] = useState<AdminAddon[] | 'failed' | null>(null)
   const [addonId, setAddonId] = useState('')
   const [quantity, setQuantity] = useState('1')
 
@@ -410,7 +519,7 @@ function AddonForm({
         setChoices([...own, ...catalogue.sharedAddons].filter((addon) => addon.isActive))
       })
       .catch(() => {
-        if (!cancelled) setChoices([])
+        if (!cancelled) setChoices('failed')
       })
     return () => {
       cancelled = true
@@ -421,6 +530,15 @@ function AddonForm({
     return (
       <p className="text-muted-foreground text-sm" role="status">
         {t('admin:booking.addons.loading')}
+      </p>
+    )
+  }
+  // A list that would not load is not a list of nothing: saying he sells no
+  // add-ons when the request failed would be a plain untruth.
+  if (choices === 'failed') {
+    return (
+      <p className="text-destructive text-sm" role="alert">
+        {t('admin:booking.addons.loadFailed')}
       </p>
     )
   }

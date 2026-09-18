@@ -702,6 +702,90 @@ describe('the photos (spec §6.20)', () => {
 
     expect(screen.queryByRole('heading', { name: 'Your photos' })).not.toBeInTheDocument()
   })
+
+  /**
+   * The one link on this page that leaves the site: it opens the
+   * photographer's own host (spec A-7), in its own tab, and carries neither the
+   * referrer nor a handle back to this window.
+   */
+  it('opens the external host in a new tab, with no referrer and no opener', async () => {
+    stubApi({
+      booking: () =>
+        json({
+          booking: {
+            ...PAID,
+            delivery: { url: 'https://photos.example-host.com/s/abc123', expiresOn: '2027-01-01', expired: false, note: null },
+          },
+        }),
+    })
+    await renderLoaded()
+
+    const link = screen.getByRole('link', { name: 'Open your photos' })
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noreferrer noopener')
+  })
+
+  it('states whatever expiry date the API sent, in words', async () => {
+    stubApi({
+      booking: () =>
+        json({
+          booking: {
+            ...PAID,
+            delivery: { url: 'https://photos.example-host.com/s/abc123', expiresOn: '2027-03-15', expired: false, note: null },
+          },
+        }),
+    })
+    await renderLoaded()
+
+    expect(screen.getByText('This link works until Monday, 15 March 2027.')).toBeInTheDocument()
+  })
+
+  it('says nothing about a date the API did not set', async () => {
+    stubApi({
+      booking: () =>
+        json({
+          booking: {
+            ...PAID,
+            delivery: { url: 'https://photos.example-host.com/s/abc123', expiresOn: null, expired: false, note: null },
+          },
+        }),
+    })
+    await renderLoaded()
+
+    expect(screen.getByRole('link', { name: 'Open your photos' })).toBeInTheDocument()
+    expect(screen.queryByText(/This link works until/)).not.toBeInTheDocument()
+  })
+
+  it('keeps the photographer’s note beside the expired notice, so they know who to ask', async () => {
+    stubApi({
+      booking: () =>
+        json({
+          booking: { ...PAID, delivery: { url: null, expiresOn: '2026-01-01', expired: true, note: 'Ask me any time.' } },
+        }),
+    })
+    await renderLoaded()
+
+    const photos = screen.getByRole('heading', { name: 'Your photos' }).closest('section')
+    expect(photos).toHaveTextContent('Ask me any time.')
+    expect(photos).toHaveTextContent('This link has expired. Contact the photographer for a new one.')
+  })
+
+  /** The files live on someone else's host, so nothing here can count a download (data-model_v2.md §5.9). */
+  it('never tells the client how many times the photos were downloaded', async () => {
+    stubApi({
+      booking: () =>
+        json({
+          booking: {
+            ...PAID,
+            delivery: { url: 'https://photos.example-host.com/s/abc123', expiresOn: '2027-01-01', expired: false, note: 'Thank you!' },
+          },
+        }),
+    })
+    await renderLoaded()
+
+    const photos = screen.getByRole('heading', { name: 'Your photos' }).closest('section')
+    expect(photos?.textContent ?? '').not.toMatch(/downloaded|downloads|times/i)
+  })
 })
 
 // --- Failing to load ----------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import { bookingTotals } from '../booking/totals.js';
 import { type PaymentMethod, type PaymentProvider, PaymentProviderError } from './provider.js';
 
@@ -32,12 +32,28 @@ export const PROVIDER_CALL_TIMEOUT_MS = 30_000;
  * How long an `initiated` session fee may still be an attempt in progress.
  *
  * The provider is called outside the transaction, so a second tap can find a
- * row whose call has not answered yet -- but only while that call could still
- * be running. Past it, an `initiated` session fee is not an attempt at all: it
- * is the photographer's request (payments/session-fee.ts), sitting there
- * precisely so the client can pay the amount it froze.
+ * row whose call has not answered yet. Only an attempt, though: a row the
+ * photographer asked for (payments/session-fee.ts) is never a call in flight,
+ * however new it is -- it sits there precisely so the client can pay the amount
+ * it froze, often within seconds of the email arriving.
  */
-const CALL_IN_FLIGHT_SECONDS = PROVIDER_CALL_TIMEOUT_MS / 1000;
+export const CALL_IN_FLIGHT_SECONDS = PROVIDER_CALL_TIMEOUT_MS / 1000;
+
+/**
+ * Whether a session-fee row is an ask the client was emailed, rather than an
+ * attempt somebody started: the request email names the payment it asks for.
+ *
+ * Written as SQL both readers share (payments/session-fee.ts writes the row and
+ * the message in one transaction, so the two are never seen apart).
+ */
+const REQUESTED = Prisma.sql`
+  EXISTS (
+    SELECT 1
+      FROM outbox o
+     WHERE o.booking_id = p.booking_id
+       AND o.template = 'session_fee_request'
+       AND o.payload->>'paymentId' = p.id::text
+  )`;
 const FAILURE_REASON_MAX_LENGTH = 500;
 
 export type StartPaymentDeps = {
@@ -168,17 +184,27 @@ export async function startSessionFeePayment(
     // The window is the database's, as the booking fee's is: an app clock that
     // drifts from it must not decide whether an attempt is still in flight.
     const attempts = await tx.$queryRaw<
-      { id: string; our_ref: string; status: string; amount_rwf: number; provider: string; recent: boolean; in_flight: boolean }[]
+      {
+        id: string;
+        our_ref: string;
+        status: string;
+        amount_rwf: number;
+        provider: string;
+        recent: boolean;
+        in_flight: boolean;
+        requested: boolean;
+      }[]
     >`
-      SELECT id::text AS id, our_ref::text AS our_ref, status, amount_rwf, provider,
-             initiated_at > now() - make_interval(secs => ${PAYMENT_ATTEMPT_WINDOW_SECONDS}::double precision) AS recent,
-             initiated_at > now() - make_interval(secs => ${CALL_IN_FLIGHT_SECONDS}::double precision) AS in_flight
-        FROM payment
-       WHERE booking_id = ${booking.id}::uuid
-         AND kind = 'session_fee'
-       ORDER BY initiated_at DESC
+      SELECT p.id::text AS id, p.our_ref::text AS our_ref, p.status, p.amount_rwf, p.provider,
+             p.initiated_at > now() - make_interval(secs => ${PAYMENT_ATTEMPT_WINDOW_SECONDS}::double precision) AS recent,
+             p.initiated_at > now() - make_interval(secs => ${CALL_IN_FLIGHT_SECONDS}::double precision) AS in_flight,
+             ${REQUESTED} AS requested
+        FROM payment p
+       WHERE p.booking_id = ${booking.id}::uuid
+         AND p.kind = 'session_fee'
+       ORDER BY p.initiated_at DESC
        LIMIT 1
-         FOR UPDATE`;
+         FOR UPDATE OF p`;
     const latest = attempts[0];
     // A prompt still on the payer's phone blocks a second one -- but only while
     // it can still be answered. A `pending` row nothing ever settles would
@@ -188,14 +214,20 @@ export async function startSessionFeePayment(
     }
     // An `initiated` row young enough that its provider call may still be
     // running is that call, not a second one: prompting again here is how a
-    // fee gets paid twice. Older than that, it is a request to be paid.
-    if (latest !== undefined && latest.in_flight && latest.status === 'initiated') {
+    // fee gets paid twice. An ask is never that call, however new: it is the
+    // row this payment is meant to settle.
+    if (latest !== undefined && latest.in_flight && latest.status === 'initiated' && !latest.requested) {
       return { status: 'in_progress', ourRef: latest.our_ref };
     }
     // The photographer's request, made and never attempted: its amount is the
-    // one the client was asked for, whatever has changed since (spec §6.15).
+    // one the client was asked for, whatever has been added since (spec §6.15).
+    //
+    // Not what has been *taken off*, though: a request left asking for more
+    // than the booking is now worth is stale, and billing it would overpay the
+    // client by construction. That opens a fresh attempt for what is really
+    // owed, which is also the figure their own page is showing them.
     // Never a row recorded against another provider (spec §6.18).
-    if (latest?.status === 'initiated' && latest.provider === provider.id) {
+    if (latest?.status === 'initiated' && latest.provider === provider.id && latest.amount_rwf <= outstandingRwf) {
       return { status: 'opened', paymentId: latest.id, ourRef: latest.our_ref, amountRwf: latest.amount_rwf };
     }
 

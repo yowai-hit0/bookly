@@ -560,6 +560,10 @@ async function receipt(
       totalRwf: totals.grandTotalRwf,
       paidRwf: totals.collectedRwf,
       outstandingRwf: totals.outstandingRwf,
+      // `outstandingRwf` is floored at nought, so money over the total would
+      // otherwise read as "paid in full" with nothing said about the
+      // difference the photographer has just been told to refund (§6.16).
+      overpaidRwf: Math.max(totals.collectedRwf - totals.grandTotalRwf, 0),
       accessToken: null,
     },
   });

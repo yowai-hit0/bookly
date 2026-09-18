@@ -30,6 +30,8 @@ export const paymentReceipt = defineTemplate({
     totalRwf: amountRwf,
     paidRwf: amountRwf,
     outstandingRwf: amountRwf,
+    /** Money received over the total, which the photographer refunds by hand (spec §6.16). */
+    overpaidRwf: amountRwf.default(0),
     /**
      * Null where the plaintext no longer exists (data-model_v2.md §5.9): the
      * receipt then names the link the client already has, rather than costing
@@ -67,9 +69,11 @@ export const paymentReceipt = defineTemplate({
             { label: tr(ctx, 'email:common.labels.outstanding'), value: money(p.outstandingRwf) },
           ],
         },
-        ...(p.outstandingRwf === 0
-          ? [{ type: 'paragraph' as const, text: tr(ctx, 'email:paymentReceipt.paidInFull') }]
-          : []),
+        ...(p.overpaidRwf > 0
+          ? [{ type: 'paragraph' as const, text: tr(ctx, 'email:paymentReceipt.overpaid', { amount: money(p.overpaidRwf) }) }]
+          : p.outstandingRwf === 0
+            ? [{ type: 'paragraph' as const, text: tr(ctx, 'email:paymentReceipt.paidInFull') }]
+            : []),
         ...(p.accessToken === null
           ? [{ type: 'paragraph' as const, text: tr(ctx, 'email:paymentReceipt.sameLink') }]
           : ([{ type: 'button', label: tr(ctx, 'email:common.viewBooking'), href: bookingLink(ctx, p.accessToken) }] satisfies Block[])),

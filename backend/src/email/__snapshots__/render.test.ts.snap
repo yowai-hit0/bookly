@@ -783,6 +783,137 @@ https://bookly.example/booking/Zx9Q2mT7vL4pR8sK1nB6yH3cF5dG0wJe
 Bookly, Kigali. All times are Kigali time (UTC+2)."
 `;
 
+exports[`payment_receipt with and without an access token > matches its snapshot for a part payment that leaves money outstanding > html 1`] = `
+"<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Payment received: 20,000 RWF for BKY-2610-7K3MQ</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;">
+<span style="display:none;max-height:0;overflow:hidden;opacity:0;">Thank you. We have received 20,000 RWF.</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;color:#18181b;">
+<tr><td style="padding:24px 28px 0;font-size:14px;font-weight:600;letter-spacing:0.04em;color:#71717a;">Bookly</td></tr>
+<tr><td style="padding:8px 28px 28px;font-size:15px;line-height:1.55;">
+<h1 style="margin:12px 0 16px;font-size:22px;line-height:1.3;">Thank you, your payment has arrived</h1>
+<p style="margin:0 0 14px;">Hello Aline Uwase,</p>
+<p style="margin:0 0 14px;">This email is your receipt for the session fee of 20,000 RWF.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 18px;border-top:1px solid #e4e4e7;">
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Booking reference</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">BKY-2610-7K3MQ</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Service</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">Portrait, Standard</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Payment for</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">Session fee</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Amount</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">20,000 RWF</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Paid on</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">15 Jan 2026, 23:30 (Kigali time)</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Payment reference</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">PAY-7F3K9Q</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Total</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">45,000 RWF</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Paid</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">38,000 RWF</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Still to pay</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">7,000 RWF</td></tr>
+</table>
+<p style="margin:0 0 14px;">Your booking link has not changed: the one in your confirmation email still opens this booking.</p>
+</td></tr>
+</table>
+<p style="max-width:560px;margin:16px auto 0;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;font-size:12px;line-height:1.5;color:#71717a;">Bookly, Kigali. All times are Kigali time (UTC+2).</p>
+</td></tr>
+</table>
+</body>
+</html>"
+`;
+
+exports[`payment_receipt with and without an access token > matches its snapshot for a part payment that leaves money outstanding > subject 1`] = `"Payment received: 20,000 RWF for BKY-2610-7K3MQ"`;
+
+exports[`payment_receipt with and without an access token > matches its snapshot for a part payment that leaves money outstanding > text 1`] = `
+"Thank you, your payment has arrived
+
+Hello Aline Uwase,
+
+This email is your receipt for the session fee of 20,000 RWF.
+
+Booking reference: BKY-2610-7K3MQ
+Service: Portrait, Standard
+Payment for: Session fee
+Amount: 20,000 RWF
+Paid on: 15 Jan 2026, 23:30 (Kigali time)
+Payment reference: PAY-7F3K9Q
+Total: 45,000 RWF
+Paid: 38,000 RWF
+Still to pay: 7,000 RWF
+
+Your booking link has not changed: the one in your confirmation email still opens this booking.
+
+--
+Bookly, Kigali. All times are Kigali time (UTC+2)."
+`;
+
+exports[`payment_receipt with and without an access token > matches its snapshot without a token > html 1`] = `
+"<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Payment received: 27,000 RWF for BKY-2610-7K3MQ</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;">
+<span style="display:none;max-height:0;overflow:hidden;opacity:0;">Thank you. We have received 27,000 RWF.</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;color:#18181b;">
+<tr><td style="padding:24px 28px 0;font-size:14px;font-weight:600;letter-spacing:0.04em;color:#71717a;">Bookly</td></tr>
+<tr><td style="padding:8px 28px 28px;font-size:15px;line-height:1.55;">
+<h1 style="margin:12px 0 16px;font-size:22px;line-height:1.3;">Thank you, your payment has arrived</h1>
+<p style="margin:0 0 14px;">Hello Aline Uwase,</p>
+<p style="margin:0 0 14px;">This email is your receipt for the session fee of 27,000 RWF.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 18px;border-top:1px solid #e4e4e7;">
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Booking reference</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">BKY-2610-7K3MQ</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Service</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">Portrait, Standard</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Payment for</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">Session fee</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Amount</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">27,000 RWF</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Paid on</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">15 Jan 2026, 23:30 (Kigali time)</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Payment reference</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">PAY-7F3K9Q</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Total</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">45,000 RWF</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Paid</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">45,000 RWF</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Still to pay</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">0 RWF</td></tr>
+</table>
+<p style="margin:0 0 14px;">Your booking is now paid in full.</p>
+<p style="margin:0 0 14px;">Your booking link has not changed: the one in your confirmation email still opens this booking.</p>
+</td></tr>
+</table>
+<p style="max-width:560px;margin:16px auto 0;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;font-size:12px;line-height:1.5;color:#71717a;">Bookly, Kigali. All times are Kigali time (UTC+2).</p>
+</td></tr>
+</table>
+</body>
+</html>"
+`;
+
+exports[`payment_receipt with and without an access token > matches its snapshot without a token > subject 1`] = `"Payment received: 27,000 RWF for BKY-2610-7K3MQ"`;
+
+exports[`payment_receipt with and without an access token > matches its snapshot without a token > text 1`] = `
+"Thank you, your payment has arrived
+
+Hello Aline Uwase,
+
+This email is your receipt for the session fee of 27,000 RWF.
+
+Booking reference: BKY-2610-7K3MQ
+Service: Portrait, Standard
+Payment for: Session fee
+Amount: 27,000 RWF
+Paid on: 15 Jan 2026, 23:30 (Kigali time)
+Payment reference: PAY-7F3K9Q
+Total: 45,000 RWF
+Paid: 45,000 RWF
+Still to pay: 0 RWF
+
+Your booking is now paid in full.
+
+Your booking link has not changed: the one in your confirmation email still opens this booking.
+
+--
+Bookly, Kigali. All times are Kigali time (UTC+2)."
+`;
+
 exports[`photo_delivery > matches its snapshot > html 1`] = `
 "<!doctype html>
 <html lang="en">
