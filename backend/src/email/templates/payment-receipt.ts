@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { formatDateTime } from '../../format.js';
+import type { Block } from '../layout.js';
 import {
   accessToken,
   amountRwf,
@@ -29,7 +30,12 @@ export const paymentReceipt = defineTemplate({
     totalRwf: amountRwf,
     paidRwf: amountRwf,
     outstandingRwf: amountRwf,
-    accessToken,
+    /**
+     * Null where the plaintext no longer exists (data-model_v2.md §5.9): the
+     * receipt then names the link the client already has, rather than costing
+     * them their working one (spec §6.21).
+     */
+    accessToken: accessToken.nullable().default(null),
   }),
   compose(p, ctx) {
     const amount = money(p.amountRwf);
@@ -64,7 +70,9 @@ export const paymentReceipt = defineTemplate({
         ...(p.outstandingRwf === 0
           ? [{ type: 'paragraph' as const, text: tr(ctx, 'email:paymentReceipt.paidInFull') }]
           : []),
-        { type: 'button', label: tr(ctx, 'email:common.viewBooking'), href: bookingLink(ctx, p.accessToken) },
+        ...(p.accessToken === null
+          ? [{ type: 'paragraph' as const, text: tr(ctx, 'email:paymentReceipt.sameLink') }]
+          : ([{ type: 'button', label: tr(ctx, 'email:common.viewBooking'), href: bookingLink(ctx, p.accessToken) }] satisfies Block[])),
       ],
     };
   },

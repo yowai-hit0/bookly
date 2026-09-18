@@ -7,11 +7,14 @@ export class ApiError extends Error {
   readonly status: number
   /** The fields a 422 `validation_failed` names; empty otherwise. */
   readonly fields: readonly string[]
+  /** The refusal's own body: a 409 carries the row it refused, already rendered. */
+  readonly body: unknown
 
-  constructor(status: number, code: string, fields: readonly string[] = []) {
+  constructor(status: number, code: string, fields: readonly string[] = [], body: unknown = null) {
     super(code)
     this.status = status
     this.fields = fields
+    this.body = body
   }
 }
 
@@ -59,7 +62,7 @@ async function apiError(res: Response): Promise<ApiError> {
     const body = (await res.json()) as { error?: unknown; fields?: unknown }
     const code = typeof body.error === 'string' ? body.error : `http_${res.status}`
     const fields = Array.isArray(body.fields) ? body.fields.filter((f): f is string => typeof f === 'string') : []
-    return new ApiError(res.status, code, fields)
+    return new ApiError(res.status, code, fields, body)
   } catch {
     return new ApiError(res.status, `http_${res.status}`)
   }

@@ -71,7 +71,8 @@
       "preheader": "Thank you. We have received {{amount}}.",
       "heading": "Thank you, your payment has arrived",
       "intro": "This email is your receipt for the {{kind}} of {{amount}}.",
-      "paidInFull": "Your booking is now paid in full."
+      "paidInFull": "Your booking is now paid in full.",
+      "sameLink": "Your booking link has not changed: the one in your confirmation email still opens this booking."
     },
     "photoDelivery": {
       "subject": "Your photos are ready ({{reference}})",

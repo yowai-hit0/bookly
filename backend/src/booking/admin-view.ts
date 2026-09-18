@@ -40,7 +40,7 @@ export type AdminBookingView = {
     rescheduledAt: string | null;
   };
   details: { locationText: string; partySize: number | null; specialRequests: string | null; consentAt: string };
-  addons: { id: string; name: string; unitPriceRwf: number; quantity: number; amountRwf: number; stage: string }[];
+  addons: { id: string; name: string; unitPriceRwf: number; quantity: number; amountRwf: number; stage: string; canRemove: boolean }[];
   money: { bookingFeeRate: number; bookingFeeRwf: number; totals: BookingTotals };
   payments: AdminPaymentView[];
   lifecycle: { confirmedAt: string | null; completedAt: string | null; cancelledAt: string | null; cancellationReason: string | null };
@@ -49,7 +49,17 @@ export type AdminBookingView = {
   /** The per-booking message history (data-model_v2.md §5.13, spec P-28). */
   messages: { id: string; kind: string; template: string | null; recipient: string | null; status: string; attempts: number; lastError: string | null; createdAt: string; completedAt: string | null }[];
   /** What the photographer may do to it now. The API enforces these again. */
-  actions: { canReschedule: boolean; canCancel: boolean; canComplete: boolean; canMarkNoShow: boolean; canResendLink: boolean };
+  actions: {
+    canReschedule: boolean;
+    canCancel: boolean;
+    canComplete: boolean;
+    canMarkNoShow: boolean;
+    canResendLink: boolean;
+    /** Post-shoot add-ons, once the shoot is done (spec §3.5 step 2). */
+    canEditAddons: boolean;
+    /** There is money left to ask for, on a booking that can still owe it. */
+    canRequestSessionFee: boolean;
+  };
 };
 
 export type AdminPaymentView = {
@@ -76,6 +86,8 @@ export async function findAdminBooking(prisma: PrismaClient, id: string): Promis
 
 export function adminBookingView(booking: AdminBooking, now: Date): AdminBookingView {
   const shootStarted = booking.startsAt <= now;
+  const totals = bookingTotals(booking, booking.addons, booking.payments);
+  const editableAddons = booking.status === 'completed';
 
   return {
     id: booking.id,
@@ -119,11 +131,13 @@ export function adminBookingView(booking: AdminBooking, now: Date): AdminBooking
       quantity: addon.quantity,
       amountRwf: addon.amountRwf,
       stage: addon.stage,
+      // Only a post-shoot line nobody has paid for yet; the API checks again.
+      canRemove: editableAddons && addon.stage === 'post_shoot' && totals.grandTotalRwf - addon.amountRwf >= totals.collectedRwf,
     })),
     money: {
       bookingFeeRate: booking.bookingFeeRate.toNumber(),
       bookingFeeRwf: booking.bookingFeeRwf,
-      totals: bookingTotals(booking, booking.addons, booking.payments),
+      totals,
     },
     payments: booking.payments.map(adminPaymentView),
     lifecycle: {
@@ -162,6 +176,8 @@ export function adminBookingView(booking: AdminBooking, now: Date): AdminBooking
       canMarkNoShow: booking.status === 'confirmed' && shootStarted,
       // A booking that was confirmed once has a client to send a link to.
       canResendLink: booking.confirmedAt !== null,
+      canEditAddons: editableAddons,
+      canRequestSessionFee: totals.outstandingRwf > 0 && (booking.status === 'confirmed' || booking.status === 'completed'),
     },
   };
 }

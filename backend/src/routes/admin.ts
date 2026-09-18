@@ -7,6 +7,7 @@ import {
   requestPasswordReset,
 } from '../auth/admin-auth.js';
 import { adminLocals, requireAdmin } from '../auth/middleware.js';
+import type { PaymentProviderId } from '../payments/provider.js';
 import { toPublicAdmin } from '../auth/public-admin.js';
 import { blocksRouter, workingHoursRouter } from './admin-availability.js';
 import { adminBookingsRouter } from './admin-bookings.js';
@@ -48,7 +49,12 @@ const resetConfirmBody = z.object({
   newPassword: z.string().min(MIN_NEW_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH),
 });
 
-export function adminRouter(deps: AuthDeps): Router {
+export type AdminRouterDeps = AuthDeps & {
+  /** The active payment provider, when one is configured (plan.md Task 20). */
+  paymentProviderId?: PaymentProviderId;
+};
+
+export function adminRouter(deps: AdminRouterDeps): Router {
   const router = Router();
 
   // --- Unauthenticated -------------------------------------------------------
@@ -120,8 +126,14 @@ export function adminRouter(deps: AuthDeps): Router {
   // Calendar views (Task 9).
   router.use('/calendar', calendarRouter(deps.prisma, deps.now));
 
-  // Bookings: the list, one booking, and its lifecycle (Task 19).
-  router.use(adminBookingsRouter({ prisma: deps.prisma, now: deps.now }));
+  // Bookings: the list, one booking, and its lifecycle (Tasks 19, 20).
+  router.use(
+    adminBookingsRouter({
+      prisma: deps.prisma,
+      now: deps.now,
+      ...(deps.paymentProviderId === undefined ? {} : { paymentProviderId: deps.paymentProviderId }),
+    }),
+  );
 
   // Catalogue CMS (Task 10).
   router.use(catalogueRouter(deps.prisma, deps.now));

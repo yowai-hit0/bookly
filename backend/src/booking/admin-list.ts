@@ -143,6 +143,9 @@ function toRow(booking: ListedBooking): BookingListRow {
   };
 }
 
+/** What our own ids look like: anything else never reaches the uuid column. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** `<start>|<id>`, base64url. Opaque to the caller, who only hands it back. */
 export function encodeCursor(startsAt: Date, id: string): string {
   return Buffer.from(`${startsAt.toISOString()}|${id}`).toString('base64url');
@@ -153,6 +156,6 @@ export function decodeCursor(cursor: string): { startsAt: Date; id: string } | n
   const [startsAt, id, ...rest] = Buffer.from(cursor, 'base64url').toString('utf8').split('|');
   if (startsAt === undefined || id === undefined || rest.length > 0) return null;
   const at = new Date(startsAt);
-  if (Number.isNaN(at.getTime()) || !/^[0-9a-f-]{36}$/i.test(id)) return null;
+  if (Number.isNaN(at.getTime()) || !UUID.test(id)) return null;
   return { startsAt: at, id };
 }

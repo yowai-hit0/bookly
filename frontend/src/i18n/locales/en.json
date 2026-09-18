@@ -369,7 +369,25 @@
         "not_refundable": "This payment is not flagged for a refund.",
         "not_found": "This booking no longer exists.",
         "invalid_request": "Check what you entered and try again.",
-        "validation_failed": "Check what you entered and try again."
+        "validation_failed": "Check what you entered and try again.",
+        "already_paid": "The client has already paid for this. Refund it rather than removing it.",
+        "nothing_to_pay": "There is nothing left to pay on this booking.",
+        "in_progress": "The client is paying right now. Wait for that to finish."
+      },
+      "addons": {
+        "title": "Add-ons from the shoot",
+        "addon": "Add-on",
+        "choose": "Choose an add-on…",
+        "quantity": "Quantity",
+        "add": "Add to the booking",
+        "remove": "Remove",
+        "loading": "Loading the add-ons…",
+        "none": "No add-ons are on sale for this service.",
+        "note": "Adding one raises what the client owes. Ask for it with the session fee below."
+      },
+      "sessionFee": {
+        "request": "Request {{amount}} session fee",
+        "note": "Emails the client the amount and a fresh link to pay it. The amount is fixed when you ask, so add every add-on first."
       }
     }
   },

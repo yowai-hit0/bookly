@@ -1,4 +1,4 @@
-import { adminFetch } from './api'
+import { ApiError, adminFetch } from './api'
 
 /**
  * The bookings list and everything the photographer does to a booking
@@ -85,7 +85,7 @@ export type AdminBooking = {
     rescheduledAt: string | null
   }
   details: { locationText: string; partySize: number | null; specialRequests: string | null; consentAt: string }
-  addons: { id: string; name: string; unitPriceRwf: number; quantity: number; amountRwf: number; stage: string }[]
+  addons: { id: string; name: string; unitPriceRwf: number; quantity: number; amountRwf: number; stage: string; canRemove: boolean }[]
   money: { bookingFeeRate: number; bookingFeeRwf: number; totals: BookingTotals }
   payments: AdminPayment[]
   lifecycle: { confirmedAt: string | null; completedAt: string | null; cancelledAt: string | null; cancellationReason: string | null }
@@ -102,7 +102,17 @@ export type AdminBooking = {
     createdAt: string
     completedAt: string | null
   }[]
-  actions: { canReschedule: boolean; canCancel: boolean; canComplete: boolean; canMarkNoShow: boolean; canResendLink: boolean }
+  actions: {
+    canReschedule: boolean
+    canCancel: boolean
+    canComplete: boolean
+    canMarkNoShow: boolean
+    canResendLink: boolean
+    /** Post-shoot add-ons, once the shoot is done (spec §3.5 step 2). */
+    canEditAddons: boolean
+    /** There is money left to ask the client for (spec §3.5 step 3). */
+    canRequestSessionFee: boolean
+  }
 }
 
 export type BookingsFilter = {
@@ -156,10 +166,39 @@ export const bookingsApi = {
     return post(`/admin/bookings/${id}/resend-link`, {})
   },
 
+  /** A post-shoot add-on, priced from the catalogue by the API (spec §6.15). */
+  addAddon(bookingId: string, addonId: string, quantity = 1): Promise<{ booking: AdminBooking }> {
+    return post(`/admin/bookings/${bookingId}/addons`, { addonId, quantity })
+  },
+
+  removeAddon(bookingId: string, addonId: string): Promise<{ booking: AdminBooking }> {
+    return adminFetch<{ booking: AdminBooking }>(`/admin/bookings/${bookingId}/addons/${addonId}`, { method: 'DELETE' })
+  },
+
+  /** Asks the client for what is outstanding, and emails them a link (spec §3.5 step 3). */
+  requestSessionFee(bookingId: string): Promise<{ booking: AdminBooking }> {
+    return post(`/admin/bookings/${bookingId}/session-fee`, {})
+  },
+
   /** Records a refund the photographer has already sent (spec §6.16). */
   recordRefund(paymentId: string, reference: string): Promise<{ booking: AdminBooking }> {
     return post(`/admin/payments/${paymentId}/refund`, { reference })
   },
+}
+
+/**
+ * The booking a refusal carried, or null when it carried none.
+ *
+ * Every 409 renders the booking as it now stands, so the screen that asked is
+ * corrected by the same round trip that refused it -- no second read, and
+ * nothing stale left behind if that read were to fail.
+ */
+export function bookingFromRefusal(error: unknown): AdminBooking | null {
+  if (!(error instanceof ApiError)) return null
+  const body = error.body
+  if (typeof body !== 'object' || body === null || !('booking' in body)) return null
+  const booking = (body as { booking: unknown }).booking
+  return typeof booking === 'object' && booking !== null && 'id' in booking ? (booking as AdminBooking) : null
 }
 
 function post(path: string, body: unknown): Promise<{ booking: AdminBooking }> {

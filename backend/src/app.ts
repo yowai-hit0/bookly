@@ -77,7 +77,12 @@ export function createApp(options: AppOptions = {}): Express {
       }),
     );
   }
-  if (options.admin) app.use('/api/admin', adminRouter(options.admin));
+  if (options.admin) {
+    // The provider the client would pay through is the provider a session-fee
+    // request is opened against: one active provider, never two (spec §6.18).
+    const providerId = options.publicApi?.payments?.provider.id;
+    app.use('/api/admin', adminRouter({ ...options.admin, ...(providerId === undefined ? {} : { paymentProviderId: providerId }) }));
+  }
 
   app.use((_req, res) => {
     res.status(404).json({ error: 'not_found' });

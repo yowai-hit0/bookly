@@ -2,7 +2,8 @@ import { type FormEvent, type ReactNode, useEffect, useId, useState } from 'reac
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router'
 import { ApiError, UnauthenticatedError } from '@/admin/api'
-import { type AdminBooking, type AdminPayment, bookingsApi } from '@/admin/bookings'
+import { type AdminBooking, type AdminPayment, bookingFromRefusal, bookingsApi } from '@/admin/bookings'
+import { type AdminAddon, catalogueApi } from '@/admin/catalogue'
 import { kigaliDateOf } from '@/admin/calendar-dates'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -70,11 +71,15 @@ export function AdminBookingDetail() {
         return
       }
       setFailure({ code: error instanceof ApiError ? error.message : 'failed' })
-      // A refusal carries the booking it refused; re-reading it is how the
-      // screen catches up with whatever changed underneath.
+      // A refusal carries the booking it refused: that is how the screen
+      // catches up with whatever changed underneath, without asking again.
       if (error instanceof ApiError && error.status === 409) {
-        const fresh = await bookingsApi.get(id).catch(() => null)
-        if (fresh !== null) setBooking(fresh.booking)
+        const carried = bookingFromRefusal(error)
+        if (carried !== null) setBooking(carried)
+        else {
+          const fresh = await bookingsApi.get(id).catch(() => null)
+          if (fresh !== null) setBooking(fresh.booking)
+        }
       }
     } finally {
       setBusy(false)
@@ -90,19 +95,21 @@ export function AdminBookingDetail() {
       </Shell>
     )
   }
-  if (state === 'missing' || booking === null) {
-    return (
-      <Shell>
-        <h1 className="text-2xl font-semibold">{t('admin:booking.missing')}</h1>
-      </Shell>
-    )
-  }
+  // A load that failed leaves no booking either, so it is answered first:
+  // only a 404 means the booking is really gone.
   if (state === 'failed') {
     return (
       <Shell>
         <p className="text-destructive text-sm" role="alert">
           {t('admin:booking.loadFailed')}
         </p>
+      </Shell>
+    )
+  }
+  if (state === 'missing' || booking === null) {
+    return (
+      <Shell>
+        <h1 className="text-2xl font-semibold">{t('admin:booking.missing')}</h1>
       </Shell>
     )
   }
@@ -159,8 +166,25 @@ export function AdminBookingDetail() {
       <Section title={t('admin:booking.sections.money')}>
         <Line term={booking.package.name}>{formatMoney(booking.package.priceRwf)}</Line>
         {booking.addons.map((addon) => (
-          <Line key={addon.id} term={`${addon.name}${addon.stage === 'post_shoot' ? ` (${t('admin:booking.postShoot')})` : ''}`}>
-            {formatMoney(addon.amountRwf)}
+          <Line
+            key={addon.id}
+            term={`${addon.name}${addon.quantity > 1 ? ` × ${addon.quantity}` : ''}${
+              addon.stage === 'post_shoot' ? ` (${t('admin:booking.postShoot')})` : ''
+            }`}
+          >
+            <span className="flex items-center gap-3">
+              <span className="tabular-nums">{formatMoney(addon.amountRwf)}</span>
+              {addon.canRemove && (
+                <button
+                  type="button"
+                  className="text-destructive text-xs hover:underline"
+                  aria-disabled={busy}
+                  onClick={() => void act(() => bookingsApi.removeAddon(booking.id, addon.id))}
+                >
+                  {t('admin:booking.addons.remove')}
+                </button>
+              )}
+            </span>
           </Line>
         ))}
         <Line term={t('admin:booking.labels.total')}>{formatMoney(money.totals.grandTotalRwf)}</Line>
@@ -168,6 +192,17 @@ export function AdminBookingDetail() {
         <Line term={t('admin:booking.labels.outstanding')}>{formatMoney(money.totals.outstandingRwf)}</Line>
         {money.totals.refundDueRwf > 0 && (
           <Line term={t('admin:booking.labels.refundDue')}>{formatMoney(money.totals.refundDueRwf)}</Line>
+        )}
+        {actions.canEditAddons && (
+          <div className="mt-2 flex flex-col gap-2 border-t pt-3">
+            <p className="text-sm font-medium">{t('admin:booking.addons.title')}</p>
+            <AddonForm
+              serviceId={booking.service.id}
+              busy={busy}
+              onAdd={(addonId, quantity) => act(() => bookingsApi.addAddon(booking.id, addonId, quantity))}
+            />
+            <p className="text-muted-foreground text-xs">{t('admin:booking.addons.note')}</p>
+          </div>
         )}
       </Section>
 
@@ -177,6 +212,18 @@ export function AdminBookingDetail() {
         <div className="flex flex-col gap-4">
           {actions.canReschedule && <RescheduleForm booking={booking} busy={busy} onSubmit={(startsAt) => act(() => bookingsApi.reschedule(booking.id, startsAt))} />}
           {actions.canCancel && <CancelForm busy={busy} onSubmit={(reason) => act(() => bookingsApi.cancel(booking.id, reason))} />}
+          {actions.canRequestSessionFee && (
+            <div className="flex flex-col gap-2">
+              <Button
+                className="self-start"
+                aria-disabled={busy}
+                onClick={() => void act(() => bookingsApi.requestSessionFee(booking.id))}
+              >
+                {t('admin:booking.sessionFee.request', { amount: formatMoney(money.totals.outstandingRwf) })}
+              </Button>
+              <p className="text-muted-foreground text-xs">{t('admin:booking.sessionFee.note')}</p>
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
             {actions.canComplete && (
               <Button variant="outline" aria-disabled={busy} onClick={() => void act(() => bookingsApi.complete(booking.id))}>
@@ -328,6 +375,96 @@ function RefundForm({
         {t('admin:booking.refund.record', { amount: formatMoney(payment.amountRwf) })}
       </Button>
       <p className="text-muted-foreground w-full text-xs">{t('admin:booking.refund.note')}</p>
+    </form>
+  )
+}
+
+/**
+ * The post-shoot add-on picker: what he sells for this service, priced by the
+ * catalogue. The API prices it again from the same rows -- a quantity and an id
+ * are all that travel, so no amount typed here can decide what a client owes.
+ */
+function AddonForm({
+  serviceId,
+  busy,
+  onAdd,
+}: {
+  serviceId: string
+  busy: boolean
+  onAdd: (addonId: string, quantity: number) => Promise<void>
+}) {
+  const { t } = useTranslation()
+  const fieldId = useId()
+  const [choices, setChoices] = useState<AdminAddon[] | null>(null)
+  const [addonId, setAddonId] = useState('')
+  const [quantity, setQuantity] = useState('1')
+
+  useEffect(() => {
+    let cancelled = false
+    catalogueApi
+      .load()
+      .then((catalogue) => {
+        if (cancelled) return
+        // This service's own add-ons, then the ones sold with everything.
+        const own = catalogue.services.find((service) => service.id === serviceId)?.addons ?? []
+        setChoices([...own, ...catalogue.sharedAddons].filter((addon) => addon.isActive))
+      })
+      .catch(() => {
+        if (!cancelled) setChoices([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [serviceId])
+
+  if (choices === null) {
+    return (
+      <p className="text-muted-foreground text-sm" role="status">
+        {t('admin:booking.addons.loading')}
+      </p>
+    )
+  }
+  if (choices.length === 0) return <p className="text-muted-foreground text-sm">{t('admin:booking.addons.none')}</p>
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (addonId === '') return
+    void onAdd(addonId, Number(quantity) || 1)
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`${fieldId}addon`}>{t('admin:booking.addons.addon')}</Label>
+        <select
+          id={`${fieldId}addon`}
+          value={addonId}
+          onChange={(event) => setAddonId(event.target.value)}
+          className="border-input h-8 rounded-lg border bg-transparent px-2 text-sm"
+        >
+          <option value="">{t('admin:booking.addons.choose')}</option>
+          {choices.map((addon) => (
+            <option key={addon.id} value={addon.id}>
+              {addon.nameEn} · {formatMoney(addon.priceRwf)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`${fieldId}quantity`}>{t('admin:booking.addons.quantity')}</Label>
+        <Input
+          id={`${fieldId}quantity`}
+          type="number"
+          min={1}
+          max={99}
+          value={quantity}
+          onChange={(event) => setQuantity(event.target.value)}
+          className="w-20"
+        />
+      </div>
+      <Button type="submit" variant="outline" size="sm" aria-disabled={busy}>
+        {t('admin:booking.addons.add')}
+      </Button>
     </form>
   )
 }

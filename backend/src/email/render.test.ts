@@ -17,6 +17,7 @@ import {
 import { escapeHtml } from './layout.js';
 import { TEMPLATES, renderEmail } from './render.js';
 import { adminAlert } from './templates/admin-alert.js';
+import { reschedule } from './templates/reschedule.js';
 import { EmailPayloadError } from './templates/shared.js';
 
 /**
@@ -682,6 +683,90 @@ describe('content rules', () => {
     const line = email.text.split('\n').find((l) => l.startsWith('Message: ')) ?? '';
     expect(line).toMatch(/^Message: [A-Z][a-z]+( [A-Za-z]+)+$/);
     expect(email.text).not.toContain('retriesExhausted');
+  });
+});
+
+// --- The reschedule email's link (plan.md Task 19) ---------------------------------
+
+/**
+ * A reschedule issues no new token and the plaintext of the existing one was
+ * never stored (data-model_v2.md §5.9), so `accessToken` is nullable: null
+ * points the client at the link they already have, and a resend (spec §6.21) is
+ * how a lost one is replaced. The button must disappear with it -- a "view
+ * booking" link with no token would 404 the client on their own booking.
+ */
+describe('reschedule with and without an access token', () => {
+  const NO_TOKEN = { accessToken: null };
+
+  it('shows the booking-link button when a plaintext token is given', () => {
+    const email = renderFixture(emailFixture('reschedule'));
+
+    expect(hrefs(email.html)).toContain(`${FIXTURE_WEB_ORIGIN}/booking/${FIXTURE_ACCESS_TOKEN}`);
+    expect(email.text).toContain(`${FIXTURE_WEB_ORIGIN}/booking/${FIXTURE_ACCESS_TOKEN}`);
+    expect(email.html).toContain('View your booking');
+    expect(email.text).not.toContain('Your booking link has not changed');
+  });
+
+  it('says the link has not changed when there is no token, and offers none', () => {
+    const email = renderWith('reschedule', NO_TOKEN);
+
+    expect(email.text).toContain('Your booking link has not changed: the one in your confirmation email still opens this booking.');
+    expect(email.html).toContain(escapeHtml('Your booking link has not changed'));
+    expect(email.html).not.toContain('View your booking');
+    // No booking link of any kind: the only URLs left are the site's own footer.
+    expect(hrefs(email.html).filter((href) => href.includes('/booking/'))).toEqual([]);
+    expect(urlsIn(email.text).filter((url) => url.includes('/booking/'))).toEqual([]);
+  });
+
+  it('carries no token anywhere in the subject, the text or the HTML', () => {
+    const email = renderWith('reschedule', NO_TOKEN);
+
+    for (const part of [email.subject, email.text, email.html]) {
+      expect(part).not.toContain(FIXTURE_ACCESS_TOKEN);
+      expect(part).not.toMatch(/accessToken|access_token/i);
+      expect(part).not.toContain('null');
+    }
+  });
+
+  it('still shows both the old time and the new one without a token', () => {
+    const email = renderWith('reschedule', NO_TOKEN);
+
+    expect(email.text).toContain('Was: Wednesday, 7 October 2026, 09:30 to 10:30 (Kigali time)');
+    expect(email.text).toContain('Now: Friday, 9 October 2026, 11:00 to 12:00 (Kigali time)');
+    expect(email.html).toContain('Wednesday, 7 October 2026');
+    expect(email.html).toContain('Friday, 9 October 2026');
+    expect(email.subject).toContain(FIXTURE_REFERENCE);
+  });
+
+  it('defaults a missing accessToken to null, so the payload admin-actions.ts enqueues parses', () => {
+    const { payload } = withPayload('reschedule', {});
+    const { accessToken: _dropped, ...withoutToken } = payload;
+
+    const parsed = reschedule.payload.parse(withoutToken) as { accessToken: unknown };
+
+    expect(parsed.accessToken).toBeNull();
+    expect(render('reschedule', withoutToken).text).toContain('Your booking link has not changed');
+  });
+
+  it('refuses an accessToken that is neither a token nor null', () => {
+    expect(payloadError(() => renderWith('reschedule', { accessToken: 'has spaces in it' }))).toBeInstanceOf(EmailPayloadError);
+    expect(payloadError(() => renderWith('reschedule', { accessToken: 42 }))).toBeInstanceOf(EmailPayloadError);
+  });
+
+  it('renders both shapes with no placeholder or missing translation left behind', () => {
+    for (const email of [renderFixture(emailFixture('reschedule')), renderWith('reschedule', NO_TOKEN)]) {
+      expect([email.subject, email.text, email.html].join('\n')).not.toMatch(
+        /\{\{|\}\}|\bundefined\b|\bNaN\b|\[object Object\]|\b(email|common):[a-z]/,
+      );
+    }
+  });
+
+  it('matches its snapshot without a token', () => {
+    const email = renderWith('reschedule', NO_TOKEN);
+
+    expect(email.subject).toMatchSnapshot('subject');
+    expect(email.text).toMatchSnapshot('text');
+    expect(email.html).toMatchSnapshot('html');
   });
 });
 

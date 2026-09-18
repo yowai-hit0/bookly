@@ -260,9 +260,10 @@ async function applyEvent(
 
   const settledAt = (deps.now ?? (() => new Date()))();
   if (payment.kind !== 'booking_fee') {
-    // A session fee (Task 20) is recorded; what follows from it is that task's.
+    // A session fee (Task 20): recorded, receipted, and the photographer told.
     await tx.payment.update({ where: { id: payment.id }, data: { status: 'succeeded', settledAt, ...reported } });
     await flagOverpayment(tx, logs, payment);
+    await receipt(tx, logs, payment, reported, settledAt);
     return finish('applied', 'payment_succeeded');
   }
 
@@ -506,6 +507,81 @@ async function refundDue(
       paymentReference: updated.providerRef ?? updated.ourRef,
       // The provider that took the money, not the one configured now (spec §6.18).
       provider: payment.provider,
+      startsAt: booking.startsAt.toISOString(),
+    },
+  });
+}
+
+/**
+ * The client's receipt for a session fee, and the photographer's alert that it
+ * arrived (spec §3.5 step 4, plan.md Task 20).
+ *
+ * The amounts are `bookingTotals()` as this transaction leaves them -- the
+ * payment is already `succeeded` above, so `paidRwf` includes it and
+ * `outstandingRwf` is what is genuinely left, nought on a booking now paid in
+ * full. No booking link: the plaintext of the client's token was never stored
+ * (data-model_v2.md §5.9), and the receipt names the link they already have
+ * rather than replacing a working one for a courtesy button.
+ *
+ * A booking fee is not receipted here: its confirmation email is its receipt.
+ */
+async function receipt(
+  tx: Prisma.TransactionClient,
+  logs: Record<string, unknown>[],
+  payment: PaymentRecord,
+  reported: Reported,
+  paidAt: Date,
+): Promise<void> {
+  const booking = await tx.booking.findUniqueOrThrow({
+    where: { id: payment.booking_id },
+    include: { addons: true, payments: true },
+  });
+  const totals = bookingTotals(booking, booking.addons, booking.payments);
+  const paymentReference = reported.providerRef ?? payment.provider_ref ?? payment.our_ref;
+
+  await enqueue(tx, {
+    kind: 'email',
+    template: 'payment_receipt',
+    recipient: booking.contactEmail,
+    bookingId: booking.id,
+    dedupeKey: `email:payment_receipt:${payment.id}`,
+    payload: {
+      locale: booking.locale,
+      reference: booking.reference,
+      clientName: booking.contactName,
+      serviceName: booking.serviceNameSnapshot,
+      packageName: booking.packageNameSnapshot,
+      startsAt: booking.startsAt.toISOString(),
+      endsAt: booking.endsAt.toISOString(),
+      kind: payment.kind,
+      amountRwf: payment.amount_rwf,
+      paidAt: paidAt.toISOString(),
+      paymentReference,
+      totalRwf: totals.grandTotalRwf,
+      paidRwf: totals.collectedRwf,
+      outstandingRwf: totals.outstandingRwf,
+      accessToken: null,
+    },
+  });
+
+  const admin = await adminRecipient(tx);
+  if (admin === null) {
+    logs.push({ level: 'error', event: 'payment_received_alert_skipped', reason: 'no_admin_user', paymentId: payment.id });
+    return;
+  }
+  await enqueue(tx, {
+    kind: 'email',
+    template: 'admin_alert',
+    recipient: admin,
+    dedupeKey: `email:admin_alert:payment_received:${payment.id}`,
+    payload: {
+      variant: 'payment_received',
+      reference: booking.reference,
+      clientName: booking.contactName,
+      kind: payment.kind,
+      amountRwf: payment.amount_rwf,
+      paidAt: paidAt.toISOString(),
+      outstandingRwf: totals.outstandingRwf,
       startsAt: booking.startsAt.toISOString(),
     },
   });

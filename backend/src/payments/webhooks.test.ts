@@ -711,7 +711,7 @@ describe('failures and pending events', () => {
     expect(sink.entries).toContainEqual(expect.objectContaining({ event: 'webhook_amount_mismatch', expected: 20_000, reported: 19_999 }));
   });
 
-  it('a succeeded session fee is recorded and the booking left alone', async () => {
+  it('a succeeded session fee is recorded, receipted, and the booking left alone', async () => {
     const booking = await insertBooking(prisma, world, { status: 'completed' });
     await insertPayment(prisma, booking.id, { status: 'succeeded' });
     const sessionFee = await insertPayment(prisma, booking.id, { status: 'pending', kind: 'session_fee', amountRwf: 30_000 });
@@ -722,7 +722,23 @@ describe('failures and pending events', () => {
     expect(outcome).toMatchObject({ status: 'applied', note: 'payment_succeeded' });
     expect(await paymentRow(sessionFee.id)).toMatchObject({ status: 'succeeded', settled_at: NOW });
     expect(await rowJson('booking', booking.id)).toBe(before);
-    expect(await outbox()).toEqual([]);
+
+    // Task 20: the client is receipted and the photographer told, while the
+    // booking itself does not move.
+    const [alert, receipt] = await outbox();
+    expect(alert).toMatchObject({
+      template: 'admin_alert',
+      recipient: ADMIN_EMAIL,
+      dedupe_key: `email:admin_alert:payment_received:${sessionFee.id}`,
+      payload: { variant: 'payment_received', kind: 'session_fee', amountRwf: 30_000, paidAt: NOW.toISOString(), outstandingRwf: 0 },
+    });
+    expect(receipt).toMatchObject({
+      template: 'payment_receipt',
+      recipient: CLIENT.email,
+      booking_id: booking.id,
+      dedupe_key: `email:payment_receipt:${sessionFee.id}`,
+      payload: { kind: 'session_fee', amountRwf: 30_000, paidAt: NOW.toISOString(), outstandingRwf: 0, accessToken: null },
+    });
   });
 });
 

@@ -28,6 +28,16 @@ import { type PaymentMethod, type PaymentProvider, PaymentProviderError } from '
 export const PAYMENT_ATTEMPT_WINDOW_SECONDS = 180;
 /** Past this the provider call is abandoned and the attempt recorded as failed. */
 export const PROVIDER_CALL_TIMEOUT_MS = 30_000;
+/**
+ * How long an `initiated` session fee may still be an attempt in progress.
+ *
+ * The provider is called outside the transaction, so a second tap can find a
+ * row whose call has not answered yet -- but only while that call could still
+ * be running. Past it, an `initiated` session fee is not an attempt at all: it
+ * is the photographer's request (payments/session-fee.ts), sitting there
+ * precisely so the client can pay the amount it froze.
+ */
+const CALL_IN_FLIGHT_SECONDS = PROVIDER_CALL_TIMEOUT_MS / 1000;
 const FAILURE_REASON_MAX_LENGTH = 500;
 
 export type StartPaymentDeps = {
@@ -158,10 +168,11 @@ export async function startSessionFeePayment(
     // The window is the database's, as the booking fee's is: an app clock that
     // drifts from it must not decide whether an attempt is still in flight.
     const attempts = await tx.$queryRaw<
-      { id: string; our_ref: string; status: string; amount_rwf: number; provider: string; recent: boolean }[]
+      { id: string; our_ref: string; status: string; amount_rwf: number; provider: string; recent: boolean; in_flight: boolean }[]
     >`
       SELECT id::text AS id, our_ref::text AS our_ref, status, amount_rwf, provider,
-             initiated_at > now() - make_interval(secs => ${PAYMENT_ATTEMPT_WINDOW_SECONDS}::double precision) AS recent
+             initiated_at > now() - make_interval(secs => ${PAYMENT_ATTEMPT_WINDOW_SECONDS}::double precision) AS recent,
+             initiated_at > now() - make_interval(secs => ${CALL_IN_FLIGHT_SECONDS}::double precision) AS in_flight
         FROM payment
        WHERE booking_id = ${booking.id}::uuid
          AND kind = 'session_fee'
@@ -172,7 +183,13 @@ export async function startSessionFeePayment(
     // A prompt still on the payer's phone blocks a second one -- but only while
     // it can still be answered. A `pending` row nothing ever settles would
     // otherwise lock the client out of their own payment for good.
-    if (latest !== undefined && latest.recent && (latest.status === 'pending' || latest.status === 'initiated')) {
+    if (latest !== undefined && latest.recent && latest.status === 'pending') {
+      return { status: 'in_progress', ourRef: latest.our_ref };
+    }
+    // An `initiated` row young enough that its provider call may still be
+    // running is that call, not a second one: prompting again here is how a
+    // fee gets paid twice. Older than that, it is a request to be paid.
+    if (latest !== undefined && latest.in_flight && latest.status === 'initiated') {
       return { status: 'in_progress', ourRef: latest.our_ref };
     }
     // The photographer's request, made and never attempted: its amount is the

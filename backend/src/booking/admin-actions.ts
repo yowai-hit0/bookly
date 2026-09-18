@@ -92,7 +92,9 @@ export async function rescheduleBooking(deps: AdminActionDeps, bookingId: string
             recipient: booking.contactEmail,
             bookingId: booking.id,
             // Every move is its own message: a booking may be moved twice.
-            dedupeKey: `email:reschedule:${booking.id}:${now.toISOString()}`,
+            // The target time is in the key too, so two moves that share a
+            // millisecond are still two messages rather than one silently lost.
+            dedupeKey: `email:reschedule:${booking.id}:${now.toISOString()}:${startsAt.toISOString()}`,
             payload: {
               locale: booking.locale,
               reference: booking.reference,
@@ -251,7 +253,9 @@ export async function resendAccessLink(deps: AdminActionDeps, bookingId: string)
       recipient: booking.contactEmail,
       bookingId: booking.id,
       // Each resend is its own message; the previous one stays in the history.
-      dedupeKey: `email:access_link_resend:${booking.id}:${now.toISOString()}`,
+      // Keyed by the token it carries, because a resend whose email were
+      // dropped as a duplicate would leave the client holding a dead link.
+      dedupeKey: `email:access_link_resend:${booking.id}:${hash.slice(0, 16)}`,
       payload: {
         locale: booking.locale,
         reference: booking.reference,

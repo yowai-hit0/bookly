@@ -897,6 +897,62 @@ https://bookly.example/booking/Zx9Q2mT7vL4pR8sK1nB6yH3cF5dG0wJe
 Bookly, Kigali. All times are Kigali time (UTC+2)."
 `;
 
+exports[`reschedule with and without an access token > matches its snapshot without a token > html 1`] = `
+"<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your booking BKY-2610-7K3MQ has moved to Friday, 9 October 2026</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;">
+<span style="display:none;max-height:0;overflow:hidden;opacity:0;">New time: Friday, 9 October 2026, 11:00 to 12:00 (Kigali time).</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;color:#18181b;">
+<tr><td style="padding:24px 28px 0;font-size:14px;font-weight:600;letter-spacing:0.04em;color:#71717a;">Bookly</td></tr>
+<tr><td style="padding:8px 28px 28px;font-size:15px;line-height:1.55;">
+<h1 style="margin:12px 0 16px;font-size:22px;line-height:1.3;">Your booking has a new time</h1>
+<p style="margin:0 0 14px;">Hello Aline Uwase,</p>
+<p style="margin:0 0 14px;">Your booking for Portrait has been moved. Everything else about it stays the same.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 18px;border-top:1px solid #e4e4e7;">
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Booking reference</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">BKY-2610-7K3MQ</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Service</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">Portrait, Standard</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Was</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">Wednesday, 7 October 2026, 09:30 to 10:30 (Kigali time)</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Now</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">Friday, 9 October 2026, 11:00 to 12:00 (Kigali time)</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Location</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">Kigali Heights, KG 7 Ave</td></tr>
+</table>
+<p style="margin:0 0 14px;">Your booking link has not changed: the one in your confirmation email still opens this booking.</p>
+</td></tr>
+</table>
+<p style="max-width:560px;margin:16px auto 0;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;font-size:12px;line-height:1.5;color:#71717a;">Bookly, Kigali. All times are Kigali time (UTC+2).</p>
+</td></tr>
+</table>
+</body>
+</html>"
+`;
+
+exports[`reschedule with and without an access token > matches its snapshot without a token > subject 1`] = `"Your booking BKY-2610-7K3MQ has moved to Friday, 9 October 2026"`;
+
+exports[`reschedule with and without an access token > matches its snapshot without a token > text 1`] = `
+"Your booking has a new time
+
+Hello Aline Uwase,
+
+Your booking for Portrait has been moved. Everything else about it stays the same.
+
+Booking reference: BKY-2610-7K3MQ
+Service: Portrait, Standard
+Was: Wednesday, 7 October 2026, 09:30 to 10:30 (Kigali time)
+Now: Friday, 9 October 2026, 11:00 to 12:00 (Kigali time)
+Location: Kigali Heights, KG 7 Ave
+
+Your booking link has not changed: the one in your confirmation email still opens this booking.
+
+--
+Bookly, Kigali. All times are Kigali time (UTC+2)."
+`;
+
 exports[`session_fee_request > matches its snapshot > html 1`] = `
 "<!doctype html>
 <html lang="en">

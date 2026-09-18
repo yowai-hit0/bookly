@@ -778,16 +778,36 @@ describe('a session-fee attempt still waiting on the payer', () => {
     expect((await payments()).filter((row) => row.kind === 'session_fee')).toHaveLength(1);
   });
 
-  it('blocks a new one while initiated inside the window', async () => {
+  it('blocks a new one while an initiated attempt could still be at the provider', async () => {
+    // The provider is called outside the transaction, so a row this young may
+    // be a call that has not answered yet: prompting again pays it twice.
     const booking = await owingBooking();
     const waiting = await insertPayment(prisma, booking.id, {
       status: 'initiated',
       kind: 'session_fee',
       amountRwf: 30_000,
-      ageSeconds: PAYMENT_ATTEMPT_WINDOW_SECONDS - 10,
+      ageSeconds: 5,
     });
 
     await expect(startSession(stubProvider(), booking)).resolves.toStrictEqual({ status: 'in_progress', ourRef: waiting.ourRef });
+  });
+
+  it('pays an older initiated row instead, because that is the photographer’s request (Task 20)', async () => {
+    // Nothing is calling a provider about a row this old. It is the request
+    // made from the admin screen, waiting for the client to pay what it froze.
+    const booking = await owingBooking();
+    const requested = await insertPayment(prisma, booking.id, {
+      status: 'initiated',
+      kind: 'session_fee',
+      amountRwf: 30_000,
+      ageSeconds: PAYMENT_ATTEMPT_WINDOW_SECONDS - 10,
+    });
+    const provider = stubProvider();
+
+    await expect(startSession(provider, booking)).resolves.toStrictEqual({ status: 'started', ourRef: requested.ourRef });
+    // The same row, at the amount it was asked for: no second bill.
+    expect((await payments()).filter((row) => row.kind === 'session_fee')).toHaveLength(1);
+    expect(provider.initiated).toHaveLength(1);
   });
 
   it("blocks a new one while pending inside the window", async () => {

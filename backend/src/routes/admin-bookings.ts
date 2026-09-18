@@ -3,16 +3,20 @@ import { type Response, Router } from 'express';
 import { z } from 'zod';
 import {
   type AdminActionResult,
+  type RescheduleResult,
   cancelByAdmin,
   markCompleted,
   markNoShow,
   rescheduleBooking,
   resendAccessLink,
 } from '../booking/admin-actions.js';
+import { ADDON_MAX_QUANTITY, type AddonEditResult, addPostShootAddon, removePostShootAddon } from '../booking/addons.js';
 import { BOOKINGS_MAX_PAGE_SIZE, findBookings } from '../booking/admin-list.js';
-import { adminBookingView, findAdminBooking } from '../booking/admin-view.js';
+import { type AdminBooking, adminBookingView, findAdminBooking } from '../booking/admin-view.js';
 import { BOOKING_STATUSES } from '../db/statuses.js';
+import type { PaymentProviderId } from '../payments/provider.js';
 import { recordRefund } from '../payments/refund.js';
+import { type SessionFeeResult, requestSessionFee } from '../payments/session-fee.js';
 import { kigaliDate, parseOrReject } from './validation.js';
 
 /**
@@ -32,12 +36,30 @@ import { kigaliDate, parseOrReject } from './validation.js';
  *   POST /payments/:id/refund      { reference, refundedAt? }
  *        200 { booking } | 404 | 409 not_refundable | 422
  *
+ * And the post-shoot half (plan.md Task 20; spec §3.5 steps 2-3, §6.15):
+ *
+ *   POST   /bookings/:id/addons    { addonId, quantity? }
+ *          200 { booking } | 404 | 409 not_allowed | 422
+ *   DELETE /bookings/:id/addons/:addonId
+ *          200 { booking } | 404 | 409 not_allowed | 409 already_paid
+ *   POST   /bookings/:id/session-fee
+ *          200 { booking } | 404 | 409 not_allowed | 409 nothing_to_pay |
+ *          409 in_progress -- and 404 where no provider is configured, because
+ *          a request nobody could pay is not worth sending.
+ *
  * A 409 carries the booking as it now stands, so a screen acting on a stale
  * view -- a booking cancelled in another tab, a slot taken while he chose --
  * can show what is true rather than only what failed.
  */
 
-export type AdminBookingsDeps = { prisma: PrismaClient; now: () => Date };
+export type AdminBookingsDeps = {
+  prisma: PrismaClient;
+  now: () => Date;
+  /** The provider a session-fee request is opened against (spec §6.18); without
+   *  one there is nothing for the client to pay through, so that route is not
+   *  mounted at all. */
+  paymentProviderId?: PaymentProviderId;
+};
 
 const rowId = z.guid();
 /** Free text the client is shown when the photographer cancels (spec §3.6). */
@@ -78,6 +100,12 @@ const cancelBody = z.strictObject({
     .transform((value) => value ?? null),
 });
 
+const addonBody = z.strictObject({
+  /** A catalogue add-on; what it costs is read from the catalogue, never sent. */
+  addonId: z.guid(),
+  quantity: z.int().min(1).max(ADDON_MAX_QUANTITY).default(1),
+});
+
 const refundBody = z.strictObject({
   /** The MoMo or bank reference he is recording (spec §6.16). */
   reference: storableText(1, REFUND_REFERENCE_MAX_LENGTH),
@@ -88,7 +116,7 @@ const refundBody = z.strictObject({
 });
 
 export function adminBookingsRouter(deps: AdminBookingsDeps): Router {
-  const { prisma, now } = deps;
+  const { prisma, now, paymentProviderId } = deps;
   const router = Router();
 
   router.get('/bookings', async (req, res) => {
@@ -125,16 +153,7 @@ export function adminBookingsRouter(deps: AdminBookingsDeps): Router {
     const body = parseOrReject(rescheduleBody, req.body, res);
     if (body === undefined) return;
 
-    const result = await rescheduleBooking({ prisma, now }, id, body.startsAt);
-    if (result.status === 'slot_taken') {
-      await answerConflict(prisma, now, res, id, 'slot_taken');
-      return;
-    }
-    if (result.status === 'unchanged') {
-      await answerConflict(prisma, now, res, id, 'unchanged');
-      return;
-    }
-    await answer(prisma, now, res, result, id);
+    await answer(prisma, now, res, await rescheduleBooking({ prisma, now }, id, body.startsAt), id);
   });
 
   router.post('/bookings/:id/cancel', async (req, res) => {
@@ -164,6 +183,35 @@ export function adminBookingsRouter(deps: AdminBookingsDeps): Router {
     await answer(prisma, now, res, await resendAccessLink({ prisma, now }, id), id);
   });
 
+  // --- Post-shoot (Task 20) --------------------------------------------------
+
+  router.post('/bookings/:id/addons', async (req, res) => {
+    const id = parseOrReject(rowId, req.params.id, res);
+    if (id === undefined) return;
+    const body = parseOrReject(addonBody, req.body, res);
+    if (body === undefined) return;
+
+    await answer(prisma, now, res, await addPostShootAddon({ prisma }, id, body), id);
+  });
+
+  router.delete('/bookings/:id/addons/:addonId', async (req, res) => {
+    const id = parseOrReject(rowId, req.params.id, res);
+    if (id === undefined) return;
+    const addonId = parseOrReject(rowId, req.params.addonId, res);
+    if (addonId === undefined) return;
+
+    await answer(prisma, now, res, await removePostShootAddon({ prisma }, id, addonId), id);
+  });
+
+  if (paymentProviderId !== undefined) {
+    router.post('/bookings/:id/session-fee', async (req, res) => {
+      const id = parseOrReject(rowId, req.params.id, res);
+      if (id === undefined) return;
+
+      await answer(prisma, now, res, await requestSessionFee({ prisma, now, providerId: paymentProviderId }, id), id);
+    });
+  }
+
   router.post('/payments/:id/refund', async (req, res) => {
     const id = parseOrReject(rowId, req.params.id, res);
     if (id === undefined) return;
@@ -180,7 +228,12 @@ export function adminBookingsRouter(deps: AdminBookingsDeps): Router {
       return;
     }
     if (result.status === 'not_refundable') {
-      await answerConflict(prisma, now, res, (await prisma.payment.findUniqueOrThrow({ where: { id }, select: { bookingId: true } })).bookingId, 'not_refundable');
+      const payment = await prisma.payment.findUnique({ where: { id }, select: { bookingId: true } });
+      if (payment === null) {
+        res.status(404).json({ error: 'not_found' });
+        return;
+      }
+      await answerConflict(prisma, now, res, payment.bookingId, 'not_refundable');
       return;
     }
 
@@ -191,23 +244,27 @@ export function adminBookingsRouter(deps: AdminBookingsDeps): Router {
   return router;
 }
 
+/** Everything an action can answer with: the booking, or the reason it refused. */
+type ActionAnswer = AdminActionResult | RescheduleResult | AddonEditResult | SessionFeeResult;
+
 /** One shape for every action: the booking as it now stands, or why not. */
 async function answer(
   prisma: PrismaClient,
   now: () => Date,
   res: Response,
-  result: AdminActionResult,
+  result: ActionAnswer,
   bookingId: string,
 ): Promise<void> {
+  if (result.status === 'ok') {
+    res.json({ booking: adminBookingView(result.booking satisfies AdminBooking, now()) });
+    return;
+  }
   if (result.status === 'not_found') {
     res.status(404).json({ error: 'not_found' });
     return;
   }
-  if (result.status === 'not_allowed') {
-    await answerConflict(prisma, now, res, bookingId, 'not_allowed');
-    return;
-  }
-  res.json({ booking: adminBookingView(result.booking, now()) });
+  // Every other refusal is a 409 carrying the booking it refused.
+  await answerConflict(prisma, now, res, bookingId, result.status);
 }
 
 /** A refusal, with the booking it refused: the screen that asked was out of date. */
