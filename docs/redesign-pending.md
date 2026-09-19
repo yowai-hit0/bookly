@@ -43,8 +43,8 @@ Your answers to decisions 6, 7 and 8: build these first. They are feature work (
 
 ## 5. Redesign housekeeping
 
-- [ ] Impeccable's engine binary and hooks (being set up next).
-- [ ] At the first `/impeccable critique`, check whether its `overused-font` rule flags Poppins or Open Sans.
+- [x] Impeccable: the engine (0.1.5) is installed and its checksum matches the release; its design hooks are switched back on (2026-09-20). Nothing to install.
+- [x] Checked 2026-09-20: Impeccable's overused-font rule does not flag Poppins or Open Sans (it does flag Geist, which the redesign replaced).
 - [ ] Dark mode is not designed (`.dark` is unreachable). Say so if you want it.
 - [ ] The Section 4 milestone needs the booking funnel run end to end (backend and database running, or mocked), plus `npm run test:e2e`.
 - [ ] Before merging `redesign/visual-only`: `PRODUCT.md` and this file sit outside the plan's normally allowed paths (keep or move them). The plan's protected-file check already allows additive `en.json` keys.

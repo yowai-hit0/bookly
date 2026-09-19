@@ -321,7 +321,7 @@ Heading **Poppins**, body **Open Sans** (as generated).
 - **Apply headings once:** add `h1, h2, h3 { font-family: var(--font-heading); }` to the existing `@layer base` block, so pages do not need `font-heading` on every heading. Existing structure, no new mechanism.
 - **Delivery (needs a decision, section 9):** the generator's `@import url('https://fonts.googleapis.com/...')` is a third-party request on first load, unlike today's self-hosting. Self-hosting the new pair (`@fontsource/poppins`, `@fontsource-variable/open-sans`) needs new dependencies, which changes `package.json` and the lockfile; the guardrails say those are reviewed separately, never inside a visual commit.
 - **Weights:** the generator requests Open Sans 300-700 and Poppins 400-700. Request only what the app uses (400, 500, 600; search for `font-bold` before deciding on 700).
-- **Unverified:** whether Impeccable's `overused-font` rule flags Poppins or Open Sans. Its engine binary is not installed, so it could not be run. Check at the first `/impeccable critique`.
+- **Checked (2026-09-20, with the Impeccable detector):** Poppins and Open Sans are not flagged by its `overused-font` rule. That rule's list names Inter, Roboto, Fraunces, Geist, Plus Jakarta Sans and Space Grotesk, so moving off Geist also removed a flagged font. A fixture using only Poppins and Open Sans, and `frontend/src/index.css`, both scan clean.
 
 ### 6. Notes for `components/ui` (Phase 2b scope)
 
