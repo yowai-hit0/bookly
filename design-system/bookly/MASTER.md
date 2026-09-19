@@ -223,7 +223,7 @@ Before delivering any UI code, verify:
 ## Hand-review addendum (Phase 2a)
 
 > Written by hand on 2026-09-19 from the shipped code and measured contrast, after reviewing the generator output. **Where this addendum and the generated text above disagree, this addendum wins.** A file in `pages/` wins over both, for its own page.
-> **Status: proposed. Section 9 lists the decisions the user must make before Phase 2b.**
+> **Status: Phase 2b is applied (commit `3ce6cd3`) with the recommended option for decisions 1-3. Decisions 4-9 in section 9 are still open. Section 10 records what 2b did.**
 
 ### 1. Corrections made in place to the generated text
 
@@ -275,26 +275,26 @@ Consequences: the app uses `text-primary` for links, `bg-muted` for the waiting 
 
 **The trap.** The generator's role names do not match shadcn's. In shadcn, `--accent` is the **hover / highlight surface** (ghost and outline hover, menu items); `--primary` is the **default button, selected state, checked native controls (`accent-primary`), `text-primary` links, the FullCalendar active button and today tint**. Mapping "Accent/CTA" to `--accent` mechanically would turn every hover surface green. The CTA colour belongs on `--primary`.
 
-Values are the MASTER hex converted to oklch, so they reproduce the hex exactly in sRGB. Lightness and hue match Tailwind v4's published sky, emerald, slate and red values; chroma is lower because Tailwind defines those colours slightly outside the sRGB gamut. Achromatic colours use hue 0.
+Values are the MASTER hex converted to oklch to four decimals; each was checked to convert back to its hex with zero error, and they are the numbers in `frontend/src/index.css`. Lightness and hue match Tailwind v4's published sky, emerald, slate and red values; chroma is lower because Tailwind defines those colours slightly outside the sRGB gamut. Achromatic colours use hue 0.
 
 | Token | Hex | oklch | Source and note |
 |-------|-----|-------|-----------------|
-| `--background` | `#F0F9FF` | `oklch(0.977 0.012 237)` | MASTER Background |
-| `--foreground` | `#0F172A` | `oklch(0.208 0.040 266)` | MASTER Foreground |
+| `--background` | `#F0F9FF` | `oklch(0.9771 0.0125 236.62)` | MASTER Background |
+| `--foreground` | `#0F172A` | `oklch(0.2077 0.0398 265.75)` | MASTER Foreground |
 | `--card`, `--popover` | `#FFFFFF` | `oklch(1 0 0)` | MASTER Card |
 | `--card-foreground`, `--popover-foreground` | `#0F172A` | same as foreground | |
-| `--primary` | `#047857` | `oklch(0.508 0.105 166)` | MASTER Accent/CTA `#059669`, one Tailwind step darker (D1, D2) |
+| `--primary` | `#047857` | `oklch(0.5081 0.1049 165.61)` | MASTER Accent/CTA `#059669`, one Tailwind step darker (D1, D2) |
 | `--primary-foreground` | `#FFFFFF` | `oklch(1 0 0)` | 5.48:1 on `#047857` |
-| `--secondary` | `#0EA5E9` | `oklch(0.685 0.148 237)` | MASTER Secondary, literal. **Unused today**: no page uses a `secondary` Button or Badge. |
+| `--secondary` | `#0EA5E9` | `oklch(0.6847 0.1479 237.32)` | MASTER Secondary, literal. **Unused today**: no page uses a `secondary` Button or Badge. |
 | `--secondary-foreground` | `#000000` | `oklch(0 0 0)` | 7.58:1 |
-| `--muted` | `#E0F2FE` | `oklch(0.951 0.025 237)` | D3 |
-| `--muted-foreground` | `#475569` | `oklch(0.446 0.037 257)` | MASTER |
+| `--muted` | `#E0F2FE` | `oklch(0.9514 0.0250 236.82)` | D3 |
+| `--muted-foreground` | `#475569` | `oklch(0.4455 0.0374 257.28)` | MASTER |
 | `--accent` | = `--muted` | | shadcn hover surface, **not** the CTA colour |
 | `--accent-foreground` | = `--foreground` | | |
-| `--destructive` | `#B91C1C` | `oklch(0.505 0.190 28)` | D4 |
-| `--border` | `#E0F0F8` | `oklch(0.946 0.020 229)` | MASTER Border, literal. Decorative dividers and card edges only. |
-| `--input` | `#7A8BA0` | `oklch(0.631 0.037 254)` | D5 |
-| `--ring` | `#0284C7` | `oklch(0.588 0.139 242)` | MASTER Primary (brand blue) |
+| `--destructive` | `#B91C1C` | `oklch(0.5054 0.1905 27.52)` | D4 |
+| `--border` | `#E0F0F8` | `oklch(0.9456 0.0201 229.04)` | MASTER Border, literal. Decorative dividers and card edges only. |
+| `--input` | `#7A8BA0` | `oklch(0.6305 0.0374 253.82)` | D5 |
+| `--ring` | `#0284C7` | `oklch(0.5876 0.1389 241.97)` | MASTER Primary (brand blue) |
 | `--radius` | `0.5rem` | | was `0.625rem`. Gives 8px buttons and inputs and about 11px cards, matching MASTER's component specs (8px / 12px). |
 | `--chart-*` | leave | | no chart exists in the app |
 | `--sidebar` | `#FFFFFF` | `oklch(1 0 0)` | admin sidebar surface = card white (`pages/admin-shell.md`) |
@@ -368,9 +368,9 @@ Calendar blocks are not a status: muted fill with a diagonal hatch (pattern, not
 
 ### 9. Open decisions (needed before Phase 2b)
 
-1. **Which colour is `--primary`?** Recommended: the CTA green (D1). Alternative: the brand blue. Swapping the two roles changes only the `--primary`, `--primary-foreground` and `--ring` rows of section 4; nothing else moves. This is the largest visible identity choice in the redesign.
-2. **AA-safe darker green, or the generated hex?** Recommended: `#047857` (D2). Keeping `#059669` means black button labels (5.57:1) and darker text for links, badges and hover states everywhere `text-primary` is used.
-3. **Font delivery.** Self-host through fontsource (recommended: matches today, no third-party request; needs a separate `chore:` commit for `package.json` and the lockfile) or the generator's Google Fonts `@import url(...)` (no dependency change; third-party request; must be the first statement in `index.css`).
+1. **Which colour is `--primary`?** Recommended: the CTA green (D1). Alternative: the brand blue. Swapping the two roles changes only the `--primary`, `--primary-foreground` and `--ring` rows of section 4; nothing else moves. This is the largest visible identity choice in the redesign. **Applied in Phase 2b: green.**
+2. **AA-safe darker green, or the generated hex?** Recommended: `#047857` (D2). Keeping `#059669` means black button labels (5.57:1) and darker text for links, badges and hover states everywhere `text-primary` is used. **Applied in Phase 2b: `#047857`.**
+3. **Font delivery.** Self-host through fontsource (recommended: matches today, no third-party request; needs a separate `chore:` commit for `package.json` and the lockfile) or the generator's Google Fonts `@import url(...)` (no dependency change; third-party request; must be the first statement in `index.css`). **Applied in Phase 2b: fontsource, with separate `chore:` commits for the dependencies.**
 4. **Home.** It is an API-health stub, not a landing page (see `pages/home.md`). A real landing page is a separate task with its own copy (`en.json` is protected).
 5. **`NotFound` has no way out** (no link home). Adding one needs a string in `en.json`, unless an existing key can be reused.
 
@@ -380,3 +380,15 @@ Calendar blocks are not a status: muted fill with a diagonal hatch (pattern, not
 7. **Calendar events do not open the booking.** There is no `eventClick` or `url` in `AdminCalendar.tsx` or `calendar-events.ts`, so the only way to a booking is the bookings list. `pages/admin-calendar.md` bans popovers and is silent on click-through. Linking a booking event to `/admin/bookings/:id` is a behaviour change, not a styling one.
 8. **`/admin/reset-password` is not a route.** The backend's password-reset email links to it (it renders `NotFound`), and the login page has no "Forgot password" link (`pages/admin-login.md` forbids one). Belongs with decision 6.
 9. **No way to reach the photographer.** Three client messages say "contact the photographer" (`checkout:closed.body`, `booking:delivery.expired`, `booking:cancel.notCancellable`), but no page shows a phone number, WhatsApp or email. Needs real details from the client and new copy.
+
+### 10. Phase 2b: what was applied (commit `3ce6cd3`)
+
+- **Tokens:** the section 4 table, written to `:root` in `frontend/src/index.css`. `.dark` is untouched (unreachable).
+- **Fonts:** Poppins 400 / 500 / 600 and Open Sans (variable), self-hosted through fontsource. Geist was removed. `h1`, `h2` and `h3` use the heading font through the existing `@layer base` block.
+- **Choices Phase 3 must follow:**
+  - **The card edge is `border` + `shadow-sm`** (`card.tsx`). The hand-rolled cards on the client pages and the booking detail already use `border`; add `shadow-sm` to match them (Phase 3 sections 2-4 and 7).
+  - **`--input` is now a mid slate**, so `disabled:bg-input/50` became `disabled:bg-muted` in `input.tsx` and `textarea.tsx`. Any Phase 3 markup that relies on `bg-input/...` should use `muted` instead.
+  - Fields have a `bg-card` fill. Buttons and inputs are 44px on coarse pointers (`pointer-coarse:`) and 32px otherwise.
+  - The default Button hover darkens (a `color-mix` with black) instead of lightening, and `aria-disabled` is styled.
+- **Not done in 2b (Phase 3):** the status treatments (section 7), solid destructive confirm buttons (call-site overrides), callouts, the FullCalendar CSS block, the admin sidebar, and the layout of every page. `text-primary` links are unchanged and now pass AA (`#047857` is 5.48:1 on white).
+- **Verified:** typecheck, lint, 1135 tests and a production build. In Chromium, `/` and `/admin/login` load the new fonts (Latin subsets only), and the tokens resolve to the intended sRGB (background `#F0F9FF`, primary `#047857`, input border `#7A8BA0`). Radius is 8px on controls and 11.2px on cards, and buttons and inputs measure 44px under touch emulation and 32px on desktop. Nothing else has been rendered yet.
