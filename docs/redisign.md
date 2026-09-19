@@ -15,12 +15,12 @@ Decisions already confirmed with the user:
 
 ## Verified codebase facts
 
-- One SPA, no separate admin app. Routes centrally declared in `frontend/src/routes.tsx`.
+- One SPA, no separate admin app. Routes centrally declared in `frontend/src/routes.tsx` — **that file is the source of truth for the route list** (13 routes today, including NotFound).
 - All design tokens live in **one file**: `frontend/src/index.css` — confirmed structure: `@import` block (`tailwindcss`, `tw-animate-css`, `shadcn/tailwind.css`, Geist font) → `@custom-variant dark` → `@theme inline` (token→CSS-var mapping + radius scale) → `:root` (light tokens) → `.dark` (dark tokens, currently unreachable — nothing in source adds a `dark` class) → `@layer base` → FullCalendar override block at **lines 131–179** (color vars inherit from tokens automatically; `font-size: 0.875rem`/`1.125rem` are hardcoded, independent of any type-scale token).
 - `frontend/components.json` confirms shadcn `style: radix-nova`, `baseColor: neutral`, `cssVariables: true`, `tailwind.config: ""` (Tailwind v4 CSS-first — **no `tailwind.config.js` exists or should be created**).
 - Shared primitives: `frontend/src/components/ui/{button,card,input,label,checkbox,textarea,tabs,badge}.tsx`, used by both client and admin pages.
-- Client routes (6): `pages/Home.tsx` (`/`), `pages/services/{ServiceList,ServiceDetail,SlotPicker,BookingDetailsForm,PriceSummary,BookingHeld}.tsx` (`/services`, `/services/:slug`), `pages/checkout/{CheckoutPage,PaymentProgressPage}.tsx`, `pages/NotFound.tsx`.
-- Admin routes (3, under `/admin`, shell `frontend/src/admin/AdminLayout.tsx`): `pages/admin/AdminLogin.tsx`, `pages/admin/AdminCalendar.tsx` (wraps FullCalendar), `pages/admin/{AdminCatalogue,EntityForm}.tsx`.
+- Client routes (8): `pages/Home.tsx` (`/`), `pages/services/{ServiceList,ServiceDetail,SlotPicker,BookingDetailsForm,PriceSummary,BookingHeld}.tsx` (`/services`, `/services/:slug`), `pages/checkout/{CheckoutPage,PaymentProgressPage,PaymentFields}.tsx` (`/checkout/:reference/:token` and its `/payments/:ourRef` child), `pages/booking/BookingPage.tsx` (the client's private booking link: `/booking/:token`, plus `/booking/:token/payments/:ourRef` which reuses `PaymentProgressPage`), `pages/NotFound.tsx`.
+- Admin routes (5, under `/admin`, shell `frontend/src/admin/AdminLayout.tsx`): `pages/admin/AdminLogin.tsx`, `pages/admin/AdminCalendar.tsx` (wraps FullCalendar), `pages/admin/{AdminCatalogue,EntityForm}.tsx`, `pages/admin/AdminBookings.tsx` (`/admin/bookings`), `pages/admin/AdminBookingDetail.tsx` (`/admin/bookings/:id` — reschedule, cancel/refund, session fee, add-ons, photo delivery).
 - **Never touch** (pure logic, has matching `.test.ts` files): `frontend/src/catalogue/{api,bookings,availability,payments}.ts`, `frontend/src/admin/{api,session,catalogue,calendar-dates,calendar-events}.ts`, `frontend/src/i18n/locales/en.json` (copy, not visual).
 - `package.json` scripts confirmed: `dev`, `build`, `typecheck` (`tsc -b --noEmit`), `lint` (`oxlint`), `test` (`vitest run`), `test:e2e` (`playwright test`).
 
@@ -54,7 +54,14 @@ python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<services/booking busine
 ... --design-system --persist -p "Bookly" --page "home"
 ```
 
-Pages to generate: `home`, `services`, `service-detail`, `checkout`, `admin-login`, `admin-calendar`, `admin-catalogue`.
+Pages to generate: `home`, `services`, `service-detail`, `checkout` (also covers `PaymentProgressPage` and `PaymentFields`), `booking`, `admin-login`, `admin-calendar`, `admin-bookings`, `admin-booking-detail`, `admin-catalogue`.
+
+**Discovery rule — pages not on this list.** Before generating (and again before each Phase 3 apply), compare `frontend/src/routes.tsx` and `frontend/src/pages/**` against this list and the Phase 3 table. For any route or page that isn't listed:
+- do not skip it, and do not fold it silently into another page's file;
+- create its design file `design-system/bookly/pages/<page>.md` (layout, and only deviations from `MASTER.md`);
+- add it to the Phase 3 table (client pages before admin pages), or note where it belongs;
+- **tell the user** which unlisted pages were found and which files were created. This is a report, not a blocking question — then continue;
+- commit the new page files as a docs-only `design:` commit. The protected-file list below still applies.
 
 Expected output (new directory at the repo root, docs only):
 
@@ -67,8 +74,11 @@ design-system/
         ├── services.md
         ├── service-detail.md
         ├── checkout.md
+        ├── booking.md
         ├── admin-login.md
         ├── admin-calendar.md
+        ├── admin-bookings.md
+        ├── admin-booking-detail.md
         └── admin-catalogue.md
 ```
 
@@ -77,7 +87,7 @@ design-system/
 
 If the generator's output doesn't match this tree, move or rename files to match before committing.
 
-**Review by hand before continuing.** The skill's layout "pattern" is landing-page oriented: Home and ServiceList map well, but the booking funnel (SlotPicker → BookingDetailsForm → PriceSummary), checkout and the admin pages need hand-written layout notes in their `pages/*.md`. Commit as `design:` (docs only) before any code changes.
+**Review by hand before continuing.** The skill's layout "pattern" is landing-page oriented: Home and ServiceList map well, but the booking funnel (SlotPicker → BookingDetailsForm → PriceSummary), checkout, the client booking page and the admin pages need hand-written layout notes in their `pages/*.md`. `admin-bookings` and `admin-booking-detail` are data-dense operate screens (status badges, money due/refund-due amounts, destructive cancel/refund actions), so they need the most care. Commit as `design:` (docs only) before any code changes.
 
 ### 2b — Apply tokens and fonts (driven by `MASTER.md`)
 
@@ -97,28 +107,32 @@ It must not introduce a new theming mechanism, not bypass shadcn conventions, no
 
 Install Impeccable now if not already. Loop per section: **UI UX Pro Max scoped apply → checkpoint → Impeccable polish → checkpoint → commit**.
 
-Each apply step must first read `design-system/bookly/MASTER.md` and that page's `design-system/bookly/pages/<page>.md`, and implement the layout described there (page file wins over MASTER). Layout is applied here, not in Phase 2.
+Each apply step must first read `design-system/bookly/MASTER.md` and that page's `design-system/bookly/pages/<page>.md`, and implement the layout described there (page file wins over MASTER). Layout is applied here, not in Phase 2. Re-run the **Discovery rule** (Phase 2a) before each apply: any page found that isn't in this table gets its own `pages/<page>.md`, a row here, and a report to the user.
 
 | # | Section | Files |
 |---|---------|-------|
 | 1 | Home + NotFound | `pages/Home.tsx`, `pages/NotFound.tsx` |
 | 2 | Services / booking flow | `pages/services/{ServiceList,ServiceDetail,SlotPicker,BookingDetailsForm,PriceSummary,BookingHeld}.tsx` |
-| 3 | Checkout flow | `pages/checkout/{CheckoutPage,PaymentProgressPage}.tsx` |
-| 4 | Admin shell + login | `admin/AdminLayout.tsx`, `pages/admin/AdminLogin.tsx` |
-| 5 | Admin calendar | `pages/admin/AdminCalendar.tsx` + FullCalendar CSS block (`index.css` lines 131–179) — needs an explicit named pass since a tool scanning only `.tsx` files won't touch it |
-| 6 | Admin catalogue | `pages/admin/{AdminCatalogue,EntityForm}.tsx` |
+| 3 | Checkout flow | `pages/checkout/{CheckoutPage,PaymentProgressPage,PaymentFields}.tsx` |
+| 4 | My booking (client magic-link page) | `pages/booking/BookingPage.tsx` (its `/payments/:ourRef` route reuses `PaymentProgressPage` from Section 3) |
+| 5 | Admin shell + login | `admin/AdminLayout.tsx`, `pages/admin/AdminLogin.tsx` |
+| 6 | Admin calendar | `pages/admin/AdminCalendar.tsx` + FullCalendar CSS block (`index.css` lines 131–179) — needs an explicit named pass since a tool scanning only `.tsx` files won't touch it |
+| 7 | Admin bookings | `pages/admin/{AdminBookings,AdminBookingDetail}.tsx` |
+| 8 | Admin catalogue | `pages/admin/{AdminCatalogue,EntityForm}.tsx` |
 
 After each section's apply: dev-server visual check of that section's routes, full test gate, diff-review, commit. After each section's polish: re-check, optionally re-run `/impeccable critique`, same gate, commit.
 
-**Milestone after Section 3** (all client pages done — user's stated priority): full manual click-through of the live booking funnel (Home → ServiceList → ServiceDetail → SlotPicker → BookingDetailsForm → PriceSummary → BookingHeld → Checkout → PaymentProgress), since layout breaks in stateful multi-step flows may only appear mid-flow. Run `npm run test:e2e`. Tag `redesign-client-done`.
+**Milestone after Section 4** (all client pages done — user's stated priority): full manual click-through of the live booking funnel (Home → ServiceList → ServiceDetail → SlotPicker → BookingDetailsForm → PriceSummary → BookingHeld → Checkout → PaymentProgress), then the emailed booking link (`/booking/:token` → BookingPage, including its payment-progress route), since layout breaks in stateful multi-step flows may only appear mid-flow. Run `npm run test:e2e`. Tag `redesign-client-done`.
 
-**Milestone after Section 5**: verify `.bookly-event--conflict` (destructive outline) and `.bookly-event--pending_payment` (dashed border) — functional visual cues, not decoration — stay legible against the new palette.
+**Milestone after Section 6**: verify `.bookly-event--conflict` (destructive outline) and `.bookly-event--pending_payment` (dashed border) — functional visual cues, not decoration — stay legible against the new palette.
 
-**Milestone after Section 6**: verify EntityForm's destructive/error states and Tabs/Badge usage stay legible and consistent.
+**Milestone after Section 7**: verify the seven booking statuses (`pending_payment`, `confirmed`, `completed`, `no_show`, `expired`, `cancelled_by_client`, `cancelled_by_admin`) stay distinguishable as Badges, and that "still to pay" / "to refund" amounts and the destructive cancel/refund states stay legible against the new palette.
+
+**Milestone after Section 8**: verify EntityForm's destructive/error states and Tabs/Badge usage stay legible and consistent.
 
 ## Phase 4 — Final cross-cutting pass
 
-Once all 6 sections are done, run `/impeccable distill` once across the whole app to consolidate redundant patterns. Then: full test gate (`typecheck`, `lint`, `test`, `test:e2e`), `git diff main --stat` to confirm the touched-file list matches expectations (zero hits on the protected list), one more full visual pass over all 9 routes for consistent radius/color/spacing/type. Only then merge `redesign/visual-only` into `main`.
+Once all 8 sections are done, run `/impeccable distill` once across the whole app to consolidate redundant patterns. Then: full test gate (`typecheck`, `lint`, `test`, `test:e2e`), `git diff main --stat` to confirm the touched-file list matches expectations (zero hits on the protected list), one more full visual pass over every route in `routes.tsx` (13 today) for consistent radius/color/spacing/type. Only then merge `redesign/visual-only` into `main`.
 
 ## Guardrails — protected files (verify absent from every diff, every invocation)
 
@@ -135,12 +149,12 @@ State this list verbatim in every prompt given to either skill. Working tree mus
 
 - All work on `redesign/visual-only`; `main` stays deployable throughout.
 - Two commits per section (apply + polish) → fine-grained `git revert` of one tool's pass without touching neighbors.
-- Tags at `redesign-foundation-done` (end of Phase 2) and `redesign-client-done` (end of Section 3) as safe fallback points.
+- Tags at `redesign-foundation-done` (end of Phase 2) and `redesign-client-done` (end of Section 4) as safe fallback points.
 - `design-system/` is tracked by git and reverts with the branch (Phase 2a is its own docs-only commit).
-- Plugin-marketplace installs live in global `~/.claude` config (outside git) — uninstall via `/plugin uninstall` if needed; npm-CLI-based `.claude/skills/` scaffolding is tracked by git and reverts with the branch.
+
 
 ## Verification
 
 - After every section: `npm run typecheck && npm run lint && npm run test` from `frontend/`.
 - After client sections complete and again at the end: `npm run test:e2e` (Playwright) plus a manual click-through of the booking funnel in `npm run dev`.
-- Final check before merge: `git diff main --stat` shows no hits on the protected file list; full visual pass across all 9 routes.
+- Final check before merge: `git diff main --stat` shows no hits on the protected file list; full visual pass across every route in `routes.tsx` (13 today).
