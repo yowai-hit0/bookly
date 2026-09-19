@@ -1,0 +1,32 @@
+# Services — Page Design
+
+> **Project:** Bookly · **Route:** `/services` · **File:** `frontend/src/pages/services/ServiceList.tsx` · **Phase 3 section:** 2
+> Generator template: UI UX Pro Max, 2026-09-19 (1200px width replaced by the shipped `max-w-5xl`).
+> This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
+
+## Layout
+
+- `main`, `max-w-5xl`, `px-4 py-8`, `gap-6`. Keep.
+- Header: `h1` (`services:title`, 3xl semibold, heading font) + muted intro (`services:intro`).
+- Grid: `ul`, 1 column, `sm:` 2 columns, `lg:` 3 columns, `gap-4` (use `gap-6` from `lg`).
+- This is the one page where the generator's grid-of-cards pattern fits as is.
+
+## Service card (`ServiceCard`, an `article`)
+
+- Surface: `bg-card`, `rounded-xl`, 1px border, `overflow-hidden`, equal heights (`h-full`, flex column).
+- Cover image (optional): `aspect-3/2`, `object-cover`, `bg-muted` placeholder. The first card keeps `fetchPriority="high"` / `loading="eager"`.
+- Body `p-4`, `gap-2`: `h2` (lg semibold, heading font) whose link is stretched over the whole card; description muted, `line-clamp-3`; the "From X RWF" line pinned to the bottom (`mt-auto`), `font-medium`, `tabular-nums`.
+- Cards without a cover image must still look intentional: no empty top band; the body simply leads.
+- **The whole card is one link and one tab stop.** Keep the stretched-link pattern and `has-[a:focus-visible]:ring-3`.
+- Hover: this is the only card in the app that is clickable, so it alone gets the hover affordance (`has-[a:hover]:shadow-md` or a border-colour shift, 150-200ms, `motion-safe`). No `translate` lift that moves the card under the pointer.
+
+## States
+
+- loading: muted `role="status"` line. Skeleton cards are allowed (same grid, no new text) but optional.
+- failed: inline `role="alert"`, destructive text + outline `sm` "Retry" button.
+- empty: muted sentence.
+
+## Do not
+
+- No filters, search, categories or sorting: none exist.
+- Do not filter or reorder services in the UI (spec 2.2).
