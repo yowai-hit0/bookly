@@ -4,7 +4,7 @@
 
 The Bookly frontend (`frontend/`, a Vite + React 19 + TypeScript SPA) has never had a real visual design pass — Tailwind v4 + shadcn/ui (`radix-nova` style) is wired up correctly, but `frontend/src/index.css` is still pure grayscale (`oklch(... 0 0)` everywhere) and page markup is mostly bare Tailwind utility classes. The goal is a full visual redesign of both the client-facing booking flow and the admin panel — **without touching any business/data logic** — using two third-party Claude Code skills the user wants to bring in:
 
-- **UI UX Pro Max** (`github.com/nextlevelbuilder/ui-ux-pro-max-skill`) — a *generator*: picks a UI style, an industry-tuned color palette, and a font pairing, then applies a full design system.
+- **UI UX Pro Max** (`github.com/nextlevelbuilder/ui-ux-pro-max-skill`) — a *generator*: picks a page layout pattern, a UI style, an industry-tuned color palette, and a font pairing, writes them to a persisted design-system doc (`design-system/bookly/MASTER.md` + per-page `pages/*.md`), then applies it.
 - **Impeccable** (`impeccable.style`) — a *polisher*: works on an existing system, respects tokens/`DESIGN.md`, and cleans up spacing/typography/consistency + generic "AI-slop" patterns via `/impeccable polish`/`critique`/`distill`.
 
 Decisions already confirmed with the user:
@@ -42,18 +42,62 @@ Install **UI UX Pro Max first**; install **Impeccable right before Phase 3** (it
 
 ## Phase 2 — Foundation pass (UI UX Pro Max, run once)
 
-This is the one point where style/palette/type get decided — must happen exactly once so the whole app stays one system.
+This is the one point where layout/style/palette/type get decided — must happen exactly once so the whole app stays one system.
 
-**Before running**: explicitly instruct it to only rewrite oklch values inside `:root`/`.dark` and Tailwind classNames in existing files — not introduce a new theming mechanism, not bypass shadcn conventions, not scaffold a `tailwind.config.js` (Tailwind v4 + `@tailwindcss/vite` means such a file would silently do nothing — a false-positive "it worked" trap), and not delete the `@import "shadcn/tailwind.css"` line (a tool may mistake it for a duplicate of the `tailwindcss` import).
+### 2a — Generate and persist the design system (docs only, no code touched)
 
-- **Scope**: `frontend/src/index.css` (token values only) + `frontend/src/components/ui/*.tsx`.
-- **Explicitly out of scope**: everything under `frontend/src/pages/`, `frontend/src/admin/AdminLayout.tsx`, `components.json`, and the full protected/logic list below.
+Run the generator with `--persist` so the result is a reviewable file, not just chat output:
 
-**Checkpoint**: `npm run dev`, visually check `/` and `/admin/login` (both consume the same primitives/tokens, so global changes should already show). Run `npm run typecheck && npm run lint && npm run test`. Diff-review, commit, tag `redesign-foundation-done`.
+```bash
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<services/booking business>" --design-system --persist -p "Bookly"
+# then one run per route, adding --page:
+... --design-system --persist -p "Bookly" --page "home"
+```
+
+Pages to generate: `home`, `services`, `service-detail`, `checkout`, `admin-login`, `admin-calendar`, `admin-catalogue`.
+
+Expected output (new directory at the repo root, docs only):
+
+```
+design-system/
+└── bookly/                     # One folder per project (slug of -p "Bookly")
+    ├── MASTER.md               # Global source of truth (colors, typography, spacing, components, layout rules)
+    └── pages/                  # Page-specific overrides (only deviations from Master)
+        ├── home.md
+        ├── services.md
+        ├── service-detail.md
+        ├── checkout.md
+        ├── admin-login.md
+        ├── admin-calendar.md
+        └── admin-catalogue.md
+```
+
+- `MASTER.md` — global rules: **color palette**, **font pairing**, spacing, component styles, UI style, effects, anti-patterns, global layout rules.
+- `pages/<page>.md` — per-page **layout description** (section order, structure). Records only what differs from `MASTER.md`; a page file wins over `MASTER.md` for that page.
+
+If the generator's output doesn't match this tree, move or rename files to match before committing.
+
+**Review by hand before continuing.** The skill's layout "pattern" is landing-page oriented: Home and ServiceList map well, but the booking funnel (SlotPicker → BookingDetailsForm → PriceSummary), checkout and the admin pages need hand-written layout notes in their `pages/*.md`. Commit as `design:` (docs only) before any code changes.
+
+### 2b — Apply tokens and fonts (driven by `MASTER.md`)
+
+**Before running**: explicitly instruct it to only:
+- rewrite oklch values inside `:root`/`.dark`;
+- swap the font `@import` (Geist → the chosen pairing) and set the font families in `@theme inline` (`--font-sans`, plus a heading font var if the pairing has one);
+- change Tailwind classNames in existing files.
+
+It must not introduce a new theming mechanism, not bypass shadcn conventions, not scaffold a `tailwind.config.js` (Tailwind v4 + `@tailwindcss/vite` means such a file would silently do nothing — a false-positive "it worked" trap), and not delete the `@import "shadcn/tailwind.css"` line (a tool may mistake it for a duplicate of the `tailwindcss` import).
+
+- **Scope**: `frontend/src/index.css` (token values + font import/family vars) + `frontend/src/components/ui/*.tsx`.
+- **Explicitly out of scope**: everything under `frontend/src/pages/` (page layouts are applied in Phase 3, from `pages/<page>.md`), `frontend/src/admin/AdminLayout.tsx`, `components.json`, and the full protected/logic list below.
+
+**Checkpoint**: `npm run dev`, visually check `/` and `/admin/login` (both consume the same primitives/tokens, so global changes should already show). Confirm the new fonts load. Run `npm run typecheck && npm run lint && npm run test`. Diff-review, commit, tag `redesign-foundation-done`.
 
 ## Phase 3 — Section-by-section rollout (client → admin)
 
 Install Impeccable now if not already. Loop per section: **UI UX Pro Max scoped apply → checkpoint → Impeccable polish → checkpoint → commit**.
+
+Each apply step must first read `design-system/bookly/MASTER.md` and that page's `design-system/bookly/pages/<page>.md`, and implement the layout described there (page file wins over MASTER). Layout is applied here, not in Phase 2.
 
 | # | Section | Files |
 |---|---------|-------|
@@ -83,6 +127,8 @@ Once all 6 sections are done, run `/impeccable distill` once across the whole ap
 - `frontend/src/i18n/locales/en.json` — copy/content, not visual
 - `frontend/components.json`, `frontend/vite.config.ts`, lockfiles — review separately if touched, never accept as part of a visual commit
 
+Allowed new directory: `design-system/` (repo root, docs only — the persisted design system from Phase 2a). Nothing else outside `frontend/src/{index.css,components/ui,pages,admin/AdminLayout.tsx}` should appear in a diff.
+
 State this list verbatim in every prompt given to either skill. Working tree must be clean before every invocation so its diff is fully attributable; read the full `git diff` (not skim) before staging explicit paths.
 
 ## Rollback strategy
@@ -90,6 +136,7 @@ State this list verbatim in every prompt given to either skill. Working tree mus
 - All work on `redesign/visual-only`; `main` stays deployable throughout.
 - Two commits per section (apply + polish) → fine-grained `git revert` of one tool's pass without touching neighbors.
 - Tags at `redesign-foundation-done` (end of Phase 2) and `redesign-client-done` (end of Section 3) as safe fallback points.
+- `design-system/` is tracked by git and reverts with the branch (Phase 2a is its own docs-only commit).
 - Plugin-marketplace installs live in global `~/.claude` config (outside git) — uninstall via `/plugin uninstall` if needed; npm-CLI-based `.claude/skills/` scaffolding is tracked by git and reverts with the branch.
 
 ## Verification
