@@ -1308,23 +1308,20 @@ describe('PUT /bookings/:id/delivery', () => {
 
   /**
    * The schema reads the scheme through `new URL()`, so `HTTPS://` parses as
-   * https and passes it through unchanged. The column's CHECK is the literal
-   * regex `^https://`, which refuses it -- and the route has no answer for that,
-   * so the write surfaces as a 500. `routes/validation.ts` states the rule this
-   * breaks: a value outside its rules is answered there, "so the database's
-   * CHECK never surfaces as a 500".
+   * https; the column's CHECK is the literal regex `^https://`, which does not.
+   * A link that is https by every reasonable reading is therefore stored in the
+   * spelling the column insists on, rather than handed back as a 422 for a rule
+   * it does not break -- or, worse, reaching the CHECK as a 500
+   * (routes/validation.ts).
    */
-  it('answers a 4xx, not a 500, for a scheme the CHECK spells differently', async () => {
+  it('normalises a scheme the CHECK spells differently, rather than answering 500', async () => {
     const booking = await completedBooking();
 
     const res = await put(`${BOOKINGS}/${booking.id}/delivery`, { url: 'HTTPS://photos.example-host.com/s/abc123' });
 
-    // Nothing was stored either way -- the CHECK saw to that.
-    expect((await adminBooking(booking.id)).deliveryUrl).toBeNull();
-    // Either normalise the scheme before storing it, or refuse it in the
-    // schema; what it must not do is hand the photographer a 500.
-    expect([res.status, res.body.error]).not.toEqual([500, 'internal_error']);
-    expect(res.status).toBeLessThan(500);
+    expect(res.status).toBe(200);
+    expect(res.body.booking.delivery.url).toBe('https://photos.example-host.com/s/abc123');
+    expect((await adminBooking(booking.id)).deliveryUrl).toBe('https://photos.example-host.com/s/abc123');
   });
 });
 

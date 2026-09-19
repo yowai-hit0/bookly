@@ -53,13 +53,21 @@ export async function saveDelivery(deps: DeliveryDeps, bookingId: string, edit: 
   if (booking === null) return { status: 'not_found' };
   if (booking.status !== 'completed') return { status: 'not_allowed' };
 
+  // `HTTPS://` parses as https, but the column CHECK is the literal regex
+  // `^https://`. What gets stored is the URL parser's own spelling, so a link
+  // that is https by every reasonable reading is saved rather than rejected --
+  // and the CHECK stays a backstop rather than a way to reach a 500.
+  if (!URL.canParse(edit.url)) return { status: 'not_allowed' };
+  const url = new URL(edit.url).toString();
+  if (!url.startsWith('https://')) return { status: 'not_allowed' };
+
   const expiresOn = edit.expiresOn ?? (await defaultExpiry(deps));
   // Guarded on the status read above: a booking cancelled in the meantime keeps
   // no delivery it could no longer honour.
   const { count } = await deps.prisma.booking.updateMany({
     where: { id: booking.id, status: 'completed' },
     data: {
-      deliveryUrl: edit.url,
+      deliveryUrl: url,
       // Prisma writes a `@db.Date` from the UTC date part (availability/engine.ts).
       deliveryExpiresOn: new Date(`${expiresOn}T00:00:00.000Z`),
       ...(edit.note === undefined ? {} : { deliveryNote: edit.note }),
@@ -83,11 +91,16 @@ export async function sendDelivery(deps: DeliveryDeps, bookingId: string): Promi
   const sentAt = deps.now();
   const expiresOn = booking.deliveryExpiresOn ?? new Date(`${await defaultExpiry(deps)}T00:00:00.000Z`);
 
-  await deps.prisma.$transaction(async (tx) => {
-    await tx.booking.updateMany({
+  const stamped = await deps.prisma.$transaction(async (tx) => {
+    const { count } = await tx.booking.updateMany({
       where: { id: booking.id, status: 'completed' },
       data: { deliverySentAt: sentAt, deliveryExpiresOn: expiresOn },
     });
+    // Guarded on the status read above. A booking cancelled while this was
+    // waiting on its row must not be told its photos are ready: the message
+    // and the stamp commit together, or neither does.
+    if (count === 0) return false;
+
     await enqueue(tx, {
       kind: 'email',
       template: 'photo_delivery',
@@ -108,8 +121,10 @@ export async function sendDelivery(deps: DeliveryDeps, bookingId: string): Promi
         note: booking.deliveryNote,
       },
     });
+    return true;
   });
 
+  if (!stamped) return { status: 'not_allowed' };
   return reload(deps, booking.id);
 }
 

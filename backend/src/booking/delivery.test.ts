@@ -659,12 +659,26 @@ describe('booking_delivery_url_https (data-model_v2.md §5.9)', () => {
     },
   );
 
-  it('refuses the same link through saveDelivery, rather than storing it', async () => {
+  it('refuses the same link through saveDelivery, rather than letting the CHECK throw', async () => {
     const booking = await completedBooking();
 
-    await expect(saveDelivery(deps(), booking.id, { url: 'http://photos.example-host.com/s/abc' })).rejects.toThrow();
+    // Answered, not raised: the column is the backstop, never the validator
+    // (routes/validation.ts), so nothing here can reach the caller as a 500.
+    const result = await saveDelivery(deps(), booking.id, { url: 'http://photos.example-host.com/s/abc' });
 
+    expect(result).toStrictEqual({ status: 'not_allowed' });
     expect((await deliveryRow(booking.id)).delivery_url).toBeNull();
+  });
+
+  it('stores an uppercase scheme the way the column spells it', async () => {
+    const booking = await completedBooking();
+
+    const result = await saveDelivery(deps(), booking.id, { url: 'HTTPS://photos.example-host.com/s/abc' });
+
+    // https by every reasonable reading, so it is saved rather than refused --
+    // in the spelling the CHECK insists on.
+    expect(result.status).toBe('ok');
+    expect((await deliveryRow(booking.id)).delivery_url).toBe('https://photos.example-host.com/s/abc');
   });
 
   it('takes an uppercase scheme nowhere: the CHECK is on the literal text', async () => {
