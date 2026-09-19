@@ -223,7 +223,7 @@ Before delivering any UI code, verify:
 ## Hand-review addendum (Phase 2a)
 
 > Written by hand on 2026-09-19 from the shipped code and measured contrast, after reviewing the generator output. **Where this addendum and the generated text above disagree, this addendum wins.** A file in `pages/` wins over both, for its own page.
-> **Status: Phase 2b is applied (commit `3ce6cd3`) with the recommended option for decisions 1-3. Decisions 4-9 in section 9 are still open. Section 10 records what 2b did.**
+> **Status: Phase 2b is applied (commit `3ce6cd3`) with the recommended option for decisions 1-3. Decisions 4-11 in section 9 were answered on 2026-09-20. Section 10 records what 2b did.**
 
 ### 1. Corrections made in place to the generated text
 
@@ -240,7 +240,7 @@ The generated page files were also wrong and are replaced: 1200px widths that ma
 
 ### 2. Constraints that override the generator
 
-- **No new user-visible strings.** `frontend/src/i18n/locales/en.json` is protected. Restyle existing text; decoration must be non-textual (icons with `aria-hidden`, CSS counters, borders, fills, dots).
+- **No new user-visible strings.** `frontend/src/i18n/locales/en.json` is protected. Restyle existing text; decoration must be non-textual (icons with `aria-hidden`, CSS counters, borders, fills, dots). **Exception (user decision, 2026-09-20, section 9 item 10): new keys may be added, additive only, when a change truly needs them (the skip-to-content link, later contact details). Existing strings are never edited.**
 - **Behaviour is fixed.** Keep DOM order, `role` / `aria-*`, focus management (headings with `tabIndex=-1` that receive focus), `aria-disabled` instead of `disabled` during requests (15 places in four files), `noValidate` forms and list `key`s.
 - **Light theme only.** `.dark` is unreachable (nothing adds the class). No dark palette was generated. Leave the `.dark` block untouched in Phase 2b unless the user asks for dark mode; it will stay grayscale.
 - **No modals** (the app uses inline confirmation and one `window.confirm`), **no 3D, parallax or scroll-driven effects.** Motion is 150-300ms state transitions only, behind `motion-safe` / `prefers-reduced-motion`.
@@ -338,7 +338,7 @@ Heading **Poppins**, body **Open Sans** (as generated).
 
 ### 7. Booking status treatments (one system for client, admin and calendar)
 
-The seven statuses today all render as the same plain badge or pill (and in the calendar, identical FullCalendar-blue events). One shared treatment, used by the client booking page pill, the admin list and detail badges and the calendar events. **Proposal: confirm at Section 7 apply and with `/impeccable critique`.**
+The seven statuses today all render as the same plain badge or pill (and in the calendar, identical FullCalendar-blue events). One shared treatment, used by the client booking page pill, the admin list and detail badges and the calendar events. **Accepted as proposed by the user on 2026-09-20 (section 9, item 11); `/impeccable critique` can still refine it at Section 7.**
 
 Rules: the text label is **always** shown; the statuses must stay distinguishable **in greyscale** (fill vs none, solid vs dashed vs dotted edge, a different icon each); text on its own fill is >= 4.5:1; no status uses a 2px destructive edge (reserved for the calendar conflict outline).
 
@@ -371,15 +371,17 @@ Calendar blocks are not a status: muted fill with a diagonal hatch (pattern, not
 1. **Which colour is `--primary`?** Recommended: the CTA green (D1). Alternative: the brand blue. Swapping the two roles changes only the `--primary`, `--primary-foreground` and `--ring` rows of section 4; nothing else moves. This is the largest visible identity choice in the redesign. **Applied in Phase 2b: green.**
 2. **AA-safe darker green, or the generated hex?** Recommended: `#047857` (D2). Keeping `#059669` means black button labels (5.57:1) and darker text for links, badges and hover states everywhere `text-primary` is used. **Applied in Phase 2b: `#047857`.**
 3. **Font delivery.** Self-host through fontsource (recommended: matches today, no third-party request; needs a separate `chore:` commit for `package.json` and the lockfile) or the generator's Google Fonts `@import url(...)` (no dependency change; third-party request; must be the first statement in `index.css`). **Applied in Phase 2b: fontsource, with separate `chore:` commits for the dependencies.**
-4. **Home.** It is an API-health stub, not a landing page (see `pages/home.md`). A real landing page is a separate task with its own copy (`en.json` is protected).
-5. **`NotFound` has no way out** (no link home). Adding one needs a string in `en.json`, unless an existing key can be reused.
+4. **Home.** It is an API-health stub, not a landing page (see `pages/home.md`). A real landing page is a separate task with its own copy (`en.json` is protected). **Decided 2026-09-20: restyle the stub only.** A real landing page is tracked in `docs/redesign-pending.md`.
+5. **`NotFound` has no way out** (no link home). Adding one needs a string in `en.json`, unless an existing key can be reused. **Decided 2026-09-20: add an "All services" link that reuses the existing string `services:allServices`** (no new copy).
 
 **Features with no interface** (found by auditing the design files against the backend routes and the spec's permission table). None of these blocks Phase 2b, and none can be built inside the visual-only branch: each needs a new page and new `en.json` copy, which this redesign forbids. They are listed so "no design file" is not mistaken for "no feature".
 
-6. **Admin screens with a backend and no page:** weekly working hours and dated open/close overrides (`/api/admin/working-hours`), availability blocks with the overlap warning (`/api/admin/blocks`), and settings (`/api/admin/settings`: fee rate, minimum notice, hold, buffer, delivery days). Decide whether to build them before Phase 3 section 5 (the admin nav grows from 3 to 5 links and the calendar gains "create a block") or after (they then get their own `pages/*.md` from this file). Recommended: before. The seeded Mon-Fri 09:00-17:00 hours cannot be changed without them.
-7. **Calendar events do not open the booking.** There is no `eventClick` or `url` in `AdminCalendar.tsx` or `calendar-events.ts`, so the only way to a booking is the bookings list. `pages/admin-calendar.md` bans popovers and is silent on click-through. Linking a booking event to `/admin/bookings/:id` is a behaviour change, not a styling one.
-8. **`/admin/reset-password` is not a route.** The backend's password-reset email links to it (it renders `NotFound`), and the login page has no "Forgot password" link (`pages/admin-login.md` forbids one). Belongs with decision 6.
-9. **No way to reach the photographer.** Three client messages say "contact the photographer" (`checkout:closed.body`, `booking:delivery.expired`, `booking:cancel.notCancellable`), but no page shows a phone number, WhatsApp or email. Needs real details from the client and new copy.
+6. **Admin screens with a backend and no page:** weekly working hours and dated open/close overrides (`/api/admin/working-hours`), availability blocks with the overlap warning (`/api/admin/blocks`), and settings (`/api/admin/settings`: fee rate, minimum notice, hold, buffer, delivery days). Decide whether to build them before Phase 3 section 5 (the admin nav grows from 3 to 5 links and the calendar gains "create a block") or after (they then get their own `pages/*.md` from this file). Recommended: before. The seeded Mon-Fri 09:00-17:00 hours cannot be changed without them. **Decided 2026-09-20: build them before Phase 3 section 5, and tell the user when the implementation reaches it** (the gate is in `docs/redisign.md`; checklist in `docs/redesign-pending.md`).
+7. **Calendar events do not open the booking.** There is no `eventClick` or `url` in `AdminCalendar.tsx` or `calendar-events.ts`, so the only way to a booking is the bookings list. `pages/admin-calendar.md` bans popovers and now also designs the click-through states (decided below). Linking a booking event to `/admin/bookings/:id` is a behaviour change, not a styling one. **Decided 2026-09-20: add click-through with the other admin work (item 6); `pages/admin-calendar.md` now designs the hover and focus states.**
+8. **`/admin/reset-password` is not a route.** The backend's password-reset email links to it (it renders `NotFound`), and the login page has no "Forgot password" link (`pages/admin-login.md` now leaves the link to the reset-password page's design). Belongs with decision 6. **Decided 2026-09-20: build it with item 6**, including a "Forgot password" link on the login page.
+9. **No way to reach the photographer.** Three client messages say "contact the photographer" (`checkout:closed.body`, `booking:delivery.expired`, `booking:cancel.notCancellable`), but no page shows a phone number, WhatsApp or email. Needs real details from the client and new copy. **Decided 2026-09-20: defer until the client gives details;** tracked in `docs/redesign-pending.md`.
+10. **`en.json` policy. Decided 2026-09-20: new keys may be added, additive only**, when a change truly needs them: the skip-to-content link (`pages/admin-shell.md`) and, later, contact details (item 9). Existing strings are never edited. The guardrails in `docs/redisign.md` are updated to match.
+11. **Booking status treatments. Decided 2026-09-20: accept section 7 as proposed.** Phase 3 section 4 (client booking page) implements it first.
 
 ### 10. Phase 2b: what was applied (commit `3ce6cd3`)
 

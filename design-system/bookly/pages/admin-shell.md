@@ -35,7 +35,7 @@
 
 - **Size and surface:** `w-60` (15rem = 240px), full viewport height, sticky, its own vertical scroll if the window is short. Surface `bg-sidebar` (= card white) with `border-r border-sidebar-border`, so it separates from the tinted page background. Uses the existing `--sidebar-*` tokens; values in MASTER section 4.
 - **Top:** the wordmark (`common:appName`, heading font, semibold, `text-lg`), `px-4 py-4`. A small decorative icon before it (`CalendarCheck`, `aria-hidden`) is optional.
-- **Links:** a vertical list, `gap-1`. Each `NavLink`: `flex items-center gap-3 rounded-lg px-3 py-2 text-sm`, a lucide icon (`size-4`, `aria-hidden`) **and** the existing label. Icon and text are always both present. Calendar `CalendarDays`, Bookings `ClipboardList`, Catalogue `Package`. Order is unchanged: calendar, bookings, catalogue.
+- **Links:** a vertical list, `gap-1`. Each `NavLink`: `flex items-center gap-3 rounded-lg px-3 py-2 text-sm`, a lucide icon (`size-4`, `aria-hidden`) **and** the existing label. Icon and text are always both present. Calendar `CalendarDays`, Bookings `ClipboardList`, Catalogue `Package`. Order is unchanged: calendar, bookings, catalogue. **Decided 2026-09-20:** the availability, working-hours, blocks and settings pages are built before this section (MASTER section 9, items 6-8), so the list grows to five or more; their icons and order are set in their own design files. Design the list for five from the start.
 - **States:**
   - default: muted text (7.58:1 on white);
   - hover: `bg-sidebar-accent` (the `muted` surface);
@@ -61,6 +61,10 @@ From `lg` the sidebar takes 240px, so the content column is the viewport minus 2
 - **Bookings table:** `min-w-[48rem]` plus the page's `px-4` needs 800px, so it stops scrolling sideways from a 1040px viewport. At 1024-1039px it scrolls by a few pixels, which is acceptable inside `overflow-x-auto`.
 - Catalogue and booking detail have room to spare.
 
+## Skip link (decided 2026-09-20)
+
+A **skip-to-content link** is the first focusable element in the shell: visually hidden until focused (`sr-only focus:not-sr-only`), then shown as a button-styled pill at the top left, above the sidebar, with a visible focus ring. It targets the content wrapper around `<Outlet />` (give it an `id` and `tabIndex={-1}`). Its label is a **new `en.json` key**: the user allowed additive keys for this (MASTER section 9, item 10). Existing strings are not edited.
+
 ## Login
 
 `/admin/login` is declared outside `AdminLayout`: **no sidebar there.** The shell only wraps pages that already require a session.
@@ -70,5 +74,4 @@ From `lg` the sidebar takes 240px, so the content column is the viewport minus 2
 - No drawer or off-canvas menu, no collapse / expand toggle, no icon-only rail: each needs state or a stored preference.
 - Do not add shadcn's `sidebar` component (`npx shadcn add sidebar` brings new files, hooks and dependencies, outside the visual-only scope). Plain markup with the existing `--sidebar-*` tokens is enough.
 - No breadcrumbs, user avatar, notification badge, search box, section headings or footer links: none exist, and most would need copy.
-- **A skip-to-content link is worth having once the navigation is persistent, but it needs a new string** in `en.json` (protected). Flag it; do not invent the copy.
-- No new copy.
+- No new copy except the skip-link key below.

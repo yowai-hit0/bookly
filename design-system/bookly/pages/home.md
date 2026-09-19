@@ -10,7 +10,7 @@ Home is **not a landing page**. Today it is an API health check: the app name, o
 
 The generator's landing-page pattern (hero, problem, solution, CTA) therefore does **not** apply. Building it would need new copy in `en.json` (protected) and would change what the page is for.
 
-**Decision for the user, not for a design pass:** if a real landing page is wanted (hero, services teaser, link to `/services`), that is a separate task with its own copy. Until then, Phase 3 restyles exactly what exists.
+**Decided 2026-09-20: restyle the stub only.** A real landing page (hero, services teaser, link to `/services`) is a separate task with its own copy, tracked in `docs/redesign-pending.md`. Phase 3 restyles exactly what exists.
 
 ## Layout (keep the shipped structure)
 

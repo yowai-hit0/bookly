@@ -21,7 +21,7 @@ Decisions already confirmed with the user:
 - Shared primitives: `frontend/src/components/ui/{button,card,input,label,checkbox,textarea,tabs,badge}.tsx`, used by both client and admin pages.
 - Client routes (8): `pages/Home.tsx` (`/`), `pages/services/{ServiceList,ServiceDetail,SlotPicker,BookingDetailsForm,PriceSummary,BookingHeld}.tsx` (`/services`, `/services/:slug`), `pages/checkout/{CheckoutPage,PaymentProgressPage,PaymentFields}.tsx` (`/checkout/:reference/:token` and its `/payments/:ourRef` child), `pages/booking/BookingPage.tsx` (the client's private booking link: `/booking/:token`, plus `/booking/:token/payments/:ourRef` which reuses `PaymentProgressPage`), `pages/NotFound.tsx`.
 - Admin routes (5, under `/admin`, shell `frontend/src/admin/AdminLayout.tsx`): `pages/admin/AdminLogin.tsx`, `pages/admin/AdminCalendar.tsx` (wraps FullCalendar), `pages/admin/{AdminCatalogue,EntityForm}.tsx`, `pages/admin/AdminBookings.tsx` (`/admin/bookings`), `pages/admin/AdminBookingDetail.tsx` (`/admin/bookings/:id` — reschedule, cancel/refund, session fee, add-ons, photo delivery).
-- **Never touch** (pure logic, has matching `.test.ts` files): `frontend/src/catalogue/{api,bookings,availability,payments}.ts`, `frontend/src/admin/{api,session,catalogue,calendar-dates,calendar-events}.ts`, `frontend/src/i18n/locales/en.json` (copy, not visual).
+- **Never touch** (pure logic, has matching `.test.ts` files): `frontend/src/catalogue/{api,bookings,availability,payments}.ts`, `frontend/src/admin/{api,session,catalogue,calendar-dates,calendar-events}.ts`, `frontend/src/i18n/locales/en.json` (copy, not visual; exception, user decision 2026-09-20: new keys may be added when a change truly needs them, existing strings are never edited).
 - `package.json` scripts confirmed: `dev`, `build`, `typecheck` (`tsc -b --noEmit`), `lint` (`oxlint`), `test` (`vitest run`), `test:e2e` (`playwright test`).
 
 ## Phase 0 — Branch & rollback scaffolding
@@ -120,6 +120,8 @@ Each apply step must first read `design-system/bookly/MASTER.md` and that page's
 | 7 | Admin bookings | `pages/admin/{AdminBookings,AdminBookingDetail}.tsx` |
 | 8 | Admin catalogue | `pages/admin/{AdminCatalogue,EntityForm}.tsx` |
 
+> **Gate before Section 5 (user decision 6, 2026-09-20):** stop and tell the user before starting Section 5. The Working hours, Availability blocks, Settings and reset-password pages, and the calendar click-through, are built first as feature work (see `docs/redesign-pending.md`, including its branch note), then get design files in `design-system/bookly/pages/` and join Section 5.
+
 After each section's apply: dev-server visual check of that section's routes, full test gate, diff-review, commit. After each section's polish: re-check, optionally re-run `/impeccable critique`, same gate, commit.
 
 **Milestone after Section 4** (all client pages done — user's stated priority): full manual click-through of the live booking funnel (Home → ServiceList → ServiceDetail → SlotPicker → BookingDetailsForm → PriceSummary → BookingHeld → Checkout → PaymentProgress), then the emailed booking link (`/booking/:token` → BookingPage, including its payment-progress route), since layout breaks in stateful multi-step flows may only appear mid-flow. Run `npm run test:e2e`. Tag `redesign-client-done`.
@@ -138,7 +140,7 @@ Once all 8 sections are done, run `/impeccable distill` once across the whole ap
 
 - `frontend/src/catalogue/{api,bookings,availability,payments}.ts` (+ `.test.ts`)
 - `frontend/src/admin/{api,session,catalogue,calendar-dates,calendar-events}.ts` (+ `.test.ts`)
-- `frontend/src/i18n/locales/en.json` — copy/content, not visual
+- `frontend/src/i18n/locales/en.json` — copy/content, not visual. **Exception (user decision, 2026-09-20): additive new keys are allowed when a change truly needs them (skip-to-content link, later contact details); existing strings are never edited.**
 - `frontend/components.json`, `frontend/vite.config.ts`, lockfiles — review separately if touched, never accept as part of a visual commit
 
 Allowed new directory: `design-system/` (repo root, docs only — the persisted design system from Phase 2a). Nothing else outside `frontend/src/{index.css,components/ui,pages,admin/AdminLayout.tsx}` should appear in a diff.

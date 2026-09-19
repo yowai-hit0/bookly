@@ -40,6 +40,16 @@ Set `--fc-event-bg-color`, `--fc-event-border-color` and `--fc-event-text-color`
 - **Block** (`.bookly-event--block`): muted fill plus a diagonal hatch (repeating gradient), so "blocked" is a pattern, not only a colour.
 - **Chip sizes:** the chip and conflict badge are `0.65rem` (about 10px). Raise to `0.75rem` where the event has room (week, day). Month cells stay dense but not below `0.7rem`.
 
+## Click-through (decided 2026-09-20)
+
+Booking events will open the booking (`/admin/bookings/:id`). The behaviour is built as feature work with the other admin pages (MASTER section 9, item 7); design for it now:
+
+- The whole event is one click target, with a pointer cursor and a hover state (a slightly darker fill; never a size or layout change).
+- A visible keyboard focus ring (`--ring`, 3px, drawn inside the event box).
+- The status chip and the conflict badge stay inside the click target and keep their text.
+- Block events are not clickable: default cursor, no hover state.
+- In month view the events stay small; the hit area is the event box, as large as the row allows.
+
 ## States
 
 loading, load failed (alert + retry), month / week / day views, all-day blocks, overlapping events, empty range.

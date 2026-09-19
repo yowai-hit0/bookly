@@ -15,9 +15,9 @@
 
 `NotFound` is also returned by `ServiceDetail` when the API answers 404 for a slug (unknown or deactivated service, spec 6.14). It renders its own `main`, so it must stay self-contained and must not assume it is a top-level route.
 
-## Known gap (needs a decision, not a design pass)
+## Way out (decided 2026-09-20)
 
-The page has no way out: no link home or to `/services`. Adding one needs a new string in `en.json` (protected) unless an existing key can be reused. Flag it; do not invent copy.
+Add a text link to `/services` using the **existing** string `services:allServices` ("All services"): no new copy. Style it like the back link on the service page (muted, `text-sm`, underline on hover, visible focus ring) and place it under the body text, with a `gap-2` to `gap-4` rhythm from it. It is the only interactive element on the page. The rest of the page stays as designed above.
 
 ## Do not
 

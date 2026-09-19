@@ -27,4 +27,5 @@ idle, submitting (button label swaps), invalid credentials, request failed.
 
 ## Do not
 
-- No "forgot password", social login, remember-me or illustration: none exist and each would need new copy or logic.
+- No social login, remember-me or illustration.
+- A **"Forgot password" link** comes with the reset-password page (decided 2026-09-20, MASTER section 9, item 8: built before Phase 3 section 5). Design it in that page's own design file; until it exists, the login has none.
