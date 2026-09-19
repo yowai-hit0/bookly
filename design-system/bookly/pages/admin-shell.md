@@ -49,6 +49,8 @@
 
 Wordmark + three links + sign-out is too wide for one row today. Allow the nav to wrap or tighten gaps, keep each link a comfortable touch target (>= 44px tall), and at `< sm` hide the sign-out **text** visually (`sr-only sm:not-sr-only`) so only the icon remains; the accessible name stays.
 
+The nav has three links because three admin pages exist. If Availability and Settings pages are added (MASTER section 9, decision 6) it becomes five links: recheck the wrap at 375px before adding them.
+
 The same `nav`, horizontal: row 1 wordmark left and sign-out right, row 2 the links (`flex-wrap`, icon + label). Surface `bg-card`, `border-b`. Not sticky (static is the safe default: no focus-not-obscured risk over long forms and the calendar).
 
 ## Width budget
