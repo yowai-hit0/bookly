@@ -12,6 +12,8 @@
 
 Do not change the constants in the TSX: `TIME_GRID_HEIGHT` (760), `SCROLL_TIME` (08:00), `HEADER_TOOLBAR`, the view options. They are behaviour, not styling.
 
+**Width budget (admin sidebar):** from `lg` the sidebar (`pages/admin-shell.md`) takes 240px, so the calendar column is the viewport minus 240px: 784px at a 1024px viewport. `max-w-7xl` (1280px) now only binds from a 1520px viewport. Verify the toolbar wrap and the week view at 1024px and 1280px.
+
 ## Calendar chrome (CSS, `.fc` block)
 
 The `.fc` block already reads the app tokens (`--fc-border-color`, `--fc-neutral-bg-color: var(--muted)`, `--fc-today-bg-color: primary 6%`, active button = `--primary`), so a token change carries most of it. What still needs deliberate CSS:

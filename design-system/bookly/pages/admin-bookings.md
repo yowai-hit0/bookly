@@ -10,6 +10,8 @@
 
 `main`, `max-w-6xl`, `px-4 py-6`, `gap-4`. Order: `h1` (2xl) -> filter section -> failed alert -> loading / empty text -> table -> "Load more".
 
+**Width budget (admin sidebar):** from `lg` the sidebar (`pages/admin-shell.md`) takes 240px. The table needs 800px (`min-w-[48rem]` plus the page's `px-4`), so it stops scrolling sideways from a 1040px viewport; at 1024-1039px it scrolls by a few pixels inside `overflow-x-auto`, which is acceptable.
+
 ### Filter section (`aria-label`)
 
 - Row 1: seven **status toggle buttons** (`aria-pressed`), `flex-wrap`, `size="sm"`. Pressed = default (filled) variant, unpressed = outline. Pressed vs unpressed must differ by more than hue: fill vs outline is enough; a small check icon on pressed is a good extra. Do not shorten labels.

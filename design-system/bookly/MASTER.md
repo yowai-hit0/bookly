@@ -296,7 +296,13 @@ Values are the MASTER hex converted to oklch, so they reproduce the hex exactly 
 | `--input` | `#7A8BA0` | `oklch(0.631 0.037 254)` | D5 |
 | `--ring` | `#0284C7` | `oklch(0.588 0.139 242)` | MASTER Primary (brand blue) |
 | `--radius` | `0.5rem` | | was `0.625rem`. Gives 8px buttons and inputs and about 11px cards, matching MASTER's component specs (8px / 12px). |
-| `--chart-*`, `--sidebar-*` | leave | | no chart or sidebar exists in the app |
+| `--chart-*` | leave | | no chart exists in the app |
+| `--sidebar` | `#FFFFFF` | `oklch(1 0 0)` | admin sidebar surface = card white (`pages/admin-shell.md`) |
+| `--sidebar-foreground` | `#0F172A` | same as foreground | |
+| `--sidebar-primary`, `--sidebar-primary-foreground` | `#047857`, `#FFFFFF` | same as `--primary` | the plain-markup sidebar does not use these; keep them coherent |
+| `--sidebar-accent`, `--sidebar-accent-foreground` | = `--muted`, = `--foreground` | | hover surface for nav items |
+| `--sidebar-border` | = `--border` | | |
+| `--sidebar-ring` | = `--ring` | | |
 
 **Deviations from the generated hex** (each has a measured reason; reverting any one is a one-line change):
 
@@ -352,7 +358,7 @@ Calendar blocks are not a status: muted fill with a diagonal hatch (pattern, not
 
 - **Public pages:** a single centred column, mobile-first at 375px. `max-w-2xl` for flows (pay, progress, my booking), `max-w-5xl` for the list and the service detail. There is no site header or footer; do not add one.
 - **The booking funnel** is three progressive groups on one route: Choose (package, add-ons) -> Pick a time -> Your details, then submit -> held -> pay -> progress. Detail in `pages/service-detail.md` and `pages/checkout.md`.
-- **Admin:** the shell header plus a per-page `main` with its own width (`7xl` calendar, `6xl` bookings, `5xl` catalogue, `3xl` booking detail). Denser than public pages: use the low end of the spacing scale.
+- **Admin:** a navigation **sidebar** from `lg` (15rem, sticky; the same `nav` reflows to a top bar below `lg`), then a per-page `main` that centres in the remaining column with its own width (`7xl` calendar, `6xl` bookings, `5xl` catalogue, `3xl` booking detail). Denser than public pages: use the low end of the spacing scale. Detail in `pages/admin-shell.md`.
 - **Card surface:** `bg-card`, `rounded-xl`, `p-4`, one edge treatment (section 6). Only clickable cards get hover.
 - **Callout** (non-refundable notice, hold expiry, warnings, the "waiting" banner): tinted fill, full 1px edge, small `aria-hidden` icon. **No left-edge stripe.**
 - **Money rows:** label left, amount right, `tabular-nums`; the total is semibold above a `border-t`; an amount is never conveyed by colour alone (its label is always there).
