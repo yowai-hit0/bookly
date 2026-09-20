@@ -1,3 +1,4 @@
+import { ExternalLink, Info, Smartphone, TriangleAlert, Undo2, Unlink } from 'lucide-react'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -12,8 +13,12 @@ import {
 import { isPlausiblePhone } from '@/catalogue/bookings'
 import { type PaymentMethod, fetchPaymentMethods, needsPhoneFor } from '@/catalogue/payments'
 import { Button } from '@/components/ui/button'
+import { Callout } from '@/components/ui/callout'
+import { StatusBadge } from '@/components/ui/status-badge'
+import { StatusIcon } from '@/components/ui/status-icon'
 import { formatDate, formatMoney, formatTime } from '@/lib/format'
 import { reportError } from '@/lib/report-error'
+import { cn } from '@/lib/utils'
 import { PaymentFields } from '@/pages/checkout/PaymentFields'
 
 /**
@@ -94,8 +99,9 @@ export function BookingPage() {
 function InvalidLink() {
   const { t } = useTranslation()
   return (
-    <section className="flex flex-col gap-3">
-      <h1 className="text-2xl font-semibold">{t('booking:invalidLink.title')}</h1>
+    <section className="flex max-w-xl flex-col gap-3 text-pretty">
+      <StatusIcon icon={Unlink} tone="neutral" />
+      <h1 className="text-2xl font-semibold text-balance">{t('booking:invalidLink.title')}</h1>
       <p className="text-muted-foreground text-sm">{t('booking:invalidLink.body')}</p>
     </section>
   )
@@ -119,14 +125,17 @@ function BookingView({ token, booking: loadedBooking, methods, onMissing, onRelo
   return (
     <>
       <section className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h1 className="text-3xl font-semibold">{t('booking:title')}</h1>
-          <p className="bg-muted rounded-full px-3 py-1 text-sm font-medium">{t(`booking:status.${booking.status}`)}</p>
+          <StatusBadge status={booking.status} size="md">
+            {t(`booking:status.${booking.status}`)}
+          </StatusBadge>
         </div>
 
-        <dl className="bg-card flex flex-col gap-2 rounded-xl border p-4 text-sm">
-          <Line term={t('booking:labels.reference')}>
-            <span className="font-mono text-base font-semibold tracking-wide">{booking.reference}</span>
+        <dl className="bg-card flex flex-col gap-2 rounded-xl border p-4 text-sm shadow-sm">
+          <Line term={t('booking:labels.reference')} className="items-baseline">
+            {/* The reference is what the client quotes, so it is the largest thing in the card. */}
+            <span className="font-mono text-lg font-semibold tracking-wide">{booking.reference}</span>
           </Line>
           <Line term={t('booking:labels.service')}>
             {t('booking:serviceValue', { service: booking.serviceName, package: booking.packageName })}
@@ -180,11 +189,13 @@ function BookingView({ token, booking: loadedBooking, methods, onMissing, onRelo
       )}
 
       {booking.cancelledAt !== null && (
-        <section className="flex flex-col gap-2 rounded-xl border p-4">
+        <section className="bg-card flex flex-col gap-2 rounded-xl border p-4 shadow-sm">
           <h2 className="text-lg font-semibold">{t('booking:cancelled.title')}</h2>
-          {booking.cancellationReason !== null && <p className="text-sm">{booking.cancellationReason}</p>}
+          {booking.cancellationReason !== null && <p className="text-sm wrap-anywhere">{booking.cancellationReason}</p>}
           {booking.totals.refundDueRwf > 0 && (
-            <p className="text-sm">{t('booking:cancelled.refund', { amount: formatMoney(booking.totals.refundDueRwf) })}</p>
+            <Callout icon={Undo2}>
+              <p>{t('booking:cancelled.refund', { amount: formatMoney(booking.totals.refundDueRwf) })}</p>
+            </Callout>
           )}
         </section>
       )}
@@ -196,34 +207,35 @@ function BookingView({ token, booking: loadedBooking, methods, onMissing, onRelo
 function Amounts({ booking }: { booking: ClientBooking }) {
   const { t } = useTranslation()
   return (
-    <dl className="bg-card flex flex-col gap-2 rounded-xl border p-4 text-sm">
+    <dl className="bg-card flex flex-col gap-2 rounded-xl border p-4 text-sm shadow-sm">
       <div className="flex justify-between gap-4">
-        <dt>{booking.packageName}</dt>
-        <dd className="tabular-nums">{formatMoney(booking.packagePriceRwf)}</dd>
+        <dt className="min-w-0 wrap-anywhere">{booking.packageName}</dt>
+        <dd className="shrink-0 tabular-nums">{formatMoney(booking.packagePriceRwf)}</dd>
       </div>
       {booking.addons.map((addon, index) => (
         // Two add-ons may share a name; their order is the booking's own.
         <div key={index} className="flex justify-between gap-4">
-          <dt>{addon.name}</dt>
-          <dd className="tabular-nums">{formatMoney(addon.priceRwf)}</dd>
+          <dt className="min-w-0 wrap-anywhere">{addon.name}</dt>
+          <dd className="shrink-0 tabular-nums">{formatMoney(addon.priceRwf)}</dd>
         </div>
       ))}
-      <div className="flex justify-between gap-4 border-t pt-2 font-semibold">
+      <div className="mt-1 flex justify-between gap-4 border-t pt-2 font-semibold">
         <dt>{t('booking:labels.total')}</dt>
-        <dd className="tabular-nums">{formatMoney(booking.totals.grandTotalRwf)}</dd>
+        <dd className="shrink-0 tabular-nums">{formatMoney(booking.totals.grandTotalRwf)}</dd>
       </div>
       <div className="flex justify-between gap-4">
         <dt>{t('booking:labels.paid')}</dt>
-        <dd className="tabular-nums">{formatMoney(booking.totals.collectedRwf)}</dd>
+        <dd className="shrink-0 tabular-nums">{formatMoney(booking.totals.collectedRwf)}</dd>
       </div>
-      <div className="flex justify-between gap-4">
+      {/* What is still to pay is the number the client can act on, so it is a step heavier while it is above zero. */}
+      <div className={cn('flex justify-between gap-4', booking.totals.outstandingRwf > 0 && 'font-semibold')}>
         <dt>{t('booking:labels.outstanding')}</dt>
-        <dd className="font-medium tabular-nums">{formatMoney(booking.totals.outstandingRwf)}</dd>
+        <dd className="shrink-0 tabular-nums">{formatMoney(booking.totals.outstandingRwf)}</dd>
       </div>
       {booking.totals.refundDueRwf > 0 && (
-        <div className="flex justify-between gap-4">
+        <div className="text-destructive flex justify-between gap-4 font-medium">
           <dt>{t('booking:labels.refundDue')}</dt>
-          <dd className="tabular-nums">{formatMoney(booking.totals.refundDueRwf)}</dd>
+          <dd className="shrink-0 tabular-nums">{formatMoney(booking.totals.refundDueRwf)}</dd>
         </div>
       )}
     </dl>
@@ -233,16 +245,20 @@ function Amounts({ booking }: { booking: ClientBooking }) {
 function Delivery({ delivery }: { delivery: NonNullable<ClientBooking['delivery']> }) {
   const { t } = useTranslation()
   return (
-    <section className="flex flex-col gap-2 rounded-xl border p-4">
+    <section className="bg-card flex flex-col gap-2 rounded-xl border p-4 shadow-sm">
       <h2 className="text-lg font-semibold">{t('booking:delivery.title')}</h2>
-      {delivery.note !== null && <p className="text-sm">{delivery.note}</p>}
+      {delivery.note !== null && <p className="text-sm wrap-anywhere">{delivery.note}</p>}
       {delivery.expired || delivery.url === null ? (
-        <p className="text-sm">{t('booking:delivery.expired')}</p>
+        <Callout icon={Info}>
+          <p>{t('booking:delivery.expired')}</p>
+        </Callout>
       ) : (
         <>
           <Button asChild className="self-start">
             <a href={delivery.url} rel="noreferrer noopener" target="_blank">
               {t('booking:delivery.open')}
+              {/* It opens a new tab, so the arrow says so; the words already name the destination. */}
+              <ExternalLink aria-hidden="true" data-icon="inline-end" />
             </a>
           </Button>
           {delivery.expiresOn !== null && (
@@ -328,19 +344,24 @@ function SessionFee({ token, booking, methods, onMissing, onReload }: SessionFee
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl border p-4">
+    <section className="bg-card flex flex-col gap-4 rounded-xl border p-4 shadow-sm">
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold">{t('booking:sessionFee.title')}</h2>
         <p className="text-sm">{t('booking:sessionFee.intro', { amount })}</p>
       </div>
 
       {waiting !== null && (
-        <p className="bg-muted rounded-lg p-3 text-sm">
-          {t('checkout:waiting.text')}{' '}
-          <Link to={bookingPaymentPath(token, waiting.ourRef)} className="text-primary underline-offset-4 hover:underline">
-            {t('checkout:waiting.link')}
-          </Link>
-        </p>
+        <Callout icon={Smartphone}>
+          <p>
+            {t('checkout:waiting.text')}{' '}
+            <Link
+              to={bookingPaymentPath(token, waiting.ourRef)}
+              className="text-primary rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              {t('checkout:waiting.link')}
+            </Link>
+          </p>
+        </Callout>
       )}
 
       {methods.length === 0 ? (
@@ -359,6 +380,7 @@ function SessionFee({ token, booking, methods, onMissing, onReload }: SessionFee
           />
           <Button
             type="submit"
+            size="lg"
             className="w-full sm:w-auto sm:self-start"
             // Not `disabled`: that would drop keyboard focus mid-submit.
             aria-disabled={submitting}
@@ -425,15 +447,19 @@ function Cancel({ token, booking, onCancelled, onRefused, onMissing }: CancelPro
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-xl border p-4">
+    <section className="bg-card flex flex-col gap-3 rounded-xl border p-4 shadow-sm">
       <h2 className="text-lg font-semibold">{t('booking:cancel.title')}</h2>
       {confirming ? (
         <>
-          <p className="text-sm font-medium">{t('booking:cancel.warning', { fee: formatMoney(booking.bookingFeeRwf) })}</p>
+          <Callout tone="destructive" icon={TriangleAlert}>
+            <p className="font-medium">{t('booking:cancel.warning', { fee: formatMoney(booking.bookingFeeRwf) })}</p>
+          </Callout>
           <div className="flex flex-wrap gap-2">
+            {/* Irreversible, so it is a solid red button rather than the tinted variant (MASTER section 6); the override is here, not a new variant. */}
             <Button
               ref={confirmRef}
               variant="destructive"
+              className="bg-destructive text-white hover:bg-[color-mix(in_oklch,var(--destructive),black_12%)] focus-visible:border-ring focus-visible:ring-ring/50"
               onClick={() => void cancel()}
               aria-disabled={cancelling}
               aria-busy={cancelling}
@@ -459,11 +485,12 @@ function Cancel({ token, booking, onCancelled, onRefused, onMissing }: CancelPro
   )
 }
 
-function Line({ term, children }: { term: string; children: ReactNode }) {
+function Line({ term, children, className }: { term: string; children: ReactNode; className?: string }) {
   return (
-    <div className="flex flex-wrap justify-between gap-x-4">
+    <div className={cn('flex flex-wrap justify-between gap-x-4', className)}>
       <dt className="text-muted-foreground">{term}</dt>
-      <dd>{children}</dd>
+      {/* Location, requests and names are typed by people, so they wrap anywhere rather than stretch the card. */}
+      <dd className="min-w-0 wrap-anywhere">{children}</dd>
     </div>
   )
 }

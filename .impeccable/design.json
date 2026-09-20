@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-20T10:49:36.944Z",
+  "generatedAt": "2026-09-20T11:29:46.554Z",
   "title": "Design System: Bookly",
   "extensions": {
     "colorMeta": {
@@ -166,7 +166,7 @@
       },
       "section": {
         "displayName": "Section",
-        "purpose": "Every h2 and card section title. Fieldset legends match in size and weight but currently render in Open Sans."
+        "purpose": "Every h2, card section title and fieldset legend (a legend takes the heading font by hand)."
       },
       "body": {
         "displayName": "Body",
@@ -297,9 +297,16 @@
       "name": "Outline Badge",
       "kind": "chip",
       "refersTo": "badge-outline",
-      "description": "A pill with a hairline edge: today the look of every booking status.",
-      "html": "<span class=\"ds-badge-outline\">Confirmed</span>",
+      "description": "A pill with a hairline edge: the plain outline badge. A booking status uses the Status Badge instead.",
+      "html": "<span class=\"ds-badge-outline\">Draft</span>",
       "css": ".ds-badge-outline{box-sizing:border-box;display:inline-flex;align-items:center;height:20px;padding:2px 8px;border:1px solid var(--border, oklch(0.9456 0.0201 229.04));border-radius:999px;color:var(--foreground, oklch(0.2077 0.0398 265.75));font:500 12px/16px 'Open Sans Variable', 'Open Sans', sans-serif;white-space:nowrap;}"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "custom",
+      "description": "A booking status as a pill with its label and a small icon. The seven stay apart in greyscale: dashed, dotted, tinted, muted and unfilled edges, and a different icon each. Green only for a confirmed booking.",
+      "html": "<div class=\"ds-sp-row\"><span class=\"ds-sp ds-sp-confirmed\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m16 9-5.5 5.5L8 12\"/></svg>Confirmed</span><span class=\"ds-sp ds-sp-pending\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 6v6l4 2\"/></svg>Waiting for payment</span><span class=\"ds-sp ds-sp-completed\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M18 6 7 17l-5-5\"/><path d=\"m22 10-7.5 7.5L13 16\"/></svg>Completed</span><span class=\"ds-sp ds-sp-noshow\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><line x1=\"17\" x2=\"22\" y1=\"8\" y2=\"13\"/><line x1=\"22\" x2=\"17\" y1=\"8\" y2=\"13\"/></svg>Recorded as missed</span><span class=\"ds-sp ds-sp-expired\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 22h14\"/><path d=\"M5 2h14\"/><path d=\"M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22\"/><path d=\"M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2\"/></svg>Expired</span><span class=\"ds-sp ds-sp-cancelled\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m15 9-6 6\"/><path d=\"m9 9 6 6\"/></svg>Cancelled by you</span><span class=\"ds-sp ds-sp-cancelled-admin\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M4.929 4.929 19.07 19.071\"/></svg>Cancelled by the photographer</span></div>",
+      "css": ".ds-sp-row{display:flex;flex-wrap:wrap;gap:8px;max-width:440px;}.ds-sp{box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px 0 10px;border:1px solid transparent;border-radius:999px;background:transparent;font:500 14px/20px 'Open Sans Variable', 'Open Sans', sans-serif;white-space:nowrap;}.ds-sp svg{flex:none;}.ds-sp-confirmed{border-color:color-mix(in oklab, var(--primary, oklch(0.5081 0.1049 165.61)) 30%, transparent);background:color-mix(in oklab, var(--primary, oklch(0.5081 0.1049 165.61)) 10%, var(--card, oklch(1 0 0)));color:var(--primary, oklch(0.5081 0.1049 165.61));}.ds-sp-pending{border-style:dashed;border-color:var(--muted-foreground, oklch(0.4455 0.0374 257.28));color:var(--foreground, oklch(0.2077 0.0398 265.75));}.ds-sp-completed{background:var(--muted, oklch(0.9514 0.0250 236.82));color:var(--foreground, oklch(0.2077 0.0398 265.75));}.ds-sp-noshow{background:color-mix(in oklab, var(--destructive, oklch(0.5054 0.1905 27.52)) 10%, var(--card, oklch(1 0 0)));color:var(--destructive, oklch(0.5054 0.1905 27.52));}.ds-sp-expired{border-style:dotted;border-color:var(--muted-foreground, oklch(0.4455 0.0374 257.28));color:var(--muted-foreground, oklch(0.4455 0.0374 257.28));}.ds-sp-cancelled{border-color:color-mix(in oklab, var(--destructive, oklch(0.5054 0.1905 27.52)) 40%, transparent);color:var(--destructive, oklch(0.5054 0.1905 27.52));}.ds-sp-cancelled-admin{border-color:var(--input, oklch(0.6305 0.0374 253.82));color:var(--muted-foreground, oklch(0.4455 0.0374 257.28));}"
     },
     {
       "name": "Text Link",
@@ -315,6 +322,13 @@
       "description": "A notice with a blue tint, a full hairline-blue edge and a small icon. Never a stripe down one side; the words carry the meaning.",
       "html": "<div class=\"ds-callout\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 16v-4\"/><path d=\"M12 8h.01\"/></svg><p>The booking fee is non-refundable if you cancel.</p></div>",
       "css": ".ds-callout{box-sizing:border-box;display:flex;align-items:flex-start;gap:8px;width:320px;padding:12px;border:1px solid color-mix(in oklch, var(--ring, oklch(0.5876 0.1389 241.97)) 30%, transparent);border-radius:var(--radius, 0.5rem);background:color-mix(in oklch, var(--ring, oklch(0.5876 0.1389 241.97)) 5%, transparent);color:var(--foreground, oklch(0.2077 0.0398 265.75));font:400 14px/20px 'Open Sans Variable', 'Open Sans', sans-serif;}.ds-callout svg{flex:none;margin-top:2px;color:var(--ring, oklch(0.5876 0.1389 241.97));}.ds-callout p{margin:0;font-weight:500;}"
+    },
+    {
+      "name": "Destructive Callout",
+      "kind": "custom",
+      "description": "The callout in Cancel Red, for the warning before an irreversible cancel. The text stays Ink Navy; the red icon carries the tone.",
+      "html": "<div class=\"ds-callout ds-callout-destructive\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/></svg><p>If you cancel, your booking fee is not refunded.</p></div>",
+      "css": ".ds-callout{box-sizing:border-box;display:flex;align-items:flex-start;gap:8px;width:320px;padding:12px;border:1px solid color-mix(in oklch, var(--ring, oklch(0.5876 0.1389 241.97)) 30%, transparent);border-radius:var(--radius, 0.5rem);background:color-mix(in oklch, var(--ring, oklch(0.5876 0.1389 241.97)) 5%, transparent);color:var(--foreground, oklch(0.2077 0.0398 265.75));font:400 14px/20px 'Open Sans Variable', 'Open Sans', sans-serif;}.ds-callout svg{flex:none;margin-top:2px;color:var(--ring, oklch(0.5876 0.1389 241.97));}.ds-callout p{margin:0;font-weight:500;}.ds-callout-destructive{border-color:color-mix(in oklab, var(--destructive, oklch(0.5054 0.1905 27.52)) 30%, transparent);background:color-mix(in oklab, var(--destructive, oklch(0.5054 0.1905 27.52)) 5%, transparent);}.ds-callout-destructive svg{color:var(--destructive, oklch(0.5054 0.1905 27.52));}"
     },
     {
       "name": "Status Line",
@@ -352,7 +366,7 @@
       },
       {
         "name": "The Two Voices Rule",
-        "body": "Poppins speaks only in `h1`, `h2`, `h3` and card titles, assigned once in the base layer of `index.css`; a page never adds a heading font by hand. Everything else is Open Sans.",
+        "body": "Poppins speaks only in `h1`, `h2`, `h3`, card titles and fieldset legends: the headings get it once from the base layer of `index.css`, and a legend, which is a heading inside a form, adds `font-heading` itself. Everything else is Open Sans.",
         "section": "typography"
       },
       {

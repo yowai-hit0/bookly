@@ -53,9 +53,9 @@ typography:
     letterSpacing: "normal"
   reference:
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-    fontSize: "1rem"
+    fontSize: "1.125rem"
     fontWeight: 600
-    lineHeight: 1.5
+    lineHeight: 1.5556
     letterSpacing: "0.025em"
 rounded:
   sm: "4.8px"
@@ -148,7 +148,7 @@ The palette and the type pairing were chosen by a design tool and accepted by th
 - Hairline borders plus `shadow-sm`; no heavy shadows.
 - Every status and every amount is written in words; colour and icons only repeat them.
 
-**State of the build (snapshot, 2026-09-20).** Tokens, fonts and the shadcn primitives are shipped and apply app-wide. Home, NotFound and the whole services flow (the list, the service page with its calendar and times, the details form, the price summary and the held booking) and the checkout (the pay page, its notices and the payment-progress page) have their redesigned page layout. The client booking page and all admin pages are still their pre-redesign layouts wearing the new tokens. What is designed but not built is listed at the end of Components.
+**State of the build (snapshot, 2026-09-20).** Tokens, fonts and the shadcn primitives are shipped and apply app-wide. Home, NotFound and the whole services flow (the list, the service page with its calendar and times, the details form, the price summary and the held booking), the checkout (the pay page, its notices and the payment-progress page) and the client booking page, with its status pill, have their redesigned page layout, so every client page is done. All admin pages are still their pre-redesign layouts wearing the new tokens. What is designed but not built is listed at the end of Components.
 
 ## Colors
 
@@ -191,14 +191,14 @@ A cool sky-and-slate ground with one confident green for action and one blue hel
 ### Hierarchy
 - **Headline** (600, 1.875rem, 1.2): the title of a client page (Home wordmark, services, service detail, booking, checkout, held).
 - **Title** (600, 1.5rem, 1.333): the title of an error, invalid-link or payment-progress state, and of admin pages such as bookings. Two admin pages (calendar and catalogue) currently title at 1.25rem; later sections settle that.
-- **Section** (600, 1.125rem, 1.556): every `h2` and card section title ("Price summary"). Fieldset legends ("Choose a package") are the same size and weight but currently render in Open Sans, because only `h1`-`h3` take the heading font; later sections make them match.
+- **Section** (600, 1.125rem, 1.556): every `h2` and card section title ("Price summary"). Fieldset legends ("Choose a package") are the same size and weight and take the heading font by hand (`font-heading`), because only `h1`-`h3` get it from the base layer.
 - **Body** (400, 0.875rem, 1.429): almost all text. Inputs are 1rem on phones (so iOS does not zoom) and 0.875rem from `md`.
 - **Label** (500, 0.875rem): buttons and form labels.
 - **Caption** (500, 0.75rem, 1.333): badges, hints and small print.
-- **Reference** (mono, 600, 1rem, +0.025em): booking and payment reference numbers, always monospace and semibold so they can be read out or copied without doubt.
+- **Reference** (mono, 600, 1.125rem, +0.025em): booking and payment reference numbers on the client pages, always monospace and semibold so they can be read out or copied without doubt.
 
 ### Named Rules
-**The Two Voices Rule.** Poppins speaks only in `h1`, `h2`, `h3` and card titles, assigned once in the base layer of `index.css`; a page never adds a heading font by hand. Everything else is Open Sans.
+**The Two Voices Rule.** Poppins speaks only in `h1`, `h2`, `h3`, card titles and fieldset legends: the headings get it once from the base layer of `index.css`, and a legend, which is a heading inside a form, adds `font-heading` itself. Everything else is Open Sans.
 
 **The Numbers Stay Put Rule.** Amounts, times and counts use tabular figures so columns and totals do not shift as digits change.
 
@@ -221,14 +221,14 @@ Tonal layering with a hairline: white cards sit on a sky-tinted page, a Powder B
 
 ## Shapes
 
-Everything derives from one `--radius` of 0.5rem: controls are 8px (`rounded-lg`), cards 11.2px (`rounded-xl`), the small button sizes 6.4px, badges fully round pills (`rounded-4xl`), and the checkbox 4px. Edges are 1px: Hairline Blue for decoration, Field Slate for controls. A focus indicator on a text link is a 2px outline offset 2px. Dashed and dotted edges are reserved to mean something (see the designed-not-built statuses below); they are never decorative. Icons are lucide, outline style, 16px beside text (plus one 40px page-level mark on NotFound), and `aria-hidden` whenever they are decorative.
+Everything derives from one `--radius` of 0.5rem: controls are 8px (`rounded-lg`), cards 11.2px (`rounded-xl`), the small button sizes 6.4px, badges fully round pills (`rounded-4xl`), and the checkbox 4px. Edges are 1px: Hairline Blue for decoration, Field Slate for controls. A focus indicator on a text link is a 2px outline offset 2px. Dashed and dotted edges are reserved to mean something (an unpaid hold is dashed, a lapsed one dotted; see Status badges); they are never decorative. Icons are lucide, outline style, 16px beside text (plus one 40px page-level mark on NotFound), and `aria-hidden` whenever they are decorative.
 
 ## Components
 
 ### Buttons
 - **Shape:** 8px radius (`rounded-lg`), 1px transparent border, label in Open Sans medium 14px.
 - **Primary (default):** Available Green fill, white label, 10px side padding. Hover darkens to Available Green, pressed. Pressing nudges down 1px.
-- **Outline:** white fill and a Field Slate edge (3.27:1 on the page, the same as a text field), Ink Navy label; hover fills Powder Blue. It used to draw a Hairline Blue edge, about 1.1:1, which made every outline button read as floating text; the variant itself was fixed. **Ghost:** no fill, Powder Blue on hover. **Destructive:** a tinted button (Cancel Red at 10% fill, Cancel Red label), used for cancel actions; the irreversible confirmations are meant to be a solid Cancel Red fill through a `className` override at the call site, not a new variant. **Secondary and link** variants exist and no page uses `secondary`.
+- **Outline:** white fill and a Field Slate edge (3.27:1 on the page, the same as a text field), Ink Navy label; hover fills Powder Blue. It used to draw a Hairline Blue edge, about 1.1:1, which made every outline button read as floating text; the variant itself was fixed. **Ghost:** no fill, Powder Blue on hover. **Destructive:** a tinted button (Cancel Red at 10% fill, Cancel Red label), used for cancel actions; the irreversible confirmation on the client booking page ("Yes, cancel my booking") is a solid Cancel Red fill with a white label (6.47:1) through a `className` override at the call site, not a new variant, and the admin's is meant to follow. **Secondary and link** variants exist and no page uses `secondary`.
 - **Size:** 32px high on a mouse, 44px under `pointer-coarse:` (icon buttons 32px and 44px). The small size also grows to 44px on touch; the extra-small size grows to 36px.
 - **Busy and disabled:** pages set `aria-disabled` (not `disabled`) while a request runs, which fades the button to 50% opacity with a not-allowed cursor and keeps it focusable. Native `disabled` fades to 50% and drops pointer events.
 - **Focus:** the border turns Calendar Blue with a 3px ring at 50%.
@@ -243,10 +243,15 @@ Everything derives from one `--radius` of 0.5rem: controls are 8px (`rounded-lg`
 - **Corner Style:** 11.2px (`rounded-xl`).
 - **Background:** Studio White, with Ink Navy text.
 - **Shadow Strategy:** Card lift plus a 1px Hairline Blue border (see Elevation & Depth).
-- **Internal Padding:** 16px (`p-4`); a `sm` size uses 12px. The hand-rolled cards on the services pages carry the border and `shadow-sm`; the ones on checkout, the client booking page and the admin still carry only the border until Sections 3, 4 and 7 add it, so there is one card look.
+- **Internal Padding:** 16px (`p-4`); a `sm` size uses 12px. The hand-rolled cards on the services pages, the checkout and the client booking page carry the border and `shadow-sm`; the admin's still carry only the border until Section 7 adds it, so there is one card look.
 
 ### Badges
-- **Style:** a pill, 20px high, caption text, 8px side padding. The active badge is Available Green with white text; the outline badge is a Hairline Blue edge with Ink Navy text (today every booking status renders as the outline badge); a destructive badge is Cancel Red at 10% with Cancel Red text.
+- **Style:** a pill, 20px high, caption text, 8px side padding. The active badge is Available Green with white text; the outline badge is a Hairline Blue edge with Ink Navy text; a destructive badge is Cancel Red at 10% with Cancel Red text. A booking status is not one of these: it uses the status badge below.
+
+### Status badges (shipped: the client booking page's pill)
+- **Style:** the seven booking statuses in one shared look, built on the outline badge as the `StatusBadge` component. The label is always shown; a 16px lucide icon repeats it. The page pill is 28px high with 14px text (`md`); the 20px badge (`sm`) is for tables.
+- **The seven:** confirmed is a mint fill (Available Green at 10% mixed into the white) with a 30% green edge, green text and a circle-check; pending payment is a dashed Slate edge with no fill and a clock; completed is a Powder Blue fill with no edge and a double check; no-show is a red tint (10%) with no edge, red text and a crossed-out person; expired is a dotted Slate edge with muted text and an hourglass; cancelled by the client is a 40% Cancel Red edge, red text and a circled cross; cancelled by the photographer is a solid Field Slate edge with muted text and a ban sign.
+- **Rules:** the seven stay apart in greyscale (edge style, fill and icon each differ), text on its own fill is at least 4.5:1, and green appears only for a confirmed booking. No status uses a heavy red edge. The tints are opaque mixes into the card's white, never a translucent fill laid over the page. An unknown status falls back to a plain outline.
 
 ### Text link (shipped: the shared `BackLink`, on NotFound and the service page)
 - **Style:** a standalone link, not one inside a sentence: Slate Text, 14px, underlined on hover only (4px offset, the same as the Button's link variant), with a leading lucide arrow when it means "back". At least 24px high, 44px on touch.
@@ -255,8 +260,9 @@ Everything derives from one `--radius` of 0.5rem: controls are 8px (`rounded-lg`
 ### Status line (shipped on Home)
 - **Style:** a small round dot before the words, in Available Green when it worked, Cancel Red when it failed and Slate Text while pending; the text turns Cancel Red on failure and wraps anywhere. The dot repeats what the words say and fades between colours in 200ms, with no transition under reduced motion.
 
-### Callouts (shipped on the service page and the held page)
-- **Style:** a Calendar Blue tint (5%) with a full 1px Calendar Blue edge (30%), 8px radius and 12px padding; a 16px lucide icon in Calendar Blue beside 14px Ink Navy text. Never a stripe down one side. The icon is decoration and the words carry the meaning. It holds the non-refundable notice, the hold expiry and the "payment request already waiting on your phone" banner. Shared as the `Callout` component.
+### Callouts (shipped on the service page, the held page, the pay page and the client booking page)
+- **Style:** a Calendar Blue tint (5%) with a full 1px Calendar Blue edge (30%), 8px radius and 12px padding; a 16px lucide icon in Calendar Blue beside 14px Ink Navy text. Never a stripe down one side. The icon is decoration and the words carry the meaning. It holds the non-refundable notice, the hold expiry, the "payment request already waiting on your phone" banner, the expired photo link and the refund note.
+- **Destructive tone:** the same shape in Cancel Red (a 5% tint, a 30% edge and a red icon), used for the warning before an irreversible cancel. The text stays Ink Navy, so the icon carries the tone and the words carry the meaning. Shared as the `Callout` component, with `info` as its default tone.
 
 ### Selectable cards (shipped: packages and add-ons)
 - **Style:** a white card with a hairline edge and `shadow-sm` around a native radio or checkbox; the whole card is the label. Hover fills a pale blue (Powder Blue at 60% mixed into the white; not on the selected card). Selected is a faint mint (Available Green at 5% mixed into the white) and a 2px green edge (the 1px border plus a 1px ring) on top of the native mark. Both fills are mixed into the card's own white, never laid over the page, so a selected card stays a white card and never looks like the blue hover. Keyboard focus turns the border Calendar Blue with the 3px ring, replacing the green ring while focused; the native input's own outline is hidden so there is one indicator. Shared as the `SelectableCard` component.
@@ -271,13 +277,13 @@ Everything derives from one `--radius` of 0.5rem: controls are 8px (`rounded-lg`
 ### Step numerals (shipped on the service page)
 - **Style:** the three funnel groups (choose, pick a time, your details) each start with a 24px Powder Blue disc holding a CSS-counter numeral in the heading font. It is generated content, so no text was added; add-ons are not numbered.
 
-### Status views (shipped: NotFound, the pay page's notices and the payment-progress page)
+### Status views (shipped: NotFound, the pay page's notices, the payment-progress page and the client booking page's invalid link)
 - **Style:** a 40px lucide icon with a light stroke, always `aria-hidden`, above a `2xl` heading and its body, then the booking card. The icon's tone says what kind of news it is: **Calendar Blue** for information and waiting, **Cancel Red** for a failure, **Slate Text** for neutral, and **Available Green** only for a booking the API has confirmed (and the already-paid notice). Waiting is a spinner, the one moving element on the page; a visitor who asks for less motion gets a still phone icon instead of a frozen spinner.
 - **The invariant:** the design never implies success while the outcome is unknown. A payment that is pending, received but not confirmed, refunded or duplicated is never green and never ticked. Shared as the `StatusIcon` component; the reference, service and time card is shared as `BookingFacts`.
 
 ### Designed, not built yet
 These are decided in `design-system/bookly/MASTER.md` (sections 7 and 8) and `design-system/bookly/pages/*.md`, and nothing in the app implements them yet:
-- **Booking-status treatments:** seven statuses in one shared look (a different edge, fill and lucide icon each, distinguishable in greyscale, with the label always shown), used by the client pill, the admin badges and the calendar events.
+- **Booking-status treatments on the admin badges and the calendar events:** the client pill already uses the shared `StatusBadge`; the admin list and detail badges and the calendar events still show the old plain badge and identical blue events.
 - **Admin sidebar:** 15rem and sticky from `lg`, reflowing to a top bar below it, plus a skip-to-content link. `AdminLayout.tsx` is still the pre-redesign layout.
 - **Calendar:** the FullCalendar styling in `index.css` is untouched and still uses the old mapping.
 

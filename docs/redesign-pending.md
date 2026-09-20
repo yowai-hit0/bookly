@@ -28,7 +28,7 @@ Your answers to decisions 6, 7 and 8: build these first. They are feature work (
 - NotFound gets an "All services" link, reusing the existing string `services:allServices`.
 - Home is restyled only.
 - The admin shell gets a skip-to-content link (a new `en.json` key, additive).
-- The seven booking statuses share one look, first used in Section 4 (`MASTER.md` section 7).
+- The seven booking statuses share one look, first used in Section 4 (`MASTER.md` section 7). Built: the client pill uses the shared `StatusBadge`. Still to adopt it: the calendar events (Section 6) and the admin badges (Section 7).
 - The admin sidebar reflows to a top bar below 1024px. No drawer, no collapse toggle.
 
 ## 4. Product gaps outside the redesign (from `PRODUCT.md`)
@@ -48,7 +48,7 @@ Your answers to decisions 6, 7 and 8: build these first. They are feature work (
 - [ ] Dark mode is not designed (`.dark` is unreachable). Say so if you want it.
 - [ ] The Section 4 milestone needs the booking funnel run end to end (backend and database running, or mocked), plus `npm run test:e2e`.
 - [ ] Before merging `redesign/visual-only`: `PRODUCT.md`, `DESIGN.md`, `.impeccable/design.json`, this file and three e2e specs (`frontend/e2e/{booking,services,slot-picker}.spec.ts`, one locator each, renamed because the back link's accessible name lost its arrow character) sit outside the plan's normally allowed paths (keep or move them). The plan's protected-file check already allows additive `en.json` keys.
-- [ ] `DESIGN.md` and its sidecar were written after Section 1 and hand-updated after Sections 2 and 3 (2026-09-20). Re-run `/impeccable document` at the Section 4 milestone and in Phase 4 so they describe what has shipped by then.
+- [ ] `DESIGN.md` and its sidecar were written after Section 1 and hand-updated after Sections 2, 3 and 4 (2026-09-20). Re-run `/impeccable document` at the Section 4 milestone and in Phase 4 so they describe what has shipped by then.
 - [ ] Two admin pages (calendar and catalogue) title at 1.25rem while the others use 1.5rem (Sections 6 and 8). Fieldset legends now use the heading font, fixed in Section 2.
 - [x] **The `outline` Button variant was nearly invisible on the page.** Decided 2026-09-20, at Section 3: fix the variant itself. It is now `border-input bg-card` (a slate edge on white, 3.27:1), so every outline button improved at once, and the local overrides from Section 2 were removed. The admin's outline buttons changed slightly ahead of their own sections.
 - [ ] On a 900px-tall desktop the service page's 21:9 cover image (about 425px at full width) puts the first package right at the fold. A `max-h` on the cover would bring the first step up. It is a page-file decision, so it stays as designed until you say.
