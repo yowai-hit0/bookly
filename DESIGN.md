@@ -191,7 +191,7 @@ A cool sky-and-slate ground with one confident green for action and one blue hel
 ### Hierarchy
 - **Headline** (600, 1.875rem, 1.2): the title of a client page (Home wordmark, services, service detail, booking, checkout, held).
 - **Title** (600, 1.5rem, 1.333): the title of an error, invalid-link or payment-progress state, and of admin pages such as bookings. Two admin pages (calendar and catalogue) currently title at 1.25rem; later sections settle that.
-- **Section** (600, 1.125rem, 1.556): every `h2` and card section title ("Price summary"). Fieldset legends ("Choose a package") are the same size and weight and take the heading font by hand (`font-heading`), because only `h1`-`h3` get it from the base layer.
+- **Section** (600, 1.125rem, 1.556): every `h2` and card section title ("Price summary"). Fieldset legends ("Choose a package") are the same size and weight and take the heading font by hand (`font-heading`), because only `h1`-`h3` get it from the base layer; inside a card that has its own `h2` (the session-fee card on the client booking page) a legend drops to 1rem so the two do not compete.
 - **Body** (400, 0.875rem, 1.429): almost all text. Inputs are 1rem on phones (so iOS does not zoom) and 0.875rem from `md`.
 - **Label** (500, 0.875rem): buttons and form labels.
 - **Caption** (500, 0.75rem, 1.333): badges, hints and small print.
@@ -229,7 +229,7 @@ Everything derives from one `--radius` of 0.5rem: controls are 8px (`rounded-lg`
 - **Shape:** 8px radius (`rounded-lg`), 1px transparent border, label in Open Sans medium 14px.
 - **Primary (default):** Available Green fill, white label, 10px side padding. Hover darkens to Available Green, pressed. Pressing nudges down 1px.
 - **Outline:** white fill and a Field Slate edge (3.27:1 on the page, the same as a text field), Ink Navy label; hover fills Powder Blue. It used to draw a Hairline Blue edge, about 1.1:1, which made every outline button read as floating text; the variant itself was fixed. **Ghost:** no fill, Powder Blue on hover. **Destructive:** a tinted button (Cancel Red at 10% fill, Cancel Red label), used for cancel actions; the irreversible confirmation on the client booking page ("Yes, cancel my booking") is a solid Cancel Red fill with a white label (6.47:1) through a `className` override at the call site, not a new variant, and the admin's is meant to follow. **Secondary and link** variants exist and no page uses `secondary`.
-- **Size:** 32px high on a mouse, 44px under `pointer-coarse:` (icon buttons 32px and 44px). The small size also grows to 44px on touch; the extra-small size grows to 36px.
+- **Size:** 32px high on a mouse, 44px under `pointer-coarse:` (icon buttons 32px and 44px). The small size also grows to 44px on touch; the extra-small size grows to 36px. A submit button (Pay) and the two-button cancel confirmation are full width on a phone and hug their labels from `sm`; a standalone button always hugs its label.
 - **Busy and disabled:** pages set `aria-disabled` (not `disabled`) while a request runs, which fades the button to 50% opacity with a not-allowed cursor and keeps it focusable. Native `disabled` fades to 50% and drops pointer events.
 - **Focus:** the border turns Calendar Blue with a 3px ring at 50%.
 

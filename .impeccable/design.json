@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-20T11:29:46.554Z",
+  "generatedAt": "2026-09-20T11:53:24.179Z",
   "title": "Design System: Bookly",
   "extensions": {
     "colorMeta": {
@@ -166,7 +166,7 @@
       },
       "section": {
         "displayName": "Section",
-        "purpose": "Every h2, card section title and fieldset legend (a legend takes the heading font by hand)."
+        "purpose": "Every h2, card section title and fieldset legend (a legend takes the heading font by hand, and drops to 1rem inside a card that has its own h2)."
       },
       "body": {
         "displayName": "Body",

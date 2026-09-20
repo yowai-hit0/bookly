@@ -67,7 +67,8 @@ export function BookingPage() {
   const current = loaded?.key === key ? loaded : null
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-8">
+    // `text-pretty` is inherited, so no notice on a phone ends on a single stranded word.
+    <main className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-8 text-pretty">
       {current === null && (
         <p className="text-muted-foreground text-sm" role="status">
           {t('booking:loading')}
@@ -369,7 +370,8 @@ function SessionFee({ token, booking, methods, onMissing, onReload }: SessionFee
           {t('checkout:errors.noMethods')}
         </p>
       ) : (
-        <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
+        // The card's own h2 is the heading here, so the method legend sits one step below it (it is 18px on the pay page, where it is the first heading).
+        <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-4 [&_legend]:text-base">
           <PaymentFields
             methods={methods}
             method={method}
@@ -454,7 +456,8 @@ function Cancel({ token, booking, onCancelled, onRefused, onMissing }: CancelPro
           <Callout tone="destructive" icon={TriangleAlert}>
             <p className="font-medium">{t('booking:cancel.warning', { fee: formatMoney(booking.bookingFeeRwf) })}</p>
           </Callout>
-          <div className="flex flex-wrap gap-2">
+          {/* Stacked and full width on a phone, like the pay button: equal targets whose edges line up with the notice above. */}
+          <div className="flex flex-col gap-2 sm:flex-row">
             {/* Irreversible, so it is a solid red button rather than the tinted variant (MASTER section 6); the override is here, not a new variant. */}
             <Button
               ref={confirmRef}
