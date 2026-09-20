@@ -399,7 +399,7 @@ Calendar blocks are not a status: muted fill with a diagonal hatch (pattern, not
 
 **Section 1: Home + NotFound (2026-09-20).** Two files, class names and non-textual decoration only. Choices that later sections reuse:
 
-- **Text link** (a standalone link, not one inside a sentence): muted `text-sm`, underline on hover. Keyboard focus is a full-strength `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring` (3.84:1 on the page). The Button's `ring-3 ring-ring/50` is not used for links: at 50% it measures about 1.9:1 on the page. Height is `min-h-6` (24px, WCAG 2.5.8) and `pointer-coarse:min-h-11` (44px).
+- **Text link** (a standalone link, not one inside a sentence): muted `text-sm`, underline on hover with `underline-offset-4` (the same as the Button's `link` variant). Keyboard focus is a full-strength `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring` (3.84:1 on the page). The Button's `ring-3 ring-ring/50` is not used for links: at 50% it measures about 1.9:1 on the page. Height is `min-h-6` (24px, WCAG 2.5.8) and `pointer-coarse:min-h-11` (44px).
 - **Decorative icons** are lucide with `aria-hidden="true"`. A leading arrow on a link is an icon, not a "←" character, so a screen reader hears only the words. The service page's back link still uses the character; Section 2 should switch it to the same treatment (`pages/service-detail.md` says so).
 - **Optical alignment:** a 40px lucide glyph has about 6px of built-in padding, so a large icon above a heading takes `-ml-1` to line up with the text's left edge.
 - **Raw strings** (API errors, anything unpredictable) sit in a shrinkable flex child: `min-w-0 wrap-anywhere`. A 200-character error at 320-1440px causes no horizontal scroll.

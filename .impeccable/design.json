@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-20T00:22:53.466Z",
+  "generatedAt": "2026-09-20T00:25:48.836Z",
   "title": "Design System: Bookly",
   "extensions": {
     "colorMeta": {
@@ -307,7 +307,7 @@
       "refersTo": "link-text",
       "description": "A standalone link with a back arrow: slate, underlined on hover, a full-strength 2px blue outline on keyboard focus.",
       "html": "<a class=\"ds-link\" href=\"#\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m12 19-7-7 7-7\"/><path d=\"M19 12H5\"/></svg>All services</a>",
-      "css": ".ds-link{box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;min-height:24px;border-radius:calc(var(--radius, 0.5rem) * 0.6);color:var(--muted-foreground, oklch(0.4455 0.0374 257.28));font:400 14px/20px 'Open Sans Variable', 'Open Sans', sans-serif;text-decoration:none;}.ds-link:hover{text-decoration:underline;}.ds-link:focus-visible{outline:2px solid var(--ring, oklch(0.5876 0.1389 241.97));outline-offset:2px;}"
+      "css": ".ds-link{box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;min-height:24px;border-radius:calc(var(--radius, 0.5rem) * 0.6);color:var(--muted-foreground, oklch(0.4455 0.0374 257.28));font:400 14px/20px 'Open Sans Variable', 'Open Sans', sans-serif;text-decoration:none;}.ds-link:hover{text-decoration:underline;text-underline-offset:4px;}.ds-link:focus-visible{outline:2px solid var(--ring, oklch(0.5876 0.1389 241.97));outline-offset:2px;}"
     },
     {
       "name": "Status Line",

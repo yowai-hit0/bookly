@@ -12,7 +12,7 @@ export function NotFound() {
       <p className="text-muted-foreground text-sm">{t('notFound:body')}</p>
       <Link
         to="/services"
-        className="text-muted-foreground focus-visible:outline-ring mt-2 inline-flex min-h-6 items-center gap-1.5 self-start rounded-sm text-sm hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11"
+        className="text-muted-foreground focus-visible:outline-ring mt-2 inline-flex min-h-6 items-center gap-1.5 self-start rounded-sm text-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11"
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
         {t('services:allServices')}

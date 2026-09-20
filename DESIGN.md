@@ -249,7 +249,7 @@ Everything derives from one `--radius` of 0.5rem: controls are 8px (`rounded-lg`
 - **Style:** a pill, 20px high, caption text, 8px side padding. The active badge is Available Green with white text; the outline badge is a Hairline Blue edge with Ink Navy text (today every booking status renders as the outline badge); a destructive badge is Cancel Red at 10% with Cancel Red text.
 
 ### Text link (shipped on NotFound)
-- **Style:** a standalone link, not one inside a sentence: Slate Text, 14px, underlined on hover only, with a leading lucide arrow when it means "back". At least 24px high, 44px on touch.
+- **Style:** a standalone link, not one inside a sentence: Slate Text, 14px, underlined on hover only (4px offset, the same as the Button's link variant), with a leading lucide arrow when it means "back". At least 24px high, 44px on touch.
 - **Focus:** a full-strength 2px Calendar Blue outline offset 2px. The Button's 50% ring is not used here because it measures about 1.9:1 on the page.
 
 ### Status line (shipped on Home)
