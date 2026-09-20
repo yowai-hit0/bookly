@@ -224,7 +224,6 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange, ref }:
             type="button"
             variant="outline"
             size="icon"
-            className="border-input bg-card"
             aria-label={t('services:picker.previousMonth')}
             disabled={month <= currentMonth}
             onClick={() => showMonth(addMonths(month, -1))}
@@ -238,7 +237,6 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange, ref }:
             type="button"
             variant="outline"
             size="icon"
-            className="border-input bg-card"
             aria-label={t('services:picker.nextMonth')}
             onClick={() => showMonth(addMonths(month, 1))}
           >
@@ -322,8 +320,7 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange, ref }:
                   <Button
                     type="button"
                     variant={start === value ? 'default' : 'outline'}
-                    // A time is a choice, so it gets a field's edge and white fill; the hairline of a plain outline button vanishes on the page.
-                    className={cn('h-11 w-full tabular-nums', start !== value && 'border-input bg-card')}
+                    className="h-11 w-full tabular-nums"
                     aria-pressed={start === value}
                     // Not `disabled`: a disabled button drops keyboard focus mid-check.
                     aria-busy={start === checkingStart}

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-20T01:10:55.209Z",
+  "generatedAt": "2026-09-20T10:49:36.944Z",
   "title": "Design System: Bookly",
   "extensions": {
     "colorMeta": {
@@ -257,9 +257,9 @@
       "name": "Outline Button",
       "kind": "button",
       "refersTo": "button-outline",
-      "description": "A quieter action beside a primary one: page-coloured fill, hairline edge, Powder Blue on hover.",
+      "description": "A quieter action beside a primary one: white fill, a slate edge like a text field, Powder Blue on hover.",
       "html": "<button class=\"ds-btn-outline\">Save</button>",
-      "css": ".ds-btn-outline{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 10px;border:1px solid transparent;border-radius:var(--radius, 0.5rem);font:500 14px/20px 'Open Sans Variable', 'Open Sans', sans-serif;white-space:nowrap;cursor:pointer;transition:all 150ms cubic-bezier(0.4,0,0.2,1);outline:none;background:var(--background, oklch(0.9771 0.0125 236.62));color:var(--foreground, oklch(0.2077 0.0398 265.75));border-color:var(--border, oklch(0.9456 0.0201 229.04));}.ds-btn-outline:hover{background:var(--muted, oklch(0.9514 0.0250 236.82));}.ds-btn-outline:focus-visible{border-color:var(--ring, oklch(0.5876 0.1389 241.97));box-shadow:0 0 0 3px color-mix(in oklch, var(--ring, oklch(0.5876 0.1389 241.97)) 50%, transparent);}.ds-btn-outline:active{transform:translateY(1px);}"
+      "css": ".ds-btn-outline{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 10px;border:1px solid transparent;border-radius:var(--radius, 0.5rem);font:500 14px/20px 'Open Sans Variable', 'Open Sans', sans-serif;white-space:nowrap;cursor:pointer;transition:all 150ms cubic-bezier(0.4,0,0.2,1);outline:none;background:var(--card, oklch(1 0 0));color:var(--foreground, oklch(0.2077 0.0398 265.75));border-color:var(--input, oklch(0.6305 0.0374 253.82));}.ds-btn-outline:hover{background:var(--muted, oklch(0.9514 0.0250 236.82));}.ds-btn-outline:focus-visible{border-color:var(--ring, oklch(0.5876 0.1389 241.97));box-shadow:0 0 0 3px color-mix(in oklch, var(--ring, oklch(0.5876 0.1389 241.97)) 50%, transparent);}.ds-btn-outline:active{transform:translateY(1px);}"
     },
     {
       "name": "Destructive Button",
@@ -382,6 +382,7 @@
       "**Don't** use white text on the lighter #059669 green (3.77:1), and don't let a hover state lighten the default Button.",
       "**Don't** set text in the plain Calendar Blue on white (4.10:1); use #0369A1.",
       "**Don't** use Hairline Blue or Powder Blue as the only boundary of a control or as the only signal of state.",
+      "**Don't** show a green icon, tick or tint for anything the API has not confirmed: waiting, received-but-unconfirmed and refund views are blue.",
       "**Don't** hard-code a colour, radius or font in a component; use the tokens in `index.css`.",
       "**Don't** use `bg-input/…` for a disabled fill (the input token is now a mid slate); use Powder Blue."
     ]

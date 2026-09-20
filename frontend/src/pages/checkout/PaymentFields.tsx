@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { type PaymentMethod, needsPhoneFor } from '@/catalogue/payments'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { SelectableCard } from '@/components/ui/selectable-card'
 
 /**
  * Choosing how to pay, and the number to prompt (plan.md Tasks 16 and 18,
@@ -28,12 +29,9 @@ export function PaymentFields({ methods, method, onMethod, phoneId, phoneRef, ph
   return (
     <>
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-lg font-semibold">{t('checkout:methods.legend')}</legend>
+        <legend className="font-heading mb-2 text-lg font-semibold">{t('checkout:methods.legend')}</legend>
         {methods.map((option) => (
-          <label
-            key={option}
-            className="has-checked:border-primary has-focus-visible:ring-ring/50 flex cursor-pointer items-center gap-3 rounded-xl border p-3 has-focus-visible:ring-3"
-          >
+          <SelectableCard key={option} className="items-center p-3">
             <input
               type="radio"
               name="method"
@@ -43,7 +41,7 @@ export function PaymentFields({ methods, method, onMethod, phoneId, phoneRef, ph
               className="accent-primary size-4 shrink-0"
             />
             <span>{t(`checkout:methods.${option}`)}</span>
-          </label>
+          </SelectableCard>
         ))}
       </fieldset>
 
@@ -60,11 +58,11 @@ export function PaymentFields({ methods, method, onMethod, phoneId, phoneRef, ph
             aria-invalid={phoneInvalid || undefined}
             aria-describedby={[`${phoneId}-hint`, phoneInvalid ? `${phoneId}-error` : null].filter(Boolean).join(' ')}
           />
-          <p id={`${phoneId}-hint`} className="text-muted-foreground text-xs">
+          <p id={`${phoneId}-hint`} className="text-muted-foreground text-sm">
             {t('checkout:phone.hint')}
           </p>
           {phoneInvalid && (
-            <p id={`${phoneId}-error`} className="text-destructive text-xs">
+            <p id={`${phoneId}-error`} className="text-destructive text-sm">
               {t('checkout:phone.invalid')}
             </p>
           )}

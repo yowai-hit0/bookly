@@ -5,6 +5,7 @@
 > **Files:** `pages/checkout/CheckoutPage.tsx`, `pages/checkout/PaymentProgressPage.tsx`, `pages/checkout/PaymentFields.tsx`. `PaymentFields` is also used by `BookingPage`; one visual definition for both.
 > Generator template: UI UX Pro Max, 2026-09-19 (1200px width replaced by the shipped `max-w-2xl`; the "admin feedback" effect note was boilerplate).
 > This file overrides `design-system/bookly/MASTER.md` for these pages. Read MASTER's "Hand-review addendum" first.
+> **Applied 2026-09-20 (Phase 3 section 3).** Two things the file left open were decided while applying it: the icon and tone of each view, and the reduced-motion fallback for the spinner. Both are in `MASTER.md` section 11.
 
 ## Shared shell
 

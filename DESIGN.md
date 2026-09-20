@@ -81,7 +81,7 @@ components:
   button-primary-hover:
     backgroundColor: "{colors.available-green-pressed}"
   button-outline:
-    backgroundColor: "{colors.morning-sky}"
+    backgroundColor: "{colors.studio-white}"
     textColor: "{colors.ink-navy}"
     typography: "{typography.label}"
     rounded: "{rounded.lg}"
@@ -148,7 +148,7 @@ The palette and the type pairing were chosen by a design tool and accepted by th
 - Hairline borders plus `shadow-sm`; no heavy shadows.
 - Every status and every amount is written in words; colour and icons only repeat them.
 
-**State of the build (snapshot, 2026-09-20).** Tokens, fonts and the shadcn primitives are shipped and apply app-wide. Home, NotFound and the whole services flow (the list, the service page with its calendar and times, the details form, the price summary and the held booking) have their redesigned page layout. Checkout, the client booking page and all admin pages are still their pre-redesign layouts wearing the new tokens. What is designed but not built is listed at the end of Components.
+**State of the build (snapshot, 2026-09-20).** Tokens, fonts and the shadcn primitives are shipped and apply app-wide. Home, NotFound and the whole services flow (the list, the service page with its calendar and times, the details form, the price summary and the held booking) and the checkout (the pay page, its notices and the payment-progress page) have their redesigned page layout. The client booking page and all admin pages are still their pre-redesign layouts wearing the new tokens. What is designed but not built is listed at the end of Components.
 
 ## Colors
 
@@ -228,7 +228,7 @@ Everything derives from one `--radius` of 0.5rem: controls are 8px (`rounded-lg`
 ### Buttons
 - **Shape:** 8px radius (`rounded-lg`), 1px transparent border, label in Open Sans medium 14px.
 - **Primary (default):** Available Green fill, white label, 10px side padding. Hover darkens to Available Green, pressed. Pressing nudges down 1px.
-- **Outline:** Morning Sky fill, Hairline Blue border, Ink Navy label; hover fills Powder Blue. **Ghost:** no fill, Powder Blue on hover. **Destructive:** a tinted button (Cancel Red at 10% fill, Cancel Red label), used for cancel actions; the irreversible confirmations are meant to be a solid Cancel Red fill through a `className` override at the call site, not a new variant. **Secondary and link** variants exist and no page uses `secondary`.
+- **Outline:** white fill and a Field Slate edge (3.27:1 on the page, the same as a text field), Ink Navy label; hover fills Powder Blue. It used to draw a Hairline Blue edge, about 1.1:1, which made every outline button read as floating text; the variant itself was fixed. **Ghost:** no fill, Powder Blue on hover. **Destructive:** a tinted button (Cancel Red at 10% fill, Cancel Red label), used for cancel actions; the irreversible confirmations are meant to be a solid Cancel Red fill through a `className` override at the call site, not a new variant. **Secondary and link** variants exist and no page uses `secondary`.
 - **Size:** 32px high on a mouse, 44px under `pointer-coarse:` (icon buttons 32px and 44px). The small size also grows to 44px on touch; the extra-small size grows to 36px.
 - **Busy and disabled:** pages set `aria-disabled` (not `disabled`) while a request runs, which fades the button to 50% opacity with a not-allowed cursor and keeps it focusable. Native `disabled` fades to 50% and drops pointer events.
 - **Focus:** the border turns Calendar Blue with a 3px ring at 50%.
@@ -256,20 +256,24 @@ Everything derives from one `--radius` of 0.5rem: controls are 8px (`rounded-lg`
 - **Style:** a small round dot before the words, in Available Green when it worked, Cancel Red when it failed and Slate Text while pending; the text turns Cancel Red on failure and wraps anywhere. The dot repeats what the words say and fades between colours in 200ms, with no transition under reduced motion.
 
 ### Callouts (shipped on the service page and the held page)
-- **Style:** a Calendar Blue tint (5%) with a full 1px Calendar Blue edge (30%), 8px radius and 12px padding; a 16px lucide icon in Calendar Blue beside 14px Ink Navy text. Never a stripe down one side. The icon is decoration and the words carry the meaning. It holds the non-refundable notice and the hold expiry. Shared as the `Callout` component.
+- **Style:** a Calendar Blue tint (5%) with a full 1px Calendar Blue edge (30%), 8px radius and 12px padding; a 16px lucide icon in Calendar Blue beside 14px Ink Navy text. Never a stripe down one side. The icon is decoration and the words carry the meaning. It holds the non-refundable notice, the hold expiry and the "payment request already waiting on your phone" banner. Shared as the `Callout` component.
 
 ### Selectable cards (shipped: packages and add-ons)
 - **Style:** a white card with a hairline edge and `shadow-sm` around a native radio or checkbox; the whole card is the label. Hover fills a pale blue (Powder Blue at 60% mixed into the white; not on the selected card). Selected is a faint mint (Available Green at 5% mixed into the white) and a 2px green edge (the 1px border plus a 1px ring) on top of the native mark. Both fills are mixed into the card's own white, never laid over the page, so a selected card stays a white card and never looks like the blue hover. Keyboard focus turns the border Calendar Blue with the 3px ring, replacing the green ring while focused; the native input's own outline is hidden so there is one indicator. Shared as the `SelectableCard` component.
 
 ### Calendar days and times (shipped in the slot picker)
 - **Days:** a 7-column grid. A bookable day is semibold on Powder Blue (hover 8% darker); an unavailable day is disabled at 50% text with no surface; the selected day is Available Green with white text. 40px tall, 44px on touch, and they take the same focus edge as controls.
-- **Times:** buttons 44px tall in 4 columns (3 on phones): white with a Field Slate edge (3.27:1 on the page, so they read as buttons; the plain outline variant's hairline edge disappears there); the chosen one is the default green button. The previous and next month buttons use the same white and slate edge.
+- **Times:** outline buttons 44px tall in 4 columns (3 on phones); the chosen one is the default green button. The previous and next month buttons are outline buttons too.
 
 ### Money rows (shipped on the price summary and the held page)
 - **Style:** label left, amount right in tabular figures. The total is semibold above a hairline; the booking-fee row, which is due now, is medium weight as a whole; the session fee is regular. A booking reference is monospace semibold at 18px, on the same baseline as its label.
 
 ### Step numerals (shipped on the service page)
 - **Style:** the three funnel groups (choose, pick a time, your details) each start with a 24px Powder Blue disc holding a CSS-counter numeral in the heading font. It is generated content, so no text was added; add-ons are not numbered.
+
+### Status views (shipped: NotFound, the pay page's notices and the payment-progress page)
+- **Style:** a 40px lucide icon with a light stroke, always `aria-hidden`, above a `2xl` heading and its body, then the booking card. The icon's tone says what kind of news it is: **Calendar Blue** for information and waiting, **Cancel Red** for a failure, **Slate Text** for neutral, and **Available Green** only for a booking the API has confirmed (and the already-paid notice). Waiting is a spinner, the one moving element on the page; a visitor who asks for less motion gets a still phone icon instead of a frozen spinner.
+- **The invariant:** the design never implies success while the outcome is unknown. A payment that is pending, received but not confirmed, refunded or duplicated is never green and never ticked. Shared as the `StatusIcon` component; the reference, service and time card is shared as `BookingFacts`.
 
 ### Designed, not built yet
 These are decided in `design-system/bookly/MASTER.md` (sections 7 and 8) and `design-system/bookly/pages/*.md`, and nothing in the app implements them yet:
@@ -295,5 +299,6 @@ These are decided in `design-system/bookly/MASTER.md` (sections 7 and 8) and `de
 - **Don't** use white text on the lighter #059669 green (3.77:1), and don't let a hover state lighten the default Button.
 - **Don't** set text in the plain Calendar Blue on white (4.10:1); use #0369A1.
 - **Don't** use Hairline Blue or Powder Blue as the only boundary of a control or as the only signal of state.
+- **Don't** show a green icon, tick or tint for anything the API has not confirmed: waiting, received-but-unconfirmed and refund views are blue.
 - **Don't** hard-code a colour, radius or font in a component; use the tokens in `index.css`.
 - **Don't** use `bg-input/…` for a disabled fill (the input token is now a mid slate); use Powder Blue.

@@ -1,11 +1,13 @@
+import { CircleCheck, CircleX, LoaderCircle, ReceiptText, Smartphone, Undo2, Unlink } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router'
-import { kigaliDateOf } from '@/admin/calendar-dates'
 import { bookingPath } from '@/catalogue/booking-access'
 import { type PaymentProgress, checkoutPath, fetchPaymentProgress } from '@/catalogue/payments'
 import { Button } from '@/components/ui/button'
-import { formatDate, formatMoney, formatTime } from '@/lib/format'
+import { StatusIcon } from '@/components/ui/status-icon'
+import { formatMoney } from '@/lib/format'
+import { BookingFacts } from './BookingFacts'
 
 /**
  * The confirmation page (plan.md Task 16, spec §3.1 step 10): where a started
@@ -107,6 +109,7 @@ export function PaymentProgressPage() {
   if (missing) {
     return (
       <main className="mx-auto flex max-w-2xl flex-col gap-3 px-4 py-8">
+        <StatusIcon icon={Unlink} tone="neutral" />
         <h1 className="text-2xl font-semibold">{t('checkout:invalidLink.title')}</h1>
         <p className="text-muted-foreground text-sm">{t('checkout:invalidLink.body')}</p>
       </main>
@@ -148,9 +151,12 @@ export function PaymentProgressPage() {
   )
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-4 px-4 py-8">
+    <main className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-8">
       {view === 'waiting' && (
         <section className="flex flex-col gap-3" role="status" aria-live="polite">
+          {/* The one moving thing on the page. A visitor who asks for less motion gets a still phone instead of a frozen spinner. Blue, never green: nothing is settled yet. */}
+          <StatusIcon icon={LoaderCircle} tone="info" className="motion-safe:animate-spin motion-reduce:hidden" />
+          <StatusIcon icon={Smartphone} tone="info" className="hidden motion-reduce:block" />
           {heading('checkout:progress.pendingTitle')}
           <p className="text-sm">{t('checkout:progress.pendingBody', { amount })}</p>
           <p className="text-sm">{t('checkout:progress.pendingWait')}</p>
@@ -171,18 +177,23 @@ export function PaymentProgressPage() {
 
       {view === 'confirmed' && (
         <section className="flex flex-col gap-3">
+          {/* The only view that looks like success, because it is the only one the API has confirmed. */}
+          <StatusIcon icon={CircleCheck} tone="positive" />
           {heading('checkout:progress.confirmedTitle')}
           <p className="text-sm">{t('checkout:progress.confirmedBody')}</p>
         </section>
       )}
       {view === 'received' && (
         <section className="flex flex-col gap-3">
+          {/* Text lines, not lucide's Receipt: that one carries a dollar sign, and this is Rwandan francs. */}
+          <StatusIcon icon={ReceiptText} tone="info" />
           {heading('checkout:progress.receivedTitle')}
           <p className="text-sm">{t('checkout:progress.receivedBody', { amount })}</p>
         </section>
       )}
       {view === 'failed' && (
         <section className="flex flex-col gap-3">
+          <StatusIcon icon={CircleX} tone="destructive" />
           {heading('checkout:progress.failedTitle')}
           <p className="text-sm">
             {progress.payment.failure === 'unavailable'
@@ -196,43 +207,33 @@ export function PaymentProgressPage() {
       )}
       {view === 'refund' && (
         <section className="flex flex-col gap-3">
+          <StatusIcon icon={Undo2} tone="info" />
           {heading('checkout:progress.refundTitle')}
           <p className="text-sm">{t('checkout:progress.refundBody', { amount })}</p>
         </section>
       )}
       {view === 'refundOther' && (
         <section className="flex flex-col gap-3">
+          <StatusIcon icon={Undo2} tone="info" />
           {heading('checkout:progress.refundOtherTitle')}
           <p className="text-sm">{t('checkout:progress.refundOtherBody', { amount })}</p>
         </section>
       )}
       {view === 'duplicate' && (
         <section className="flex flex-col gap-3">
+          <StatusIcon icon={Undo2} tone="info" />
           {heading('checkout:progress.duplicateTitle')}
           <p className="text-sm">{t('checkout:progress.duplicateBody', { amount })}</p>
         </section>
       )}
 
-      <dl className="bg-card flex flex-col gap-2 rounded-xl border p-4 text-sm">
-        <div className="flex flex-wrap justify-between gap-x-4">
-          <dt className="text-muted-foreground">{t('checkout:summary.reference')}</dt>
-          <dd className="font-mono text-base font-semibold tracking-wide">{booking.reference}</dd>
-        </div>
-        <div className="flex flex-wrap justify-between gap-x-4">
-          <dt className="text-muted-foreground">{t('checkout:summary.service')}</dt>
-          <dd>{t('checkout:summary.serviceValue', { service: booking.serviceName, package: booking.packageName })}</dd>
-        </div>
-        <div className="flex flex-wrap justify-between gap-x-4">
-          <dt className="text-muted-foreground">{t('checkout:summary.when')}</dt>
-          <dd>
-            {t('checkout:summary.whenValue', {
-              date: formatDate(kigaliDateOf(booking.startsAt)),
-              start: formatTime(booking.startsAt),
-              end: formatTime(booking.endsAt),
-            })}
-          </dd>
-        </div>
-      </dl>
+      <BookingFacts
+        reference={booking.reference}
+        serviceName={booking.serviceName}
+        packageName={booking.packageName}
+        startsAt={booking.startsAt}
+        endsAt={booking.endsAt}
+      />
     </main>
   )
 }
