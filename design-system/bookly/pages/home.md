@@ -3,6 +3,7 @@
 > **Project:** Bookly · **Route:** `/` · **File:** `frontend/src/pages/Home.tsx` · **Phase 3 section:** 1
 > Generator template: UI UX Pro Max, 2026-09-19. Its page text ("Landing / Marketing", 1200px width) was wrong for this page and is replaced by the hand-written notes below.
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first; its constraints apply to every page.
+> **Applied 2026-09-20 (Phase 3 section 1).** What was chosen beyond this file (the button hugs its label, the dot colours) is in `MASTER.md` section 11.
 
 ## What this page actually is
 

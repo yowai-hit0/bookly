@@ -223,7 +223,7 @@ Before delivering any UI code, verify:
 ## Hand-review addendum (Phase 2a)
 
 > Written by hand on 2026-09-19 from the shipped code and measured contrast, after reviewing the generator output. **Where this addendum and the generated text above disagree, this addendum wins.** A file in `pages/` wins over both, for its own page.
-> **Status: Phase 2b is applied (commit `3ce6cd3`) with the recommended option for decisions 1-3. Decisions 4-11 in section 9 were answered on 2026-09-20. Section 10 records what 2b did.**
+> **Status: Phase 2b is applied (commit `3ce6cd3`) with the recommended option for decisions 1-3. Decisions 4-11 in section 9 were answered on 2026-09-20. Section 10 records what 2b did. Section 11 records what each Phase 3 section applied.**
 
 ### 1. Corrections made in place to the generated text
 
@@ -394,3 +394,16 @@ Calendar blocks are not a status: muted fill with a diagonal hatch (pattern, not
   - The default Button hover darkens (a `color-mix` with black) instead of lightening, and `aria-disabled` is styled.
 - **Not done in 2b (Phase 3):** the status treatments (section 7), solid destructive confirm buttons (call-site overrides), callouts, the FullCalendar CSS block, the admin sidebar, and the layout of every page. `text-primary` links are unchanged and now pass AA (`#047857` is 5.48:1 on white).
 - **Verified:** typecheck, lint, 1135 tests and a production build. In Chromium, `/` and `/admin/login` load the new fonts (Latin subsets only), and the tokens resolve to the intended sRGB (background `#F0F9FF`, primary `#047857`, input border `#7A8BA0`). Radius is 8px on controls and 11.2px on cards, and buttons and inputs measure 44px under touch emulation and 32px on desktop. Nothing else has been rendered yet.
+
+### 11. Phase 3: what each section applied
+
+**Section 1: Home + NotFound (2026-09-20).** Two files, class names and non-textual decoration only. Choices that later sections reuse:
+
+- **Text link** (a standalone link, not one inside a sentence): muted `text-sm`, underline on hover. Keyboard focus is a full-strength `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring` (3.84:1 on the page). The Button's `ring-3 ring-ring/50` is not used for links: at 50% it measures about 1.9:1 on the page. Height is `min-h-6` (24px, WCAG 2.5.8) and `pointer-coarse:min-h-11` (44px).
+- **Decorative icons** are lucide with `aria-hidden="true"`. A leading arrow on a link is an icon, not a "←" character, so a screen reader hears only the words. The service page's back link still uses the character; Section 2 should switch it to the same treatment (`pages/service-detail.md` says so).
+- **Optical alignment:** a 40px lucide glyph has about 6px of built-in padding, so a large icon above a heading takes `-ml-1` to line up with the text's left edge.
+- **Raw strings** (API errors, anything unpredictable) sit in a shrinkable flex child: `min-w-0 wrap-anywhere`. A 200-character error at 320-1440px causes no horizontal scroll.
+- **Status dot** repeats the words and is never the only signal: `primary` when reachable, `destructive` on failure, `muted-foreground` while checking, with a 200ms colour transition that is off under `motion-reduce`. Rendered contrast on the page: 5.14 / 6.07 / 7.11, error text 6.07.
+- **A standalone button on a public page** hugs its label (`self-start`) instead of stretching across the column, as `BookingPage` already does.
+- **Tests:** `NotFound.test.tsx` is new (the page had none): the copy, one link named "All services" pointing at `/services`, and that clicking it navigates. The suite is 1137 tests.
+- **Verified** (Chromium, `/api` mocked, 1280px and 375px touch): the fonts load, the heading is Poppins 600 (30px on Home, 24px on NotFound), the tokens resolve to the intended sRGB, and the button measures 32px on desktop and 44px under touch. NotFound renders both as the `*` route and inside `/services/:slug` when the API answers 404, and never overflows horizontally at 320, 375, 768, 1024 or 1440px.

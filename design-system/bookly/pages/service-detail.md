@@ -20,7 +20,7 @@ Step numbers: mark groups 1-3 with **CSS counters only** (numerals in the headin
 ## Layout
 
 - `main`, `max-w-5xl`, `px-4 py-8`, `gap-6`.
-- Top: back link ("<- All services", muted sm) -> header: cover image (`aspect-21/9`, `rounded-xl`, `object-cover`) -> `h1` (3xl semibold) -> description (`whitespace-pre-line`, muted).
+- Top: back link ("<- All services", muted sm; use the text-link treatment from `MASTER.md` section 11, with an `ArrowLeft` icon in place of the "←" character) -> header: cover image (`aspect-21/9`, `rounded-xl`, `object-cover`) -> `h1` (3xl semibold) -> description (`whitespace-pre-line`, muted).
 - Below the header, from `lg`: grid `[1fr_22rem]`, `items-start`, `gap-6`. Left column = groups 1-3; right column = price summary, `lg:sticky lg:top-4`.
 - Below `lg`: single column in DOM order: package -> add-ons -> picker -> form -> **price summary + submit last**. Keep that order (reading order and tab order follow it). Give the summary a clear top separation so it reads as the closing step.
 
