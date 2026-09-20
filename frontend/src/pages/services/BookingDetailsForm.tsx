@@ -4,6 +4,8 @@ import type { DetailField } from '@/catalogue/bookings'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
+import { stepNumber } from './step-number'
 
 /**
  * The booking form (plan.md Task 13, spec §3.1 step 6): name, email, phone,
@@ -50,7 +52,7 @@ export function BookingDetailsForm({ id, invalid, onSubmit }: Props) {
   return (
     <form id={id} noValidate onSubmit={onSubmit} aria-labelledby={headingId} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 id={headingId} className="text-lg font-semibold">
+        <h2 id={headingId} className={cn('text-lg font-semibold', stepNumber)}>
           {t('services:booking.title')}
         </h2>
         <p className="text-muted-foreground text-sm">{t('services:booking.intro')}</p>
@@ -78,12 +80,12 @@ export function BookingDetailsForm({ id, invalid, onSubmit }: Props) {
               <Input {...common} type={field.type ?? 'text'} autoComplete={field.autoComplete} inputMode={field.inputMode} />
             )}
             {field.hint && (
-              <p id={`${inputId}-hint`} className="text-muted-foreground text-xs">
+              <p id={`${inputId}-hint`} className="text-muted-foreground text-sm">
                 {t(`services:booking.hints.${field.name}`)}
               </p>
             )}
             {isInvalid && (
-              <p id={`${inputId}-error`} className="text-destructive text-xs">
+              <p id={`${inputId}-error`} className="text-destructive text-sm">
                 {t(`services:booking.invalid.${field.name}`)}
               </p>
             )}
@@ -104,7 +106,7 @@ export function BookingDetailsForm({ id, invalid, onSubmit }: Props) {
           <span>{t('services:booking.consent')}</span>
         </label>
         {invalid.has('consent') && (
-          <p id={`${idPrefix}consent-error`} className="text-destructive text-xs">
+          <p id={`${idPrefix}consent-error`} className="text-destructive text-sm">
             {t('services:booking.invalid.consent')}
           </p>
         )}

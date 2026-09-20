@@ -57,7 +57,7 @@ export function ServiceList() {
         (loaded.services.length === 0 ? (
           <p className="text-muted-foreground">{t('services:empty')}</p>
         ) : (
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
             {loaded.services.map((service, index) => (
               <li key={service.id}>
                 <ServiceCard service={service} priority={index === 0} />
@@ -76,7 +76,9 @@ function ServiceCard({ service, priority }: { service: PublicService; priority: 
   return (
     // The heading's link is stretched over the whole card, so the card is one
     // tab stop with the service's name as its accessible name.
-    <article className="bg-card relative flex h-full flex-col overflow-hidden rounded-xl border has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring/50">
+    // The only clickable card in the app, so it alone lifts on hover (a shadow,
+    // never a move); its focus edge turns full-strength like a control's.
+    <article className="bg-card relative flex h-full flex-col overflow-hidden rounded-xl border shadow-sm has-[a:focus-visible]:border-ring has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring/50 has-[a:hover]:shadow-md motion-safe:transition-shadow motion-safe:duration-200">
       {service.coverImageUrl !== null && (
         <img
           src={service.coverImageUrl}
@@ -88,7 +90,7 @@ function ServiceCard({ service, priority }: { service: PublicService; priority: 
       )}
       <div className="flex flex-1 flex-col gap-2 p-4">
         <h2 className="text-lg font-semibold">
-          <Link to={`/services/${service.slug}`} className="after:absolute after:inset-0 hover:underline focus-visible:outline-none">
+          <Link to={`/services/${service.slug}`} className="underline-offset-4 after:absolute after:inset-0 hover:underline focus-visible:outline-none">
             {service.nameEn}
           </Link>
         </h2>
@@ -96,7 +98,7 @@ function ServiceCard({ service, priority }: { service: PublicService; priority: 
           <p className="text-muted-foreground line-clamp-3 text-sm">{service.descriptionEn}</p>
         )}
         {lowestPrice !== null && (
-          <p className="mt-auto pt-2 text-sm font-medium">{t('services:fromPrice', { price: formatMoney(lowestPrice) })}</p>
+          <p className="mt-auto pt-2 text-sm font-medium tabular-nums">{t('services:fromPrice', { price: formatMoney(lowestPrice) })}</p>
         )}
       </div>
     </article>

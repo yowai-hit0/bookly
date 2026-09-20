@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-20T00:25:48.836Z",
+  "generatedAt": "2026-09-20T00:56:09.561Z",
   "title": "Design System: Bookly",
   "extensions": {
     "colorMeta": {
@@ -310,6 +310,13 @@
       "css": ".ds-link{box-sizing:border-box;display:inline-flex;align-items:center;gap:6px;min-height:24px;border-radius:calc(var(--radius, 0.5rem) * 0.6);color:var(--muted-foreground, oklch(0.4455 0.0374 257.28));font:400 14px/20px 'Open Sans Variable', 'Open Sans', sans-serif;text-decoration:none;}.ds-link:hover{text-decoration:underline;text-underline-offset:4px;}.ds-link:focus-visible{outline:2px solid var(--ring, oklch(0.5876 0.1389 241.97));outline-offset:2px;}"
     },
     {
+      "name": "Callout",
+      "kind": "custom",
+      "description": "A notice with a blue tint, a full hairline-blue edge and a small icon. Never a stripe down one side; the words carry the meaning.",
+      "html": "<div class=\"ds-callout\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 16v-4\"/><path d=\"M12 8h.01\"/></svg><p>The booking fee is non-refundable if you cancel.</p></div>",
+      "css": ".ds-callout{box-sizing:border-box;display:flex;align-items:flex-start;gap:8px;width:320px;padding:12px;border:1px solid color-mix(in oklch, var(--ring, oklch(0.5876 0.1389 241.97)) 30%, transparent);border-radius:var(--radius, 0.5rem);background:color-mix(in oklch, var(--ring, oklch(0.5876 0.1389 241.97)) 5%, transparent);color:var(--foreground, oklch(0.2077 0.0398 265.75));font:400 14px/20px 'Open Sans Variable', 'Open Sans', sans-serif;}.ds-callout svg{flex:none;margin-top:2px;color:var(--ring, oklch(0.5876 0.1389 241.97));}.ds-callout p{margin:0;font-weight:500;}"
+    },
+    {
       "name": "Status Line",
       "kind": "custom",
       "description": "A dot that repeats the words beside it: green when reachable, red on failure, slate while checking.",
@@ -355,7 +362,7 @@
       },
       {
         "name": "The Hairline Rule",
-        "body": "A card's edge is a 1px border plus `shadow-sm` and nothing heavier. Extra separation comes from tone (white on sky), never from a bigger shadow.",
+        "body": "A card's edge is a 1px border plus `shadow-sm` and nothing heavier. The one clickable card, a service on the list, lifts to `shadow-md` on hover as its affordance. Extra separation comes from tone (white on sky), never from a bigger shadow.",
         "section": "elevation"
       }
     ],

@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useParams } from 'react-router'
+import { useParams } from 'react-router'
 import { type PublicServiceDetail, fetchService } from '@/catalogue/api'
 import {
   DETAIL_FIELDS,
@@ -10,13 +10,16 @@ import {
   parseBookingDetails,
   submitBooking,
 } from '@/catalogue/bookings'
+import { BackLink } from '@/components/ui/back-link'
 import { Button } from '@/components/ui/button'
 import { formatMoney } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { NotFound } from '@/pages/NotFound'
 import { BookingDetailsForm } from './BookingDetailsForm'
 import { BookingHeld } from './BookingHeld'
 import { PriceSummary } from './PriceSummary'
 import { SlotPicker, type SlotPickerHandle } from './SlotPicker'
+import { stepNumber } from './step-number'
 
 /**
  * One service's packages and add-ons, with a total that updates as they are
@@ -66,7 +69,7 @@ export function ServiceDetail() {
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
-      <BackLink />
+      <AllServicesLink />
       {current === null ? (
         <p className="text-muted-foreground text-sm" role="status">
           {t('services:loading')}
@@ -173,7 +176,7 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
-      <BackLink />
+      <AllServicesLink />
       <header className="flex flex-col gap-3">
         {service.coverImageUrl !== null && (
           <img
@@ -185,7 +188,7 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
         )}
         <h1 className="text-3xl font-semibold">{service.nameEn}</h1>
         {service.descriptionEn !== null && (
-          <p className="text-muted-foreground whitespace-pre-line">{service.descriptionEn}</p>
+          <p className="text-muted-foreground max-w-2xl whitespace-pre-line">{service.descriptionEn}</p>
         )}
       </header>
 
@@ -193,13 +196,14 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
         <p className="text-muted-foreground">{t('services:noPackages')}</p>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[1fr_22rem] lg:items-start">
-          <div className="flex flex-col gap-6">
+          {/* The counter numbers the three groups: choose, pick a time, your details (step-number.ts). */}
+          <div className="flex flex-col gap-6 [counter-reset:step]">
             <fieldset className="flex flex-col gap-2">
-              <legend className="mb-2 text-lg font-semibold">{t('services:choosePackage')}</legend>
+              <legend className={cn('font-heading mb-2 text-lg font-semibold', stepNumber)}>{t('services:choosePackage')}</legend>
               {service.packages.map((pkg) => (
                 <label
                   key={pkg.id}
-                  className="has-checked:border-primary has-focus-visible:ring-ring/50 flex cursor-pointer gap-3 rounded-xl border p-4 has-focus-visible:ring-3"
+                  className="bg-card has-checked:border-primary has-checked:bg-primary/5 has-checked:ring-primary not-has-checked:hover:bg-muted/60 has-focus-visible:border-ring has-focus-visible:ring-ring/50 flex cursor-pointer gap-3 rounded-xl border p-4 shadow-sm has-checked:ring-1 has-focus-visible:ring-3 motion-safe:transition-colors motion-safe:duration-150"
                 >
                   <input
                     type="radio"
@@ -227,11 +231,11 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
 
             {service.addons.length > 0 && (
               <fieldset className="flex flex-col gap-2">
-                <legend className="mb-2 text-lg font-semibold">{t('services:chooseAddons')}</legend>
+                <legend className="font-heading mb-2 text-lg font-semibold">{t('services:chooseAddons')}</legend>
                 {service.addons.map((addon) => (
                   <label
                     key={addon.id}
-                    className="has-checked:border-primary has-focus-visible:ring-ring/50 flex cursor-pointer items-center gap-3 rounded-xl border p-3 has-focus-visible:ring-3"
+                    className="bg-card has-checked:border-primary has-checked:bg-primary/5 has-checked:ring-primary not-has-checked:hover:bg-muted/60 has-focus-visible:border-ring has-focus-visible:ring-ring/50 flex cursor-pointer items-center gap-3 rounded-xl border p-3 shadow-sm has-checked:ring-1 has-focus-visible:ring-3 motion-safe:transition-colors motion-safe:duration-150"
                   >
                     <input
                       type="checkbox"
@@ -248,7 +252,7 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
 
             {chosenPackage === null ? (
               <section className="flex flex-col gap-1">
-                <h2 className="text-lg font-semibold">{t('services:picker.title')}</h2>
+                <h2 className={cn('text-lg font-semibold', stepNumber)}>{t('services:picker.title')}</h2>
                 <p className="text-muted-foreground text-sm">{t('services:picker.choosePackageFirst')}</p>
               </section>
             ) : (
@@ -265,7 +269,8 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
             )}
           </div>
 
-          <div className="lg:sticky lg:top-4">
+          {/* Below lg it is the last thing on the page, the closing step, so it gets extra room above. */}
+          <div className="max-lg:mt-4 lg:sticky lg:top-4">
             <PriceSummary pkg={chosenPackage} addons={chosenAddons} bookingFeeRate={service.bookingFeeRate}>
               {chosenPackage !== null &&
                 (startsAt === null ? (
@@ -297,13 +302,9 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
   )
 }
 
-function BackLink() {
+function AllServicesLink() {
   const { t } = useTranslation()
-  return (
-    <Link to="/services" className="text-muted-foreground self-start text-sm hover:underline">
-      ← {t('services:allServices')}
-    </Link>
-  )
+  return <BackLink to="/services">{t('services:allServices')}</BackLink>
 }
 
 /** `90` → `1 h 30 min`; `120` → `2 hours`; `45` → `45 min`. */

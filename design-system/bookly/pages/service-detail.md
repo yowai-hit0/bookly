@@ -4,6 +4,7 @@
 > **Files (Phase 3 section 2):** `pages/services/ServiceDetail.tsx` (owns all state) and its parts `SlotPicker.tsx`, `BookingDetailsForm.tsx`, `PriceSummary.tsx`, `BookingHeld.tsx`
 > Generator template: UI UX Pro Max, 2026-09-19. Its "Product Detail" text recommended WebGL/Three.js 3D, physics lighting and parallax. That is wrong for a booking funnel and contradicts MASTER's own "avoid 3D effects"; it has been removed.
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
+> **Applied 2026-09-20 (Phase 3 section 2)** to all five files. The choices made beyond this file (the shared `BackLink` and `Callout`, the selectable-card and step-numeral recipes) are in `MASTER.md` section 11.
 
 ## The funnel on one page
 

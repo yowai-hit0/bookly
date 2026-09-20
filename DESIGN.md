@@ -148,7 +148,7 @@ The palette and the type pairing were chosen by a design tool and accepted by th
 - Hairline borders plus `shadow-sm`; no heavy shadows.
 - Every status and every amount is written in words; colour and icons only repeat them.
 
-**State of the build (snapshot, 2026-09-20).** Tokens, fonts and the shadcn primitives are shipped and apply app-wide. Only Home and NotFound have their redesigned page layout. Services, checkout, the client booking page and all admin pages are still their pre-redesign layouts wearing the new tokens. What is designed but not built is listed at the end of Components.
+**State of the build (snapshot, 2026-09-20).** Tokens, fonts and the shadcn primitives are shipped and apply app-wide. Home, NotFound and the whole services flow (the list, the service page with its calendar and times, the details form, the price summary and the held booking) have their redesigned page layout. Checkout, the client booking page and all admin pages are still their pre-redesign layouts wearing the new tokens. What is designed but not built is listed at the end of Components.
 
 ## Colors
 
@@ -217,7 +217,7 @@ Tonal layering with a hairline: white cards sit on a sky-tinted page, a Powder B
 - **Focus ring** (`box-shadow: 0 0 0 3px` Calendar Blue at 50%): keyboard focus on buttons, inputs, checkboxes and badges, paired with the control's border turning full Calendar Blue.
 
 ### Named Rules
-**The Hairline Rule.** A card's edge is a 1px border plus `shadow-sm` and nothing heavier. Extra separation comes from tone (white on sky), never from a bigger shadow.
+**The Hairline Rule.** A card's edge is a 1px border plus `shadow-sm` and nothing heavier. The one clickable card, a service on the list, lifts to `shadow-md` on hover as its affordance. Extra separation comes from tone (white on sky), never from a bigger shadow.
 
 ## Shapes
 
@@ -243,24 +243,37 @@ Everything derives from one `--radius` of 0.5rem: controls are 8px (`rounded-lg`
 - **Corner Style:** 11.2px (`rounded-xl`).
 - **Background:** Studio White, with Ink Navy text.
 - **Shadow Strategy:** Card lift plus a 1px Hairline Blue border (see Elevation & Depth).
-- **Internal Padding:** 16px (`p-4`); a `sm` size uses 12px. The hand-rolled cards on the pages already carry the 1px border but not yet the shadow; Sections 2-4 and 7 add it so there is one card look.
+- **Internal Padding:** 16px (`p-4`); a `sm` size uses 12px. The hand-rolled cards on the services pages carry the border and `shadow-sm`; the ones on checkout, the client booking page and the admin still carry only the border until Sections 3, 4 and 7 add it, so there is one card look.
 
 ### Badges
 - **Style:** a pill, 20px high, caption text, 8px side padding. The active badge is Available Green with white text; the outline badge is a Hairline Blue edge with Ink Navy text (today every booking status renders as the outline badge); a destructive badge is Cancel Red at 10% with Cancel Red text.
 
-### Text link (shipped on NotFound)
+### Text link (shipped: the shared `BackLink`, on NotFound and the service page)
 - **Style:** a standalone link, not one inside a sentence: Slate Text, 14px, underlined on hover only (4px offset, the same as the Button's link variant), with a leading lucide arrow when it means "back". At least 24px high, 44px on touch.
 - **Focus:** a full-strength 2px Calendar Blue outline offset 2px. The Button's 50% ring is not used here because it measures about 1.9:1 on the page.
 
 ### Status line (shipped on Home)
 - **Style:** a small round dot before the words, in Available Green when it worked, Cancel Red when it failed and Slate Text while pending; the text turns Cancel Red on failure and wraps anywhere. The dot repeats what the words say and fades between colours in 200ms, with no transition under reduced motion.
 
+### Callouts (shipped on the service page and the held page)
+- **Style:** a Calendar Blue tint (5%) with a full 1px Calendar Blue edge (30%), 8px radius and 12px padding; a 16px lucide icon in Calendar Blue beside 14px Ink Navy text. Never a stripe down one side. The icon is decoration and the words carry the meaning. It holds the non-refundable notice and the hold expiry. Shared as the `Callout` component.
+
+### Selectable cards (shipped: packages and add-ons)
+- **Style:** a white card with a hairline edge and `shadow-sm` around a native radio or checkbox; the whole card is the label. Hover fills Powder Blue at 60% (not on the selected card). Selected is a 5% Available Green tint and a 2px green edge (the 1px border plus a 1px ring) on top of the native mark. Keyboard focus turns the border Calendar Blue with the 3px ring, replacing the green ring while focused.
+
+### Calendar days and times (shipped in the slot picker)
+- **Days:** a 7-column grid. A bookable day is semibold on Powder Blue (hover 8% darker); an unavailable day is disabled at 50% text with no surface; the selected day is Available Green with white text. 40px tall, 44px on touch, and they take the same focus edge as controls.
+- **Times:** outline buttons 44px tall in 4 columns (3 on phones); the chosen one is the default green button.
+
+### Money rows (shipped on the price summary and the held page)
+- **Style:** label left, amount right in tabular figures. The total is semibold above a hairline; the booking-fee row, which is due now, is medium weight as a whole; the session fee is regular. A booking reference is monospace semibold at 18px, on the same baseline as its label.
+
+### Step numerals (shipped on the service page)
+- **Style:** the three funnel groups (choose, pick a time, your details) each start with a 24px Powder Blue disc holding a CSS-counter numeral in the heading font. It is generated content, so no text was added; add-ons are not numbered.
+
 ### Designed, not built yet
 These are decided in `design-system/bookly/MASTER.md` (sections 7 and 8) and `design-system/bookly/pages/*.md`, and nothing in the app implements them yet:
 - **Booking-status treatments:** seven statuses in one shared look (a different edge, fill and lucide icon each, distinguishable in greyscale, with the label always shown), used by the client pill, the admin badges and the calendar events.
-- **Callouts:** a tinted fill, a full 1px edge and a small icon, never a left stripe.
-- **Selectable cards** (packages, add-ons, payment methods): a tinted fill plus a ring when selected.
-- **Money rows:** label left, amount right in tabular figures, total semibold above a `border-t`.
 - **Admin sidebar:** 15rem and sticky from `lg`, reflowing to a top bar below it, plus a skip-to-content link. `AdminLayout.tsx` is still the pre-redesign layout.
 - **Calendar:** the FullCalendar styling in `index.css` is untouched and still uses the old mapping.
 

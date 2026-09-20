@@ -131,7 +131,7 @@ test('chooses a package and an add-on by keyboard alone, and the summary follows
   await expect(standard).not.toBeChecked()
 
   await page.keyboard.press('Tab')
-  await expect(page.getByRole('link', { name: '← All services' })).toBeFocused()
+  await expect(page.getByRole('link', { name: 'All services' })).toBeFocused()
 
   // Into the package group: with nothing checked, Tab lands on the first radio.
   await page.keyboard.press('Tab')

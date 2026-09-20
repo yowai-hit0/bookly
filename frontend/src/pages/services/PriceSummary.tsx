@@ -1,5 +1,7 @@
+import { Info } from 'lucide-react'
 import { type ReactNode, useId } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Callout } from '@/components/ui/callout'
 import { formatMoney } from '@/lib/format'
 import { feePercent, quoteBasket } from '@/lib/quote'
 
@@ -44,7 +46,7 @@ export function PriceSummary({ pkg, addons, bookingFeeRate, children }: Props) {
         })
 
   return (
-    <section aria-labelledby={headingId} className="bg-card flex flex-col gap-3 rounded-xl border p-4">
+    <section aria-labelledby={headingId} className="bg-card flex flex-col gap-3 rounded-xl border p-4 shadow-sm">
       <h2 id={headingId} className="text-lg font-semibold">
         {t('services:summary.title')}
       </h2>
@@ -64,9 +66,10 @@ export function PriceSummary({ pkg, addons, bookingFeeRate, children }: Props) {
               <dt>{t('services:summary.total')}</dt>
               <dd className="shrink-0 tabular-nums">{formatMoney(quote.totalRwf)}</dd>
             </div>
-            <div className="flex justify-between gap-4">
+            {/* The booking fee is what is due now, so its whole row is a step heavier than the session fee. */}
+            <div className="flex justify-between gap-4 font-medium">
               <dt>{t('services:summary.bookingFee', { percent: feePercent(bookingFeeRate) })}</dt>
-              <dd className="shrink-0 font-medium tabular-nums">{formatMoney(quote.bookingFeeRwf)}</dd>
+              <dd className="shrink-0 tabular-nums">{formatMoney(quote.bookingFeeRwf)}</dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt>{t('services:summary.sessionFee')}</dt>
@@ -76,7 +79,9 @@ export function PriceSummary({ pkg, addons, bookingFeeRate, children }: Props) {
         )}
       </div>
 
-      <p className="text-sm font-medium">{t('services:summary.nonRefundable')}</p>
+      <Callout icon={Info}>
+        <p className="font-medium">{t('services:summary.nonRefundable')}</p>
+      </Callout>
       {children}
     </section>
   )

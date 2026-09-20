@@ -175,7 +175,7 @@ test('books by keyboard alone: package, add-on, date, start, form, consent, Conf
   await expect(page.getByRole('heading', { level: 1, name: 'Portraits' })).toBeVisible()
 
   await page.keyboard.press('Tab')
-  await expect(page.getByRole('link', { name: '← All services' })).toBeFocused()
+  await expect(page.getByRole('link', { name: 'All services' })).toBeFocused()
   await page.keyboard.press('Tab')
   await expect(page.getByRole('radio', { name: /^Mini/ })).toBeFocused()
   await page.keyboard.press('ArrowDown')

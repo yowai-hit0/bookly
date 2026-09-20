@@ -1,3 +1,4 @@
+import { Clock, Info } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
@@ -5,6 +6,7 @@ import { kigaliDateOf } from '@/admin/calendar-dates'
 import type { HeldBooking } from '@/catalogue/bookings'
 import { checkoutPath } from '@/catalogue/payments'
 import { Button } from '@/components/ui/button'
+import { Callout } from '@/components/ui/callout'
 import { formatDate, formatMoney, formatTime } from '@/lib/format'
 import { feePercent } from '@/lib/quote'
 
@@ -35,14 +37,17 @@ export function BookingHeld({ booking }: { booking: HeldBooking }) {
         {t('services:booking.held.title')}
       </h1>
 
-      <dl className="bg-card flex flex-col gap-2 rounded-xl border p-4 text-sm">
-        <div className="flex flex-wrap justify-between gap-x-4">
+      <dl className="bg-card flex flex-col gap-2 rounded-xl border p-4 text-sm shadow-sm">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4">
           <dt className="text-muted-foreground">{t('services:booking.held.reference')}</dt>
-          <dd className="font-mono text-base font-semibold tracking-wide">{booking.reference}</dd>
+          {/* The reference is what the client keeps, so it is the largest thing in the card. */}
+          <dd className="font-mono text-lg font-semibold tracking-wide">{booking.reference}</dd>
         </div>
         <div className="flex flex-wrap justify-between gap-x-4">
           <dt className="text-muted-foreground">{t('services:booking.held.service')}</dt>
-          <dd>{t('services:booking.held.serviceValue', { service: booking.serviceName, package: booking.packageName })}</dd>
+          <dd className="min-w-0 wrap-anywhere">
+            {t('services:booking.held.serviceValue', { service: booking.serviceName, package: booking.packageName })}
+          </dd>
         </div>
         <div className="flex flex-wrap justify-between gap-x-4">
           <dt className="text-muted-foreground">{t('services:booking.held.when')}</dt>
@@ -55,23 +60,24 @@ export function BookingHeld({ booking }: { booking: HeldBooking }) {
           </dd>
         </div>
         <div className="mt-1 flex justify-between gap-4 border-t pt-2">
-          <dt>{booking.packageName}</dt>
-          <dd className="tabular-nums">{formatMoney(booking.packagePriceRwf)}</dd>
+          <dt className="min-w-0 wrap-anywhere">{booking.packageName}</dt>
+          <dd className="shrink-0 tabular-nums">{formatMoney(booking.packagePriceRwf)}</dd>
         </div>
         {booking.addons.map((addon, index) => (
           // Two add-ons may share a name; their order is the booking's own.
           <div key={index} className="flex justify-between gap-4">
-            <dt>{addon.name}</dt>
-            <dd className="tabular-nums">{formatMoney(addon.priceRwf)}</dd>
+            <dt className="min-w-0 wrap-anywhere">{addon.name}</dt>
+            <dd className="shrink-0 tabular-nums">{formatMoney(addon.priceRwf)}</dd>
           </div>
         ))}
         <div className="flex justify-between gap-4 border-t pt-2 font-semibold">
           <dt>{t('services:summary.total')}</dt>
           <dd className="tabular-nums">{formatMoney(booking.totalRwf)}</dd>
         </div>
-        <div className="flex justify-between gap-4">
+        {/* Due now, so the whole row is a step heavier than the session fee. */}
+        <div className="flex justify-between gap-4 font-medium">
           <dt>{t('services:summary.bookingFee', { percent: feePercent(booking.bookingFeeRate) })}</dt>
-          <dd className="font-medium tabular-nums">{fee}</dd>
+          <dd className="tabular-nums">{fee}</dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt>{t('services:summary.sessionFee')}</dt>
@@ -79,12 +85,17 @@ export function BookingHeld({ booking }: { booking: HeldBooking }) {
         </div>
       </dl>
 
-      <p className="text-sm">
-        {booking.holdExpiresAt === null
-          ? t('services:booking.held.holdUntilUnknown', { fee })
-          : t('services:booking.held.holdUntil', { time: formatTime(booking.holdExpiresAt), fee })}
-      </p>
-      <p className="text-sm font-medium">{t('services:summary.nonRefundable')}</p>
+      {/* The hold is time-critical, so it is a callout of its own, above the non-refundable notice. */}
+      <Callout icon={Clock}>
+        <p>
+          {booking.holdExpiresAt === null
+            ? t('services:booking.held.holdUntilUnknown', { fee })
+            : t('services:booking.held.holdUntil', { time: formatTime(booking.holdExpiresAt), fee })}
+        </p>
+      </Callout>
+      <Callout icon={Info}>
+        <p className="font-medium">{t('services:summary.nonRefundable')}</p>
+      </Callout>
       {booking.checkoutToken !== undefined && (
         <Button asChild size="lg" className="self-start">
           <Link to={checkoutPath(booking.reference, booking.checkoutToken)}>{t('services:booking.held.pay')}</Link>

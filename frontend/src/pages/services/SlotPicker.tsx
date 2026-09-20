@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { formatDate, formatMonth, formatTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { stepNumber } from './step-number'
 
 /**
  * The public calendar and slot picker (plan.md Task 12, spec §3.1 steps 4-5):
@@ -211,13 +212,13 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange, ref }:
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 id={headingId} className="text-lg font-semibold">
+        <h2 id={headingId} className={cn('text-lg font-semibold', stepNumber)}>
           {t('services:picker.title')}
         </h2>
         <p className="text-muted-foreground text-sm">{t('services:picker.timezone')}</p>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border p-4">
+      <div className="bg-card flex flex-col gap-3 rounded-xl border p-4 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <Button
             type="button"
@@ -268,10 +269,13 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange, ref }:
                   setNotice(null)
                   setSelectedDate(date)
                 }}
+                // Bookable dates differ from the rest by weight and by surface, not by colour alone.
                 className={cn(
-                  'focus-visible:ring-ring/50 h-10 rounded-lg text-sm tabular-nums outline-none focus-visible:ring-3',
-                  count === 0 ? 'text-muted-foreground/50' : 'hover:bg-muted font-semibold',
-                  isShown && 'bg-primary text-primary-foreground hover:bg-primary',
+                  'focus-visible:border-ring focus-visible:ring-ring/50 h-10 rounded-lg border border-transparent text-sm tabular-nums outline-none focus-visible:ring-3 pointer-coarse:h-11 motion-safe:transition-colors motion-safe:duration-150',
+                  count === 0
+                    ? 'text-muted-foreground/50 cursor-not-allowed'
+                    : 'bg-muted font-semibold hover:bg-[color-mix(in_oklch,var(--muted),black_8%)]',
+                  isShown && 'bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),black_12%)]',
                 )}
               >
                 {Number(date.slice(8))}
@@ -316,7 +320,7 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange, ref }:
                   <Button
                     type="button"
                     variant={start === value ? 'default' : 'outline'}
-                    className="w-full tabular-nums"
+                    className="h-11 w-full tabular-nums"
                     aria-pressed={start === value}
                     // Not `disabled`: a disabled button drops keyboard focus mid-check.
                     aria-busy={start === checkingStart}

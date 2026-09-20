@@ -200,7 +200,7 @@ describe('loading a service', () => {
     renderAt('/services/portraits')
 
     expect(await screen.findByRole('status')).toHaveTextContent('Loading…')
-    expect(screen.getByRole('link', { name: '← All services' })).toHaveAttribute('href', '/services')
+    expect(screen.getByRole('link', { name: 'All services' })).toHaveAttribute('href', '/services')
     expect(screen.queryByRole('radio')).not.toBeInTheDocument()
 
     answer(json({ service: PORTRAITS }))
@@ -356,7 +356,7 @@ describe('the service page', () => {
     stubApi()
     const router = await renderLoaded()
 
-    await user().click(screen.getByRole('link', { name: '← All services' }))
+    await user().click(screen.getByRole('link', { name: 'All services' }))
 
     expect(await screen.findByRole('link', { name: 'Weddings' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/services')

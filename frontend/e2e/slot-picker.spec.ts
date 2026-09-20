@@ -117,7 +117,7 @@ test('chooses a package, a date and a start by keyboard alone', async ({ page })
   await expect(page.getByText('Choose a package to see available times.')).toBeVisible()
 
   await page.keyboard.press('Tab')
-  await expect(page.getByRole('link', { name: '← All services' })).toBeFocused()
+  await expect(page.getByRole('link', { name: 'All services' })).toBeFocused()
   await page.keyboard.press('Tab')
   await expect(page.getByRole('radio', { name: /^Mini/ })).toBeFocused()
   await page.keyboard.press('ArrowDown')

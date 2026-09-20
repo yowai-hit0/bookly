@@ -3,6 +3,7 @@
 > **Project:** Bookly · **Route:** `/services` · **File:** `frontend/src/pages/services/ServiceList.tsx` · **Phase 3 section:** 2
 > Generator template: UI UX Pro Max, 2026-09-19 (1200px width replaced by the shipped `max-w-5xl`).
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
+> **Applied 2026-09-20 (Phase 3 section 2).** The choices made beyond this file are in `MASTER.md` section 11.
 
 ## Layout
 
