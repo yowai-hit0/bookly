@@ -110,8 +110,8 @@ export function PaymentProgressPage() {
     return (
       <main className="mx-auto flex max-w-2xl flex-col gap-3 px-4 py-8">
         <StatusIcon icon={Unlink} tone="neutral" />
-        <h1 className="text-2xl font-semibold">{t('checkout:invalidLink.title')}</h1>
-        <p className="text-muted-foreground text-sm">{t('checkout:invalidLink.body')}</p>
+        <h1 className="text-2xl font-semibold text-balance">{t('checkout:invalidLink.title')}</h1>
+        <p className="text-muted-foreground max-w-xl text-sm text-pretty">{t('checkout:invalidLink.body')}</p>
       </main>
     )
   }
@@ -145,87 +145,90 @@ export function PaymentProgressPage() {
   const payAgainAt = reference === '' ? bookingPath(token) : checkoutPath(reference, token)
 
   const heading = (key: string) => (
-    <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold outline-none">
+    <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold text-balance outline-none">
       {t(key)}
     </h1>
   )
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-8">
-      {view === 'waiting' && (
-        <section className="flex flex-col gap-3" role="status" aria-live="polite">
-          {/* The one moving thing on the page. A visitor who asks for less motion gets a still phone instead of a frozen spinner. Blue, never green: nothing is settled yet. */}
-          <StatusIcon icon={LoaderCircle} tone="info" className="motion-safe:animate-spin motion-reduce:hidden" />
-          <StatusIcon icon={Smartphone} tone="info" className="hidden motion-reduce:block" />
-          {heading('checkout:progress.pendingTitle')}
-          <p className="text-sm">{t('checkout:progress.pendingBody', { amount })}</p>
-          <p className="text-sm">{t('checkout:progress.pendingWait')}</p>
-          <p className="text-muted-foreground text-sm">{t('checkout:progress.pendingLeave')}</p>
-          {failures >= TROUBLE_AFTER_FAILURES && !gaveUp && (
-            <p className="text-muted-foreground text-sm">{t('checkout:progress.connectionTrouble')}</p>
-          )}
-        </section>
-      )}
-      {view === 'waiting' && gaveUp && (
-        <div className="flex flex-col items-start gap-2">
-          <p className="text-sm">{t('checkout:progress.stillWaiting')}</p>
-          <Button variant="outline" size="sm" onClick={checkAgain}>
-            {t('checkout:progress.checkAgain')}
-          </Button>
-        </div>
-      )}
+      {/* One measure for every outcome's words; the booking card below keeps the full width. */}
+      <div className="flex max-w-xl flex-col gap-6 text-pretty">
+        {view === 'waiting' && (
+          <section className="flex flex-col gap-3" role="status" aria-live="polite">
+            {/* The one moving thing on the page. A visitor who asks for less motion gets a still phone instead of a frozen spinner. Blue, never green: nothing is settled yet. */}
+            <StatusIcon icon={LoaderCircle} tone="info" className="motion-safe:animate-spin motion-reduce:hidden" />
+            <StatusIcon icon={Smartphone} tone="info" className="hidden motion-reduce:block" />
+            {heading('checkout:progress.pendingTitle')}
+            <p className="text-sm">{t('checkout:progress.pendingBody', { amount })}</p>
+            <p className="text-sm">{t('checkout:progress.pendingWait')}</p>
+            <p className="text-muted-foreground text-sm">{t('checkout:progress.pendingLeave')}</p>
+            {failures >= TROUBLE_AFTER_FAILURES && !gaveUp && (
+              <p className="text-muted-foreground text-sm">{t('checkout:progress.connectionTrouble')}</p>
+            )}
+          </section>
+        )}
+        {view === 'waiting' && gaveUp && (
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-sm">{t('checkout:progress.stillWaiting')}</p>
+            <Button variant="outline" size="sm" onClick={checkAgain}>
+              {t('checkout:progress.checkAgain')}
+            </Button>
+          </div>
+        )}
 
-      {view === 'confirmed' && (
-        <section className="flex flex-col gap-3">
-          {/* The only view that looks like success, because it is the only one the API has confirmed. */}
-          <StatusIcon icon={CircleCheck} tone="positive" />
-          {heading('checkout:progress.confirmedTitle')}
-          <p className="text-sm">{t('checkout:progress.confirmedBody')}</p>
-        </section>
-      )}
-      {view === 'received' && (
-        <section className="flex flex-col gap-3">
-          {/* Text lines, not lucide's Receipt: that one carries a dollar sign, and this is Rwandan francs. */}
-          <StatusIcon icon={ReceiptText} tone="info" />
-          {heading('checkout:progress.receivedTitle')}
-          <p className="text-sm">{t('checkout:progress.receivedBody', { amount })}</p>
-        </section>
-      )}
-      {view === 'failed' && (
-        <section className="flex flex-col gap-3">
-          <StatusIcon icon={CircleX} tone="destructive" />
-          {heading('checkout:progress.failedTitle')}
-          <p className="text-sm">
-            {progress.payment.failure === 'unavailable'
-              ? t('checkout:progress.failedUnavailable')
-              : t('checkout:progress.failedDeclined')}
-          </p>
-          <Button asChild className="self-start">
-            <Link to={payAgainAt}>{t('checkout:progress.tryAgain')}</Link>
-          </Button>
-        </section>
-      )}
-      {view === 'refund' && (
-        <section className="flex flex-col gap-3">
-          <StatusIcon icon={Undo2} tone="info" />
-          {heading('checkout:progress.refundTitle')}
-          <p className="text-sm">{t('checkout:progress.refundBody', { amount })}</p>
-        </section>
-      )}
-      {view === 'refundOther' && (
-        <section className="flex flex-col gap-3">
-          <StatusIcon icon={Undo2} tone="info" />
-          {heading('checkout:progress.refundOtherTitle')}
-          <p className="text-sm">{t('checkout:progress.refundOtherBody', { amount })}</p>
-        </section>
-      )}
-      {view === 'duplicate' && (
-        <section className="flex flex-col gap-3">
-          <StatusIcon icon={Undo2} tone="info" />
-          {heading('checkout:progress.duplicateTitle')}
-          <p className="text-sm">{t('checkout:progress.duplicateBody', { amount })}</p>
-        </section>
-      )}
+        {view === 'confirmed' && (
+          <section className="flex flex-col gap-3">
+            {/* The only view that looks like success, because it is the only one the API has confirmed. */}
+            <StatusIcon icon={CircleCheck} tone="positive" />
+            {heading('checkout:progress.confirmedTitle')}
+            <p className="text-sm">{t('checkout:progress.confirmedBody')}</p>
+          </section>
+        )}
+        {view === 'received' && (
+          <section className="flex flex-col gap-3">
+            {/* Text lines, not lucide's Receipt: that one carries a dollar sign, and this is Rwandan francs. */}
+            <StatusIcon icon={ReceiptText} tone="info" />
+            {heading('checkout:progress.receivedTitle')}
+            <p className="text-sm">{t('checkout:progress.receivedBody', { amount })}</p>
+          </section>
+        )}
+        {view === 'failed' && (
+          <section className="flex flex-col gap-3">
+            <StatusIcon icon={CircleX} tone="destructive" />
+            {heading('checkout:progress.failedTitle')}
+            <p className="text-sm">
+              {progress.payment.failure === 'unavailable'
+                ? t('checkout:progress.failedUnavailable')
+                : t('checkout:progress.failedDeclined')}
+            </p>
+            <Button asChild className="self-start">
+              <Link to={payAgainAt}>{t('checkout:progress.tryAgain')}</Link>
+            </Button>
+          </section>
+        )}
+        {view === 'refund' && (
+          <section className="flex flex-col gap-3">
+            <StatusIcon icon={Undo2} tone="info" />
+            {heading('checkout:progress.refundTitle')}
+            <p className="text-sm">{t('checkout:progress.refundBody', { amount })}</p>
+          </section>
+        )}
+        {view === 'refundOther' && (
+          <section className="flex flex-col gap-3">
+            <StatusIcon icon={Undo2} tone="info" />
+            {heading('checkout:progress.refundOtherTitle')}
+            <p className="text-sm">{t('checkout:progress.refundOtherBody', { amount })}</p>
+          </section>
+        )}
+        {view === 'duplicate' && (
+          <section className="flex flex-col gap-3">
+            <StatusIcon icon={Undo2} tone="info" />
+            {heading('checkout:progress.duplicateTitle')}
+            <p className="text-sm">{t('checkout:progress.duplicateBody', { amount })}</p>
+          </section>
+        )}
+      </div>
 
       <BookingFacts
         reference={booking.reference}

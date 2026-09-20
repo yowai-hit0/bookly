@@ -9,7 +9,7 @@ export function NotFound() {
   return (
     <main className="mx-auto flex min-h-svh max-w-md flex-col justify-center gap-2 p-6">
       <StatusIcon icon={FileQuestionMark} tone="neutral" />
-      <h1 className="text-2xl font-semibold">{t('notFound:title')}</h1>
+      <h1 className="text-2xl font-semibold text-balance">{t('notFound:title')}</h1>
       <p className="text-muted-foreground text-sm">{t('notFound:body')}</p>
       <BackLink to="/services" className="mt-2">
         {t('services:allServices')}

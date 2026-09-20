@@ -204,28 +204,31 @@ function CheckoutView({ reference, token, checkout, methods, onStale, onMissing 
         </div>
       </BookingFacts>
 
-      {checkout.holdExpiresAt !== null && (
-        <Callout icon={Clock}>
-          <p>{t('checkout:holdUntil', { time: formatTime(checkout.holdExpiresAt) })}</p>
+      {/* The notices are one group of related notes, so they sit closer to each other than to the form. */}
+      <div className="flex flex-col gap-2">
+        {checkout.holdExpiresAt !== null && (
+          <Callout icon={Clock}>
+            <p>{t('checkout:holdUntil', { time: formatTime(checkout.holdExpiresAt) })}</p>
+          </Callout>
+        )}
+        <Callout icon={Info}>
+          <p className="font-medium">{t('checkout:nonRefundable')}</p>
         </Callout>
-      )}
-      <Callout icon={Info}>
-        <p className="font-medium">{t('checkout:nonRefundable')}</p>
-      </Callout>
 
-      {checkout.waitingPayment !== null && (
-        <Callout icon={Smartphone}>
-          <p>
-            {t('checkout:waiting.text')}{' '}
-            <Link
-              to={paymentPath(reference, token, checkout.waitingPayment.ourRef)}
-              className="text-primary rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            >
-              {t('checkout:waiting.link')}
-            </Link>
-          </p>
-        </Callout>
-      )}
+        {checkout.waitingPayment !== null && (
+          <Callout icon={Smartphone}>
+            <p>
+              {t('checkout:waiting.text')}{' '}
+              <Link
+                to={paymentPath(reference, token, checkout.waitingPayment.ourRef)}
+                className="text-primary rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                {t('checkout:waiting.link')}
+              </Link>
+            </p>
+          </Callout>
+        )}
+      </div>
 
       {methods.length === 0 ? (
         <p className="text-destructive text-sm" role="alert">
@@ -278,9 +281,9 @@ function Notice({ icon, tone, title, body, children }: NoticeProps) {
     headingRef.current?.focus()
   }, [title])
   return (
-    <section className="flex flex-col gap-3">
+    <section className="flex max-w-xl flex-col gap-3 text-pretty">
       <StatusIcon icon={icon} tone={tone} />
-      <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold outline-none">
+      <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold text-balance outline-none">
         {title}
       </h1>
       <p className="text-muted-foreground text-sm">{body}</p>
