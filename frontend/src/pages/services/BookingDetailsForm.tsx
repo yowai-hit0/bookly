@@ -94,7 +94,7 @@ export function BookingDetailsForm({ id, invalid, onSubmit }: Props) {
       })}
 
       <div className="flex flex-col gap-1.5">
-        <label className="flex cursor-pointer items-start gap-3 text-sm">
+        <label className="flex cursor-pointer items-start gap-3 text-sm pointer-coarse:min-h-11">
           <input
             type="checkbox"
             name="consent"

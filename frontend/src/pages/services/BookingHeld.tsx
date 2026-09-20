@@ -72,16 +72,16 @@ export function BookingHeld({ booking }: { booking: HeldBooking }) {
         ))}
         <div className="flex justify-between gap-4 border-t pt-2 font-semibold">
           <dt>{t('services:summary.total')}</dt>
-          <dd className="tabular-nums">{formatMoney(booking.totalRwf)}</dd>
+          <dd className="shrink-0 tabular-nums">{formatMoney(booking.totalRwf)}</dd>
         </div>
         {/* Due now, so the whole row is a step heavier than the session fee. */}
         <div className="flex justify-between gap-4 font-medium">
           <dt>{t('services:summary.bookingFee', { percent: feePercent(booking.bookingFeeRate) })}</dt>
-          <dd className="tabular-nums">{fee}</dd>
+          <dd className="shrink-0 tabular-nums">{fee}</dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt>{t('services:summary.sessionFee')}</dt>
-          <dd className="tabular-nums">{formatMoney(booking.sessionFeeRwf)}</dd>
+          <dd className="shrink-0 tabular-nums">{formatMoney(booking.sessionFeeRwf)}</dd>
         </div>
       </dl>
 
