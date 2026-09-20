@@ -47,4 +47,6 @@ Your answers to decisions 6, 7 and 8: build these first. They are feature work (
 - [x] Checked 2026-09-20: Impeccable's overused-font rule does not flag Poppins or Open Sans (it does flag Geist, which the redesign replaced).
 - [ ] Dark mode is not designed (`.dark` is unreachable). Say so if you want it.
 - [ ] The Section 4 milestone needs the booking funnel run end to end (backend and database running, or mocked), plus `npm run test:e2e`.
-- [ ] Before merging `redesign/visual-only`: `PRODUCT.md` and this file sit outside the plan's normally allowed paths (keep or move them). The plan's protected-file check already allows additive `en.json` keys.
+- [ ] Before merging `redesign/visual-only`: `PRODUCT.md`, `DESIGN.md`, `.impeccable/design.json` and this file sit outside the plan's normally allowed paths (keep or move them). The plan's protected-file check already allows additive `en.json` keys.
+- [ ] `DESIGN.md` and its sidecar are a snapshot of the code after Phase 3 Section 1 (2026-09-20). Re-run `/impeccable document` at the Section 4 milestone and in Phase 4 so they describe what has shipped by then.
+- [ ] Two type inconsistencies found while writing `DESIGN.md`: fieldset legends render in Open Sans while `h2` uses Poppins at the same size (Section 2), and two admin pages title at 1.25rem while the others use 1.5rem (Sections 6 and 8).
