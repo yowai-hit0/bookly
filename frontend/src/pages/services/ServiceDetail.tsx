@@ -12,6 +12,7 @@ import {
 } from '@/catalogue/bookings'
 import { BackLink } from '@/components/ui/back-link'
 import { Button } from '@/components/ui/button'
+import { SelectableCard } from '@/components/ui/selectable-card'
 import { formatMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { NotFound } from '@/pages/NotFound'
@@ -186,7 +187,7 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
             fetchPriority="high"
           />
         )}
-        <h1 className="text-3xl font-semibold">{service.nameEn}</h1>
+        <h1 className="mt-1 text-3xl font-semibold text-balance">{service.nameEn}</h1>
         {service.descriptionEn !== null && (
           <p className="text-muted-foreground max-w-2xl whitespace-pre-line">{service.descriptionEn}</p>
         )}
@@ -197,58 +198,55 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
       ) : (
         <div className="grid gap-6 lg:grid-cols-[1fr_22rem] lg:items-start">
           {/* The counter numbers the three groups: choose, pick a time, your details (step-number.ts). */}
-          <div className="flex flex-col gap-6 [counter-reset:step]">
-            <fieldset className="flex flex-col gap-2">
-              <legend className={cn('font-heading mb-2 text-lg font-semibold', stepNumber)}>{t('services:choosePackage')}</legend>
-              {service.packages.map((pkg) => (
-                <label
-                  key={pkg.id}
-                  className="bg-card has-checked:border-primary has-checked:bg-primary/5 has-checked:ring-primary not-has-checked:hover:bg-muted/60 has-focus-visible:border-ring has-focus-visible:ring-ring/50 flex cursor-pointer gap-3 rounded-xl border p-4 shadow-sm has-checked:ring-1 has-focus-visible:ring-3 motion-safe:transition-colors motion-safe:duration-150"
-                >
-                  <input
-                    type="radio"
-                    name="package"
-                    value={pkg.id}
-                    checked={packageId === pkg.id}
-                    onChange={() => setPackageId(pkg.id)}
-                    className="accent-primary mt-1 size-4 shrink-0"
-                  />
-                  <span className="flex flex-1 flex-col gap-1">
-                    <span className="flex flex-wrap items-baseline justify-between gap-x-4">
-                      <span className="font-medium">{pkg.nameEn}</span>
-                      <span className="font-semibold tabular-nums">{formatMoney(pkg.priceRwf)}</span>
-                    </span>
-                    <span className="text-muted-foreground text-sm">
-                      {t('services:photos', { count: pkg.photoCount })} · {formatDuration(t, pkg.durationMinutes)}
-                    </span>
-                    {pkg.descriptionEn !== null && (
-                      <span className="text-muted-foreground text-sm whitespace-pre-line">{pkg.descriptionEn}</span>
-                    )}
-                  </span>
-                </label>
-              ))}
-            </fieldset>
-
-            {service.addons.length > 0 && (
+          <div className="flex flex-col gap-8 [counter-reset:step]">
+            {/* The add-ons belong to step 1, so they sit closer to the packages than the steps sit to each other. */}
+            <div className="flex flex-col gap-4">
               <fieldset className="flex flex-col gap-2">
-                <legend className="font-heading mb-2 text-lg font-semibold">{t('services:chooseAddons')}</legend>
-                {service.addons.map((addon) => (
-                  <label
-                    key={addon.id}
-                    className="bg-card has-checked:border-primary has-checked:bg-primary/5 has-checked:ring-primary not-has-checked:hover:bg-muted/60 has-focus-visible:border-ring has-focus-visible:ring-ring/50 flex cursor-pointer items-center gap-3 rounded-xl border p-3 shadow-sm has-checked:ring-1 has-focus-visible:ring-3 motion-safe:transition-colors motion-safe:duration-150"
-                  >
+                <legend className={cn('font-heading mb-2 text-lg font-semibold', stepNumber)}>{t('services:choosePackage')}</legend>
+                {service.packages.map((pkg) => (
+                  <SelectableCard key={pkg.id} className="p-4">
                     <input
-                      type="checkbox"
-                      checked={addonIds.has(addon.id)}
-                      onChange={(event) => toggleAddon(addon.id, event.target.checked)}
-                      className="accent-primary size-4 shrink-0"
+                      type="radio"
+                      name="package"
+                      value={pkg.id}
+                      checked={packageId === pkg.id}
+                      onChange={() => setPackageId(pkg.id)}
+                      className="accent-primary mt-1 size-4 shrink-0"
                     />
-                    <span className="flex-1">{addon.nameEn}</span>
-                    <span className="tabular-nums">{formatMoney(addon.priceRwf)}</span>
-                  </label>
+                    <span className="flex flex-1 flex-col gap-1">
+                      <span className="flex flex-wrap items-baseline justify-between gap-x-4">
+                        <span className="font-medium">{pkg.nameEn}</span>
+                        <span className="ml-auto font-semibold tabular-nums">{formatMoney(pkg.priceRwf)}</span>
+                      </span>
+                      <span className="text-muted-foreground text-sm">
+                        {t('services:photos', { count: pkg.photoCount })} · {formatDuration(t, pkg.durationMinutes)}
+                      </span>
+                      {pkg.descriptionEn !== null && (
+                        <span className="text-muted-foreground text-sm whitespace-pre-line">{pkg.descriptionEn}</span>
+                      )}
+                    </span>
+                  </SelectableCard>
                 ))}
               </fieldset>
-            )}
+
+              {service.addons.length > 0 && (
+                <fieldset className="flex flex-col gap-2">
+                  <legend className="font-heading mb-2 text-lg font-semibold">{t('services:chooseAddons')}</legend>
+                  {service.addons.map((addon) => (
+                    <SelectableCard key={addon.id} className="items-center p-3">
+                      <input
+                        type="checkbox"
+                        checked={addonIds.has(addon.id)}
+                        onChange={(event) => toggleAddon(addon.id, event.target.checked)}
+                        className="accent-primary size-4 shrink-0"
+                      />
+                      <span className="flex-1">{addon.nameEn}</span>
+                      <span className="tabular-nums">{formatMoney(addon.priceRwf)}</span>
+                    </SelectableCard>
+                  ))}
+                </fieldset>
+              )}
+            </div>
 
             {chosenPackage === null ? (
               <section className="flex flex-col gap-1">
@@ -269,8 +267,8 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
             )}
           </div>
 
-          {/* Below lg it is the last thing on the page, the closing step, so it gets extra room above. */}
-          <div className="max-lg:mt-4 lg:sticky lg:top-4">
+          {/* Below lg it is the last thing on the page, the closing step, so it is spaced like the steps above it. */}
+          <div className="max-lg:mt-2 lg:sticky lg:top-4">
             <PriceSummary pkg={chosenPackage} addons={chosenAddons} bookingFeeRate={service.bookingFeeRate}>
               {chosenPackage !== null &&
                 (startsAt === null ? (

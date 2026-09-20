@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-20T00:56:09.561Z",
+  "generatedAt": "2026-09-20T01:10:55.209Z",
   "title": "Design System: Bookly",
   "extensions": {
     "colorMeta": {
@@ -369,7 +369,7 @@
     "dos": [
       "**Do** write every status, amount and time in words; let a dot, tint or icon only repeat them.",
       "**Do** keep controls 32px on a mouse and 44px under `pointer-coarse:`.",
-      "**Do** put keyboard focus in Calendar Blue: a 3px ring at 50% plus a full-strength border on controls, and a 2px full-strength outline offset 2px on text links.",
+      "**Do** put keyboard focus in Calendar Blue: a 3px ring at 50% plus a full-strength border on controls, and a 2px full-strength outline offset 2px on text links and on a bare native checkbox.",
       "**Do** set `aria-disabled` on a busy control instead of `disabled`, and fade it to 50%.",
       "**Do** put unpredictable text (errors, names, references) in a shrinkable child with `min-w-0 wrap-anywhere`.",
       "**Do** use tabular figures for amounts and times, and monospace semibold for references.",

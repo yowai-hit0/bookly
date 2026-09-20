@@ -89,7 +89,7 @@ function ServiceCard({ service, priority }: { service: PublicService; priority: 
         />
       )}
       <div className="flex flex-1 flex-col gap-2 p-4">
-        <h2 className="text-lg font-semibold">
+        <h2 className="text-lg font-semibold text-balance">
           <Link to={`/services/${service.slug}`} className="underline-offset-4 after:absolute after:inset-0 hover:underline focus-visible:outline-none">
             {service.nameEn}
           </Link>

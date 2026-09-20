@@ -101,7 +101,7 @@ export function BookingDetailsForm({ id, invalid, onSubmit }: Props) {
             required
             aria-invalid={invalid.has('consent') || undefined}
             aria-describedby={invalid.has('consent') ? `${idPrefix}consent-error` : undefined}
-            className="accent-primary mt-0.5 size-4 shrink-0"
+            className="accent-primary focus-visible:outline-ring mt-0.5 size-4 shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2"
           />
           <span>{t('services:booking.consent')}</span>
         </label>

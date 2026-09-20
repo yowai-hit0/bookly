@@ -259,11 +259,11 @@ Everything derives from one `--radius` of 0.5rem: controls are 8px (`rounded-lg`
 - **Style:** a Calendar Blue tint (5%) with a full 1px Calendar Blue edge (30%), 8px radius and 12px padding; a 16px lucide icon in Calendar Blue beside 14px Ink Navy text. Never a stripe down one side. The icon is decoration and the words carry the meaning. It holds the non-refundable notice and the hold expiry. Shared as the `Callout` component.
 
 ### Selectable cards (shipped: packages and add-ons)
-- **Style:** a white card with a hairline edge and `shadow-sm` around a native radio or checkbox; the whole card is the label. Hover fills Powder Blue at 60% (not on the selected card). Selected is a 5% Available Green tint and a 2px green edge (the 1px border plus a 1px ring) on top of the native mark. Keyboard focus turns the border Calendar Blue with the 3px ring, replacing the green ring while focused.
+- **Style:** a white card with a hairline edge and `shadow-sm` around a native radio or checkbox; the whole card is the label. Hover fills a pale blue (Powder Blue at 60% mixed into the white; not on the selected card). Selected is a faint mint (Available Green at 5% mixed into the white) and a 2px green edge (the 1px border plus a 1px ring) on top of the native mark. Both fills are mixed into the card's own white, never laid over the page, so a selected card stays a white card and never looks like the blue hover. Keyboard focus turns the border Calendar Blue with the 3px ring, replacing the green ring while focused; the native input's own outline is hidden so there is one indicator. Shared as the `SelectableCard` component.
 
 ### Calendar days and times (shipped in the slot picker)
 - **Days:** a 7-column grid. A bookable day is semibold on Powder Blue (hover 8% darker); an unavailable day is disabled at 50% text with no surface; the selected day is Available Green with white text. 40px tall, 44px on touch, and they take the same focus edge as controls.
-- **Times:** outline buttons 44px tall in 4 columns (3 on phones); the chosen one is the default green button.
+- **Times:** buttons 44px tall in 4 columns (3 on phones): white with a Field Slate edge (3.27:1 on the page, so they read as buttons; the plain outline variant's hairline edge disappears there); the chosen one is the default green button. The previous and next month buttons use the same white and slate edge.
 
 ### Money rows (shipped on the price summary and the held page)
 - **Style:** label left, amount right in tabular figures. The total is semibold above a hairline; the booking-fee row, which is due now, is medium weight as a whole; the session fee is regular. A booking reference is monospace semibold at 18px, on the same baseline as its label.
@@ -282,7 +282,7 @@ These are decided in `design-system/bookly/MASTER.md` (sections 7 and 8) and `de
 ### Do:
 - **Do** write every status, amount and time in words; let a dot, tint or icon only repeat them.
 - **Do** keep controls 32px on a mouse and 44px under `pointer-coarse:`.
-- **Do** put keyboard focus in Calendar Blue: a 3px ring at 50% plus a full-strength border on controls, and a 2px full-strength outline offset 2px on text links.
+- **Do** put keyboard focus in Calendar Blue: a 3px ring at 50% plus a full-strength border on controls, and a 2px full-strength outline offset 2px on text links and on a bare native checkbox.
 - **Do** set `aria-disabled` on a busy control instead of `disabled`, and fade it to 50%.
 - **Do** put unpredictable text (errors, names, references) in a shrinkable child with `min-w-0 wrap-anywhere`.
 - **Do** use tabular figures for amounts and times, and monospace semibold for references.
