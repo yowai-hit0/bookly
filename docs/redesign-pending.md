@@ -40,6 +40,18 @@ Stage 2's commits were `e7ca0e1` (design) and `4ead62e` (feat).
 - **Counts:** vitest 1291 passed (40 files), playwright 38 passed. Typecheck and lint clean.
 - **Next action:** Section 6 — the admin calendar, including the FullCalendar CSS block in `index.css`. Warn the subagent about `.bookly-event--conflict` (`admin-calendar.spec.ts:207`), `.fc-toolbar-title`, `.fc-daygrid-day`, `.fc-timegrid-col` and the `[data-kind]` chip innerText assertions.
 
+### Stage 3, Section 6 — admin calendar (2026-09-21) — DONE
+
+Section 5's commit was `8e79c87`.
+
+- Two files: `pages/admin/AdminCalendar.tsx` and the FullCalendar block in `index.css`. No protected file, **no new `en.json` key**, no e2e or unit assertion changed — all 38 e2e passed first time.
+- **The `!important` decision, and why it is not laziness.** `admin/calendar-events.ts` is protected and sets `backgroundColor` / `borderColor` / `textColor` per status in its `COLOURS` map; FullCalendar applies those as literal inline styles on the event element, which beats any class selector. `!important` in the CSS is the only lever that changes an event's look without editing a protected file. Verified by reading `calendar-events.ts:45-50`. It is documented in a comment at the top of the block.
+- **Only four booking statuses can reach the calendar** — `calendar-events.ts:13` types `BookingStatus` as `pending_payment | confirmed | completed | no_show`; cancelled and expired bookings never appear. The seven-status check belongs to Section 7, which is where the doc's own milestone puts it.
+- **Greyscale check, done by me, not taken on trust.** Rendered all four statuses plus a block and a conflict, then applied a real `grayscale(1)` filter. The hold's dashed edge and the conflict's 2px inset outline both read clearly, and the block's diagonal hatch is the only non-solid fill. Honest limit: completed / no-show / confirmed are close in the fill-and-border channel alone; what separates them in greyscale is the icon and the always-present text label, which is what MASTER section 7 asks for. Also confirmed the chips' `innerText` is unchanged by the new icons (`"09:00 Grace M Confirmed Conflicts with a block"`), which is what the `[data-kind]` assertions read.
+- **A stale design file corrected, not the code.** `pages/admin-calendar.md` said "block events are not clickable: default cursor, no hover state". The feature work in `d02bd41` made blocks clickable (a block opens the availability page that edits it — your decision, section 1 below), so the page file was written before the behaviour and was wrong. The subagent kept blocks looking clickable and flagged it; I corrected the page file rather than styling a working affordance as inert.
+- **Counts:** vitest 1291 passed (40 files), playwright 38 passed. Typecheck and lint clean.
+- **Next action:** Section 7 — `AdminBookings` and `AdminBookingDetail`. Warn the subagent about `section`-filtered-by-`h2` locators (`:358,382,405,427,444`), glued `dt`+`dd` strings like `'Total40,000 RWF'` (`:383,:406-417`), and the unqualified `heading level 1` lookups at `:357` and `:403`.
+
 ---
 
 Updated 2026-09-21, after the Section 5 feature work. The reasoning behind each item is in `design-system/bookly/MASTER.md`, section 9. This file is the checklist; tick items off as they are done.

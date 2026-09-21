@@ -137,7 +137,15 @@
     }
 }
 /* FullCalendar (admin calendar, Task 9), themed with the app's tokens so it
-   sits with the shadcn components rather than in FullCalendar's own blue. */
+   sits with the shadcn components rather than in FullCalendar's own blue.
+   Section 6 (design-system/bookly/pages/admin-calendar.md) adds the shared
+   booking status treatments (MASTER.md section 7) to the event boxes below.
+   `calendar-events.ts` is protected and already sets a background/border/text
+   colour inline on every event (its `COLOURS` map); FullCalendar applies those
+   as literal inline styles on the event element (`elStyle` in
+   `@fullcalendar/core`'s `StandardEvent`), which beats any class selector, so
+   the status overrides below use `!important` -- the only way to change an
+   event's look from here without editing that file. */
 .fc {
     --fc-border-color: var(--border);
     --fc-page-bg-color: var(--background);
@@ -151,16 +159,24 @@
     --fc-button-hover-border-color: var(--border);
     --fc-button-active-bg-color: var(--primary);
     --fc-button-active-border-color: var(--primary);
+    /* Fallback only: every event above always supplies its own colour via
+       `COLOURS`, so these are never actually read today; set from tokens per
+       the page file in case that ever stops being true. */
+    --fc-event-bg-color: var(--muted);
+    --fc-event-border-color: var(--border);
+    --fc-event-text-color: var(--foreground);
     font-size: 0.875rem;
 }
 
 .fc .fc-toolbar-title {
+    font-family: var(--font-heading);
     font-size: 1.125rem;
     font-weight: 600;
 }
 
 .fc .fc-button {
     border-radius: var(--radius-md);
+    min-height: 2.25rem;
     font-size: 0.875rem;
     font-weight: 500;
     text-transform: capitalize;
@@ -175,25 +191,109 @@
     box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent);
 }
 
-/* A booking inside a block (spec §6.4): outlined, visible at any event size. */
+/* Three button groups plus the title don't fit one row under `sm` (640px):
+   let the toolbar wrap and put the title on its own line above the buttons
+   (`.fc-toolbar-chunk` is FullCalendar's own wrapper for each of the three
+   `HEADER_TOOLBAR` sections -- left, center, right). */
+@media (max-width: 640px) {
+    .fc .fc-toolbar {
+        flex-wrap: wrap;
+        row-gap: 0.5rem;
+    }
+
+    .fc .fc-toolbar-chunk:nth-child(2) {
+        order: -1;
+        flex-basis: 100%;
+        text-align: center;
+    }
+}
+
+/* Booking status treatments (MASTER.md section 7, "Calendar event" column),
+   kept apart from each other and from the conflict outline below without
+   relying on colour alone: a dashed edge, a tinted fill, a plain muted fill,
+   a destructive tint, and (in AdminCalendar.tsx) a distinct icon and the
+   status word itself in every case. */
+
+/* A hold is unpaid: card fill (not the page tint) with a dashed edge in the
+   brand blue, so the dash is visible against its own fill. */
+.fc .bookly-event--pending_payment {
+    background-color: var(--card) !important;
+    border-color: var(--ring) !important;
+    border-style: dashed;
+}
+
+/* Confirmed: a light tint of the CTA green with a solid edge in the same
+   colour; the label text moves off the inline white onto that green so it
+   stays readable on the lighter fill. */
+.fc .bookly-event--confirmed {
+    background-color: color-mix(in oklab, var(--primary) 10%, var(--card)) !important;
+    border-color: var(--primary) !important;
+}
+.fc .bookly-event--confirmed .fc-event-main {
+    color: var(--primary) !important;
+}
+
+/* Completed: the neutral muted fill FullCalendar already gives it, plus a
+   muted-foreground edge (the calendar gives this one an edge; the badge
+   elsewhere does not, since a dense grid needs the extra boundary). */
+.fc .bookly-event--completed {
+    border-color: var(--muted-foreground) !important;
+}
+
+/* No-show: a destructive tint with a destructive edge and label, matching the
+   client and admin badge treatment (never a 2px edge -- that is reserved for
+   the conflict outline below). */
+.fc .bookly-event--no_show {
+    background-color: color-mix(in oklab, var(--destructive) 10%, var(--card)) !important;
+    border-color: var(--destructive) !important;
+}
+.fc .bookly-event--no_show .fc-event-main {
+    color: var(--destructive) !important;
+}
+
+/* A block is not a status: a muted fill plus a diagonal hatch, so "blocked"
+   reads as a pattern rather than only a colour. `calendar-events.ts` fills
+   blocks with `--secondary` (unused anywhere else in the app); overridden
+   here to the muted fill MASTER specifies. */
+.fc .bookly-event--block {
+    background-color: var(--muted) !important;
+    background-image: repeating-linear-gradient(
+        45deg,
+        color-mix(in oklab, var(--muted-foreground) 14%, transparent),
+        color-mix(in oklab, var(--muted-foreground) 14%, transparent) 2px,
+        transparent 2px,
+        transparent 8px
+    );
+}
+
+/* A booking inside a block (spec §6.4): outlined, visible at any event size.
+   No status treatment above uses a 2px destructive border, so this stays the
+   one place that does, and it reads on top of every fill above it (checked
+   against both the confirmed tint and the pending-payment card fill). */
 .fc .bookly-event--conflict {
     outline: 2px solid var(--destructive);
     outline-offset: -2px;
 }
 
-/* A hold is unpaid: a dashed edge marks it apart from a confirmed booking. */
-.fc .bookly-event--pending_payment {
-    border-style: dashed;
-}
-
-/* Every event opens something -- a booking its own page, a block the page that
-   edits it -- and FullCalendar puts each one in the tab order, so they take the
-   same focus ring as any other control. */
+/* Every event opens something -- a booking its own page, a block the page
+   that edits it -- and FullCalendar puts each one in the tab order, so they
+   take a pointer cursor, a slightly darker fill on hover and a focus ring
+   drawn inside the box, the same as any other clickable control. */
 .fc .bookly-event {
     cursor: pointer;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+    .fc .bookly-event {
+        transition: filter 150ms ease;
+    }
+}
+
+.fc .bookly-event:hover {
+    filter: brightness(0.96);
+}
+
 .fc .bookly-event:focus-visible {
     outline: 2px solid var(--ring);
-    outline-offset: 1px;
+    outline-offset: -2px;
 }

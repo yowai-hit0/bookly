@@ -42,12 +42,14 @@ Set `--fc-event-bg-color`, `--fc-event-border-color` and `--fc-event-text-color`
 
 ## Click-through (decided 2026-09-20)
 
-Booking events will open the booking (`/admin/bookings/:id`). The behaviour is built as feature work with the other admin pages (MASTER section 9, item 7); design for it now:
+Booking events will open the booking (`/admin/bookings/:id`). The behaviour is built as feature work with the other admin pages (MASTER section 9, item 7); design for it now.
+
+**Corrected 2026-09-21, at the Section 6 apply.** The feature work that shipped in `d02bd41` makes **blocks clickable too**: a block opens the availability page that edits it, so every event FullCalendar puts in the tab order leads somewhere (the user's decision, `docs/redesign-pending.md` section 1). The line below saying blocks are not clickable was written before that and is wrong; blocks take the same pointer cursor, hover and focus ring as bookings. Styling a working click target as inert would hide a real affordance.
 
 - The whole event is one click target, with a pointer cursor and a hover state (a slightly darker fill; never a size or layout change).
 - A visible keyboard focus ring (`--ring`, 3px, drawn inside the event box).
 - The status chip and the conflict badge stay inside the click target and keep their text.
-- Block events are not clickable: default cursor, no hover state.
+- ~~Block events are not clickable: default cursor, no hover state.~~ **Superseded** — see the correction above. Blocks are clickable and look it.
 - In month view the events stay small; the hit area is the event box, as large as the row allows.
 
 ## States

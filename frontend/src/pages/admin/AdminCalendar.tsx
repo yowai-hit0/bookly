@@ -11,14 +11,20 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import luxonPlugin from '@fullcalendar/luxon3'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
-import { TriangleAlert } from 'lucide-react'
+import { CheckCheck, CircleCheck, Clock, type LucideIcon, TriangleAlert, UserX } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router'
 import { UnauthenticatedError, adminFetch } from '@/admin/api'
 import { availabilityApi, blockFormValues } from '@/admin/availability'
 import { CALENDAR_VIEWS, type CalendarView, isKigaliDate, kigaliDateOf } from '@/admin/calendar-dates'
-import { type CalendarData, type CalendarEntry, kigaliRangeOf, toEventInputs } from '@/admin/calendar-events'
+import {
+  type BookingStatus,
+  type CalendarData,
+  type CalendarEntry,
+  kigaliRangeOf,
+  toEventInputs,
+} from '@/admin/calendar-events'
 import { Button } from '@/components/ui/button'
 import { TIME_ZONE } from '@/lib/format'
 import { BlockForm } from './BlockForm'
@@ -264,26 +270,44 @@ function renderEventContent(arg: EventContentArg) {
 }
 
 /**
- * One booking or block. The status is visible text, not colour alone, and a
- * booking overlapping a block carries a conflict marker (spec §6.4). Week and
- * day views have room for the service, package and reference, or the block's
- * private reason.
+ * The seven-status icon set (MASTER.md section 7), reused here for the four
+ * statuses that can reach the calendar -- a cancelled or expired booking
+ * never appears in `CalendarData`. The icon repeats the chip's text label; it
+ * never stands in for it (the label is always shown).
+ */
+const STATUS_ICON: Record<BookingStatus, LucideIcon> = {
+  pending_payment: Clock,
+  confirmed: CircleCheck,
+  completed: CheckCheck,
+  no_show: UserX,
+}
+
+/**
+ * One booking or block. The status is visible text plus an icon, not colour
+ * alone, and a booking overlapping a block carries a conflict marker (spec
+ * §6.4). Week and day views have room for the service, package and
+ * reference, or the block's private reason, and for a slightly larger chip
+ * (`design-system/bookly/pages/admin-calendar.md`: 0.7rem in month, 0.75rem
+ * where there is more room).
  */
 function EventContent({ entry, timeText, detailed }: { entry: CalendarEntry; timeText: string; detailed: boolean }) {
   const { t } = useTranslation()
   const status = entry.kind === 'booking' ? entry.booking.status : 'block'
   const time = timeText !== '' ? timeText : entry.kind === 'block' && entry.block.isAllDay ? t('admin:calendar.allDay') : ''
+  const StatusIcon = status === 'block' ? null : STATUS_ICON[status]
+  const chipSize = detailed ? 'text-[0.75rem]' : 'text-[0.7rem]'
 
   return (
     <div className="flex h-full flex-col gap-0.5 overflow-hidden px-1 py-0.5 text-xs" data-kind={entry.kind} data-status={status}>
       <div className="flex flex-wrap items-center gap-1">
         {time !== '' && <span className="font-medium tabular-nums">{time}</span>}
         {entry.kind === 'booking' && <span className="truncate">{entry.booking.contactName}</span>}
-        <span className="rounded border border-current px-1 text-[0.65rem] leading-4 font-medium">
+        <span className={`inline-flex items-center gap-0.5 rounded border border-current px-1 leading-4 font-medium ${chipSize}`}>
+          {StatusIcon !== null && <StatusIcon aria-hidden="true" className="size-3" />}
           {t(`admin:calendar.status.${status}`)}
         </span>
         {entry.kind === 'booking' && entry.booking.conflictsWithBlock && (
-          <span className="bg-destructive inline-flex items-center gap-0.5 rounded px-1 text-[0.65rem] leading-4 font-medium text-white">
+          <span className={`bg-destructive inline-flex items-center gap-0.5 rounded px-1 leading-4 font-medium text-white ${chipSize}`}>
             <TriangleAlert aria-hidden="true" className="size-3" />
             {t('admin:calendar.conflict')}
           </span>
