@@ -4,11 +4,12 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { UnauthenticatedError } from '@/admin/api'
 import { BOOKING_STATUSES, type BookingListRow, type BookingStatus, bookingsApi } from '@/admin/bookings'
 import { kigaliDateOf } from '@/admin/calendar-dates'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { formatDate, formatMoney, formatTime } from '@/lib/format'
+import { cn } from '@/lib/utils'
 
 /**
  * The bookings list (plan.md Task 19): filtered by status and date, searched by
@@ -193,7 +194,11 @@ export function AdminBookings() {
             <thead>
               <tr className="border-b text-left">
                 {(['when', 'reference', 'client', 'service', 'status', 'money'] as const).map((column) => (
-                  <th key={column} scope="col" className="text-muted-foreground px-2 py-2 font-medium">
+                  <th
+                    key={column}
+                    scope="col"
+                    className={cn('text-muted-foreground px-2 py-2 font-medium', column === 'money' && 'text-right')}
+                  >
                     {t(`admin:bookings.columns.${column}`)}
                   </th>
                 ))}
@@ -222,9 +227,9 @@ export function AdminBookings() {
                     <span className="text-muted-foreground block">{booking.packageName}</span>
                   </td>
                   <td className="px-2 py-2 align-top">
-                    <Badge variant="outline">{t(`admin:bookings.status.${booking.status}`)}</Badge>
+                    <StatusBadge status={booking.status}>{t(`admin:bookings.status.${booking.status}`)}</StatusBadge>
                   </td>
-                  <td className="px-2 py-2 align-top tabular-nums">
+                  <td className="px-2 py-2 text-right align-top tabular-nums">
                     {formatMoney(booking.grandTotalRwf)}
                     {booking.outstandingRwf > 0 && (
                       <span className="text-muted-foreground block">

@@ -5,12 +5,13 @@ import { ApiError, UnauthenticatedError } from '@/admin/api'
 import { type AdminBooking, type AdminPayment, bookingFromRefusal, bookingsApi } from '@/admin/bookings'
 import { type AdminAddon, catalogueApi } from '@/admin/catalogue'
 import { kigaliDateOf } from '@/admin/calendar-dates'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDate, formatDateTime, formatMoney, formatTime } from '@/lib/format'
+import { cn } from '@/lib/utils'
 
 /**
  * One booking, and everything the photographer does to it (plan.md Task 19;
@@ -118,9 +119,11 @@ export function AdminBookingDetail() {
 
   return (
     <Shell>
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
+      <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="font-mono text-2xl font-semibold">{booking.reference}</h1>
-        <Badge variant="outline">{t(`admin:bookings.status.${booking.status}`)}</Badge>
+        <StatusBadge status={booking.status} size="md">
+          {t(`admin:bookings.status.${booking.status}`)}
+        </StatusBadge>
       </header>
 
       {failure !== null && (
@@ -175,23 +178,32 @@ export function AdminBookingDetail() {
             <span className="flex items-center gap-3">
               <span className="tabular-nums">{formatMoney(addon.amountRwf)}</span>
               {addon.canRemove && (
-                <button
+                <Button
                   type="button"
-                  className="text-destructive text-xs hover:underline"
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                   aria-disabled={busy}
                   onClick={() => void act(() => bookingsApi.removeAddon(booking.id, addon.id))}
                 >
                   {t('admin:booking.addons.remove')}
-                </button>
+                </Button>
               )}
             </span>
           </Line>
         ))}
-        <Line term={t('admin:booking.labels.total')}>{formatMoney(money.totals.grandTotalRwf)}</Line>
+        <Line term={t('admin:booking.labels.total')} className="mt-1 border-t pt-2 font-semibold">
+          {formatMoney(money.totals.grandTotalRwf)}
+        </Line>
         <Line term={t('admin:booking.labels.collected')}>{formatMoney(money.totals.collectedRwf)}</Line>
-        <Line term={t('admin:booking.labels.outstanding')}>{formatMoney(money.totals.outstandingRwf)}</Line>
+        {/* Still to pay is the number that needs action, so it is a step heavier while it is above zero. */}
+        <Line term={t('admin:booking.labels.outstanding')} className={money.totals.outstandingRwf > 0 ? 'font-semibold' : undefined}>
+          {formatMoney(money.totals.outstandingRwf)}
+        </Line>
         {money.totals.refundDueRwf > 0 && (
-          <Line term={t('admin:booking.labels.refundDue')}>{formatMoney(money.totals.refundDueRwf)}</Line>
+          <Line term={t('admin:booking.labels.refundDue')} className="text-destructive font-semibold">
+            {formatMoney(money.totals.refundDueRwf)}
+          </Line>
         )}
         {actions.canEditAddons && (
           <div className="mt-2 flex flex-col gap-2 border-t pt-3">
@@ -267,7 +279,7 @@ export function AdminBookingDetail() {
                   })}
                   <span className="text-muted-foreground"> · {formatDateTime(message.createdAt)}</span>
                 </span>
-                <span className="text-muted-foreground">
+                <span className={message.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'}>
                   {t(`admin:booking.messageStatus.${message.status}`, { defaultValue: message.status })}
                   {message.lastError !== null && ` · ${message.lastError}`}
                 </span>
@@ -294,18 +306,18 @@ function Shell({ children }: { children: ReactNode }) {
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-2 rounded-xl border p-4">
+    <section className="bg-card flex flex-col gap-2 rounded-xl border p-4 shadow-sm">
       <h2 className="text-lg font-semibold">{title}</h2>
       {children}
     </section>
   )
 }
 
-function Line({ term, children }: { term: string; children: ReactNode }) {
+function Line({ term, children, className }: { term: string; children: ReactNode; className?: string }) {
   return (
-    <div className="flex flex-wrap justify-between gap-x-4 text-sm">
+    <div className={cn('flex flex-wrap justify-between gap-x-4 text-sm', className)}>
       <span className="text-muted-foreground">{term}</span>
-      <span>{children}</span>
+      <span className="tabular-nums">{children}</span>
     </div>
   )
 }
@@ -333,7 +345,7 @@ function Payments({
                   {t(`admin:booking.paymentKinds.${payment.kind}`, { defaultValue: payment.kind })} ·{' '}
                   <span className="tabular-nums">{formatMoney(payment.amountRwf)}</span>
                 </span>
-                <span className="text-muted-foreground">
+                <span className={payment.status === 'failed' || payment.status === 'refund_due' ? 'text-destructive' : 'text-muted-foreground'}>
                   {t(`admin:booking.paymentStatus.${payment.status}`, { defaultValue: payment.status })}
                   {payment.settledAt !== null && ` · ${formatDateTime(payment.settledAt)}`}
                 </span>
@@ -558,7 +570,7 @@ function AddonForm({
           id={`${fieldId}addon`}
           value={addonId}
           onChange={(event) => setAddonId(event.target.value)}
-          className="border-input h-8 rounded-lg border bg-transparent px-2 text-sm"
+          className="border-input bg-card pointer-coarse:h-11 h-8 rounded-lg border px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <option value="">{t('admin:booking.addons.choose')}</option>
           {choices.map((addon) => (
@@ -634,22 +646,32 @@ function CancelForm({ busy, onSubmit }: { busy: boolean; onSubmit: (reason: stri
   }
 
   if (!confirming) {
+    // Kept out of the row of routine buttons: its own top border and spacing (MASTER, admin-booking-detail.md).
     return (
-      <Button variant="destructive" className="self-start" onClick={() => setConfirming(true)}>
-        {t('admin:booking.cancel.start')}
-      </Button>
+      <div className="border-t pt-4">
+        <Button variant="destructive" className="self-start" onClick={() => setConfirming(true)}>
+          {t('admin:booking.cancel.start')}
+        </Button>
+      </div>
     )
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2">
+    <form onSubmit={submit} className="flex flex-col gap-2 border-t pt-4">
       <p className="text-sm font-medium">{t('admin:booking.cancel.warning')}</p>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={fieldId}>{t('admin:booking.cancel.reason')}</Label>
         <Textarea id={fieldId} name="reason" rows={2} />
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" variant="destructive" size="sm" aria-disabled={busy}>
+        {/* Irreversible, so it is a solid red button rather than the tinted variant (MASTER section 6), the same override the client booking page uses. */}
+        <Button
+          type="submit"
+          variant="destructive"
+          size="sm"
+          className="bg-destructive text-white hover:bg-[color-mix(in_oklch,var(--destructive),black_12%)] focus-visible:border-ring focus-visible:ring-ring/50"
+          aria-disabled={busy}
+        >
           {t('admin:booking.cancel.confirm')}
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={() => setConfirming(false)}>

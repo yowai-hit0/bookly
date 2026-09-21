@@ -52,6 +52,18 @@ Section 5's commit was `8e79c87`.
 - **Counts:** vitest 1291 passed (40 files), playwright 38 passed. Typecheck and lint clean.
 - **Next action:** Section 7 — `AdminBookings` and `AdminBookingDetail`. Warn the subagent about `section`-filtered-by-`h2` locators (`:358,382,405,427,444`), glued `dt`+`dd` strings like `'Total40,000 RWF'` (`:383,:406-417`), and the unqualified `heading level 1` lookups at `:357` and `:403`.
 
+### Stage 3, Section 7 — admin bookings list and detail (2026-09-21) — DONE
+
+Section 6's commit was `65e4150`.
+
+- Two files: `AdminBookings.tsx` and `AdminBookingDetail.tsx`. **`status-badge.tsx` was not touched**, so the client pill is provably unchanged — the admin simply adopts it, which was the point of this section. No protected file, no new `en.json` key, no e2e or unit assertion changed; all 38 e2e passed first time, including the glued-string and `section`-filter locators.
+- **The milestone checks, done by me rather than taken on trust.** The subagent reported its contrast figures but said it had *not* re-run a greyscale pass, arguing the component file was unchanged. That argument does not cover how the badges read in the admin's own context, so I rendered all seven statuses in the real list and checked both myself:
+  - **Contrast, measured from what Chromium actually paints** (computed styles come back as `oklch`, so each colour was painted to a canvas and read as sRGB): "still to pay" `#475569` on the page background `#F0F9FF` = **7.11:1**; "to refund" `#B91C1C` on the same = **6.07:1**. Both clear 4.5:1. These match the subagent's numbers exactly.
+  - **Greyscale:** under a real `grayscale(1)`, the seven stay apart — dashed (hold) and dotted (expired) are unmistakable, and the rest separate by fill, edge weight and a distinct icon. Honest limit, the same one as Section 6: completed vs no-show, and the two cancelled states, are close in the fill-and-edge channel alone; the icon and the always-present label carry the distinction. That is what MASTER section 7 specifies, so it passes, but it is not a strong pattern difference.
+- The money column was never actually right-aligned (it had `tabular-nums` but no `text-align`); it is now, header included. The detail page's `Line` values gained the `tabular-nums` the page file had always asked for.
+- **Counts:** vitest 1291 passed (40 files), playwright 38 passed. Typecheck and lint clean.
+- **Next action:** Section 8 — `AdminCatalogue` and `EntityForm`. Warn the subagent about `[data-slot="card"]` (`admin-catalogue.spec.ts:99`, a shadcn internal), `'Weddings Active'` (`:100`) and the `·`-separated line (`:113`), all of which are concatenated visual text.
+
 ---
 
 Updated 2026-09-21, after the Section 5 feature work. The reasoning behind each item is in `design-system/bookly/MASTER.md`, section 9. This file is the checklist; tick items off as they are done.
