@@ -1,19 +1,21 @@
 # Redesign: what still needs your attention
 
-Updated 2026-09-20, after Phase 2b. The reasoning behind each item is in `design-system/bookly/MASTER.md`, section 9. This file is the checklist; tick items off as they are done.
+Updated 2026-09-21, after the Section 5 feature work. The reasoning behind each item is in `design-system/bookly/MASTER.md`, section 9. This file is the checklist; tick items off as they are done.
 
-## 1. Before Phase 3 section 5 (I will stop and tell you)
+## 1. Before Phase 3 section 5 -- done (2026-09-21)
 
-Your answers to decisions 6, 7 and 8: build these first. They are feature work (new pages, new copy, changes to logic files), so they do not belong in the visual-only redesign. Each page then gets a design file in `design-system/bookly/pages/` and joins Section 5.
+Decisions 6, 7 and 8, built as feature work on `main` (commit `d02bd41`) and merged into `redesign/visual-only`. Every endpoint already existed, so none of it touched the backend. Each page still needs a design file in `design-system/bookly/pages/` and joins Section 5.
 
-- [ ] **Working hours** (weekly hours and dated open/close overrides). Backend: `/api/admin/working-hours`. No page exists. The seeded Mon-Fri 09:00-17:00 cannot be changed without it.
-- [ ] **Availability blocks**, with the overlap warning. Backend: `/api/admin/blocks`. The calendar also gains "create a block".
-- [ ] **Settings** (booking-fee rate, minimum notice, hold, buffer, delivery days). Backend: `/api/admin/settings`.
-- [ ] **Password reset page** at `/admin/reset-password`, plus a "Forgot password" link on the login page. The reset email already links to that address; today it shows "Page not found".
-- [ ] **Calendar click-through:** a booking event opens `/admin/bookings/:id`. Today only the bookings list does. Changes `AdminCalendar.tsx` and `calendar-events.ts`.
-- [ ] **Decide the final admin nav.** The audit assumed five links (calendar, bookings, catalogue, availability, settings). Say whether working hours and blocks share one page.
+- [x] **Working hours** (weekly hours and dated open/close overrides). `/admin/availability`.
+- [x] **Availability blocks**, with the overlap warning (spec 6.4: named, never silently saved over a confirmed booking). Same page, plus "Block time" on the calendar.
+- [x] **Settings** (booking-fee rate, minimum notice, hold, buffer, delivery days). `/admin/settings`.
+- [x] **Password reset page** at `/admin/reset-password`, plus "Forgot your password?" on the login page. The token travels in the URL fragment, so it reaches no server log or referrer.
+- [x] **Calendar click-through:** a booking event opens `/admin/bookings/:id`. A block opens the availability page that edits it, so every event FullCalendar puts in the tab order leads somewhere.
+- [x] **The final admin nav** is five links: calendar, bookings, catalogue, availability, settings. **Your decision, 2026-09-21: working hours and blocks share one Availability page,** because between them they answer one question -- when can a client book?
 
-**Branch note.** Some of this touches files the redesign treats as protected (`admin/calendar-events.ts`, `admin/api.ts`, `en.json`). Build it on `main` (or on a branch off it), merge it, then merge `main` into `redesign/visual-only` before Section 5. Otherwise the final check ("no protected file in `git diff main`") fails, and the visual branch stops being visual-only.
+**Still to design (Section 5 and after).** These shipped wearing the pre-redesign admin styling, which is what Section 5 onward restyles. `availability.md` and `settings.md` do not exist yet; write them before Section 5 applies anything to those two pages.
+
+**Branch note (settled).** The work touched `en.json` and `index.css`, so it was built on `main` and merged in; `git diff main` on the visual branch is unchanged by it, and the protected-file check still passes.
 
 ## 2. Waiting on you or the client
 
