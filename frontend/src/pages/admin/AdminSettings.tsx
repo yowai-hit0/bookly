@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
@@ -95,8 +96,8 @@ export function AdminSettings() {
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
       <div className="flex flex-col">
-        <h1 className="text-xl font-semibold">{t('admin:settings.title')}</h1>
-        <p className="text-muted-foreground text-xs">{t('admin:settings.intro')}</p>
+        <h1 className="text-2xl font-semibold">{t('admin:settings.title')}</h1>
+        <p className="text-muted-foreground text-sm">{t('admin:settings.intro')}</p>
       </div>
 
       {loaded === null && (
@@ -136,6 +137,7 @@ export function AdminSettings() {
                         name={field}
                         type="text"
                         inputMode="decimal"
+                        className="max-w-40 tabular-nums"
                         // Keyed on the loaded values, so a save redraws the
                         // inputs from what the API stored.
                         key={values[field]}
@@ -147,7 +149,8 @@ export function AdminSettings() {
               </div>
 
               {saved && (
-                <p className="text-sm" role="status">
+                <p className="flex items-center gap-1.5 text-sm" role="status">
+                  <Check aria-hidden="true" className="text-primary size-4" />
                   {t('admin:settings.saved')}
                 </p>
               )}

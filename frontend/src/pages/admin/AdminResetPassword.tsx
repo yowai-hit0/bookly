@@ -1,3 +1,4 @@
+import { MailCheck, TriangleAlert } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router'
@@ -31,11 +32,17 @@ type RequestStatus = 'idle' | 'submitting' | 'sent' | 'failed'
 type ConfirmStatus = 'idle' | 'submitting' | 'done' | 'invalidToken' | 'failed'
 
 export function AdminResetPassword() {
+  const { t } = useTranslation()
   const { hash } = useLocation()
   const token = new URLSearchParams(hash.replace(/^#/, '')).get('token')
 
   return (
-    <main className="mx-auto flex min-h-svh max-w-sm flex-col justify-center p-6">
+    <main className="mx-auto flex min-h-svh max-w-sm flex-col justify-center gap-4 p-6">
+      {/* Same frame as `/admin/login`: a photographer arriving from there must
+          land somewhere that visibly matches, not something phishing-shaped. */}
+      <span className="font-heading text-foreground/80 self-center text-lg font-semibold">
+        {t('common:appName')}
+      </span>
       {token === null || token === '' ? <RequestLink /> : <ChoosePassword token={token} />}
     </main>
   )
@@ -66,15 +73,16 @@ function RequestLink() {
   }
 
   return (
-    <Card>
+    <Card className="shadow-md">
       <CardHeader>
         <CardTitle>
-          <h1>{t('admin:resetPassword.requestTitle')}</h1>
+          <h1 className="text-xl">{t('admin:resetPassword.requestTitle')}</h1>
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {status === 'sent' ? (
-          <p className="text-sm" role="status">
+          <p className="flex items-start gap-2 text-sm" role="status">
+            <MailCheck aria-hidden="true" className="text-primary mt-0.5 size-4 shrink-0" />
             {t('admin:resetPassword.requestSent')}
           </p>
         ) : (
@@ -89,7 +97,7 @@ function RequestLink() {
                   {t('admin:resetPassword.requestFailed')}
                 </p>
               )}
-              <Button type="submit" disabled={status === 'submitting'}>
+              <Button type="submit" className="w-full" disabled={status === 'submitting'}>
                 {status === 'submitting'
                   ? t('admin:resetPassword.requestSubmitting')
                   : t('admin:resetPassword.requestSubmit')}
@@ -148,16 +156,18 @@ function ChoosePassword({ token }: { token: string }) {
 
   if (status === 'done') {
     return (
-      <Card>
+      <Card className="shadow-md">
         <CardHeader>
           <CardTitle>
-            <h1>{t('admin:resetPassword.doneTitle')}</h1>
+            <h1 className="text-xl">{t('admin:resetPassword.doneTitle')}</h1>
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <p className="text-sm" role="status">
             {t('admin:resetPassword.doneBody')}
           </p>
+          {/* The one shape where the way out is a button: the job is finished
+              and there is exactly one next thing to do. */}
           <Button asChild className="self-start">
             <Link to="/admin/login">{t('admin:resetPassword.backToSignIn')}</Link>
           </Button>
@@ -167,10 +177,10 @@ function ChoosePassword({ token }: { token: string }) {
   }
 
   return (
-    <Card>
+    <Card className="shadow-md">
       <CardHeader>
         <CardTitle>
-          <h1>{t('admin:resetPassword.chooseTitle')}</h1>
+          <h1 className="text-xl">{t('admin:resetPassword.chooseTitle')}</h1>
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -193,12 +203,16 @@ function ChoosePassword({ token }: { token: string }) {
           </AdminField>
 
           {(status === 'invalidToken' || status === 'failed') && (
-            <p className="text-destructive text-sm" role="alert">
+            <p className="text-destructive flex items-start gap-2 text-sm" role="alert">
+              {/* The dead end gets an icon; a plain retry-worthy failure does not. */}
+              {status === 'invalidToken' && (
+                <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              )}
               {t(status === 'invalidToken' ? 'admin:resetPassword.invalidToken' : 'admin:resetPassword.chooseFailed')}
             </p>
           )}
 
-          <Button type="submit" disabled={status === 'submitting'}>
+          <Button type="submit" className="w-full" disabled={status === 'submitting'}>
             {status === 'submitting'
               ? t('admin:resetPassword.chooseSubmitting')
               : t('admin:resetPassword.chooseSubmit')}

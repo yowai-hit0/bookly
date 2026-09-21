@@ -53,11 +53,15 @@ export function AdminLogin() {
     status === 'invalid' ? t('admin:signIn.invalid') : status === 'failed' ? t('admin:signIn.failed') : null
 
   return (
-    <main className="mx-auto flex min-h-svh max-w-sm flex-col justify-center p-6">
-      <Card>
+    <main className="mx-auto flex min-h-svh max-w-sm flex-col justify-center gap-4 p-6">
+      {/* The only place in admin where brand presence is appropriate. */}
+      <span className="font-heading text-foreground/80 self-center text-lg font-semibold">
+        {t('common:appName')}
+      </span>
+      <Card className="shadow-md">
         <CardHeader>
           <CardTitle>
-            <h1>{t('admin:signIn.title')}</h1>
+            <h1 className="text-xl">{t('admin:signIn.title')}</h1>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -81,11 +85,14 @@ export function AdminLogin() {
                 {message}
               </p>
             )}
-            <Button type="submit" disabled={status === 'submitting'}>
+            <Button type="submit" className="w-full" disabled={status === 'submitting'}>
               {status === 'submitting' ? t('admin:signIn.submitting') : t('admin:signIn.submit')}
             </Button>
             {/* The reset page asks for the address itself; this link carries nothing. */}
-            <Link to="/admin/reset-password" className="text-muted-foreground text-sm underline-offset-4 hover:underline">
+            <Link
+              to="/admin/reset-password"
+              className="text-muted-foreground self-start text-sm underline-offset-4 hover:underline"
+            >
               {t('admin:signIn.forgot')}
             </Link>
           </form>

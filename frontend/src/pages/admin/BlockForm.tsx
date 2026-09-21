@@ -1,3 +1,4 @@
+import { TriangleAlert } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
@@ -101,14 +102,19 @@ export function BlockForm({ title, submitLabel, values, onSave, onCancel }: Prop
   const errorFor = (field: string) => (invalid.has(field) ? t(`admin:availability.invalid.${field}`) : null)
 
   return (
-    <form className="flex flex-col gap-3 rounded-md border p-3" aria-label={title} noValidate onSubmit={onSubmit}>
-      <h3 className="text-sm font-medium">{title}</h3>
+    <form
+      className="bg-muted/40 flex flex-col gap-3 rounded-lg border p-3"
+      aria-label={title}
+      noValidate
+      onSubmit={onSubmit}
+    >
+      <h3 className="font-heading text-sm font-medium">{title}</h3>
 
       <fieldset className="flex flex-col gap-1.5">
-        <legend className="text-sm font-medium">{t('admin:availability.fields.mode')}</legend>
+        <legend className="font-heading text-sm font-medium">{t('admin:availability.fields.mode')}</legend>
         <div className="flex flex-wrap gap-4">
           {(['all-day', 'time-range'] as const).map((option) => (
-            <Label key={option} className="flex items-center gap-2 font-normal">
+            <Label key={option} className="min-h-6 items-center gap-2 font-normal pointer-coarse:min-h-11">
               <input
                 type="radio"
                 name="mode"
@@ -159,8 +165,9 @@ export function BlockForm({ title, submitLabel, values, onSave, onCancel }: Prop
       </AdminField>
 
       {overlap !== null && (
-        <div className="border-destructive flex flex-col gap-2 rounded-md border p-3" role="alert">
-          <p className="text-sm font-medium">
+        <div className="border-destructive bg-destructive/5 flex flex-col gap-2 rounded-lg border p-3" role="alert">
+          <p className="flex items-center gap-2 text-sm font-medium">
+            <TriangleAlert aria-hidden="true" className="text-destructive size-4 shrink-0" />
             {t('admin:availability.blocks.overlapTitle', { count: overlap.bookings.length })}
           </p>
           <ul className="flex flex-col gap-1 text-sm">
@@ -173,9 +180,12 @@ export function BlockForm({ title, submitLabel, values, onSave, onCancel }: Prop
           </ul>
           <p className="text-muted-foreground text-sm">{t('admin:availability.blocks.overlapBody')}</p>
           <div className="flex flex-wrap gap-2">
+            {/* Irreversible, so it is a solid red button rather than the tinted
+                variant (MASTER section 6); the override is here, not a new variant. */}
             <Button
               type="button"
               variant="destructive"
+              className="bg-destructive text-white hover:bg-[color-mix(in_oklch,var(--destructive),black_12%)] focus-visible:border-ring focus-visible:ring-ring/50"
               disabled={saving}
               onClick={() => void save({ ...overlap.payload, confirm: true })}
             >

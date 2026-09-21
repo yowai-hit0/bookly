@@ -88,14 +88,19 @@ export function WorkingHoursForm({ title, submitLabel, values, onSave, onCancel 
   const errorFor = (field: string) => (invalid.has(field) ? t(`admin:availability.invalid.${field}`) : null)
 
   return (
-    <form className="flex flex-col gap-3 rounded-md border p-3" aria-label={title} noValidate onSubmit={onSubmit}>
-      <h3 className="text-sm font-medium">{title}</h3>
+    <form
+      className="bg-muted/40 flex flex-col gap-3 rounded-lg border p-3"
+      aria-label={title}
+      noValidate
+      onSubmit={onSubmit}
+    >
+      <h3 className="font-heading text-sm font-medium">{title}</h3>
 
       <fieldset className="flex flex-col gap-1.5">
-        <legend className="text-sm font-medium">{t('admin:availability.fields.kind')}</legend>
+        <legend className="font-heading text-sm font-medium">{t('admin:availability.fields.kind')}</legend>
         <div className="flex flex-wrap gap-4">
           {(['weekday', 'date'] as const).map((option) => (
-            <Label key={option} className="flex items-center gap-2 font-normal">
+            <Label key={option} className="min-h-6 items-center gap-2 font-normal pointer-coarse:min-h-11">
               <input
                 type="radio"
                 name="kind"

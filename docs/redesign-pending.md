@@ -27,6 +27,19 @@ Stage 0's docs commit was `06f958a`.
 - **Counts:** vitest 1285 passed (39 files), playwright 38 passed. Typecheck and lint clean.
 - **Next action:** Stage 3 — spawn the Section 5 subagent (admin shell + login, plus the three pages from row 5b), sonnet, thinking high, one at a time.
 
+### Stage 3, Section 5 — admin shell, login, availability, settings, reset password (2026-09-21) — DONE
+
+Stage 2's commits were `e7ca0e1` (design) and `4ead62e` (feat).
+
+- Subagent restyled 9 files; `index.css` needed nothing. One additive `en.json` key, `admin.skipToContent`. No protected file in the diff, no unit test changed, **no e2e spec needed repair** — all 38 passed first time, including `admin-catalogue.spec.ts:157`, which navigates by the nav links.
+- **`AdminLayout.tsx` is the real change:** top bar -> one `nav` that reflows (sidebar from `lg`, top bar below), a skip link to a new `#admin-content` wrapper, a lucide icon per link, and the active pill. The wordmark stayed a `<span>`; an `h1` there would have made `admin-bookings.spec.ts` lines 357 and 403 strict-mode ambiguous.
+- **Two things I changed after the subagent returned:**
+  - sign-out had no `ml-auto`, so on the top bar it sat beside the wordmark instead of at the right edge as `admin-shell.md` specifies. Added `ml-auto lg:ml-0`. Verified at 412px: sign-out at x=360, five nav links wrapping to two rows, every one 44px tall.
+  - `AdminLayout` had **no unit test at all**, so the new skip link and the wordmark-is-not-an-`h1` rule were covered by nothing. Added `src/admin/AdminLayout.test.tsx` (6 cases), which pins both, plus the five link names the e2e suite navigates by.
+- **Accepted deviation from the page files:** `admin-login.md` and the other admin page files say "inputs 44px, the primitive is 32px today, fix it here". That note is stale — Phase 2b gave `Input` and `Button` `pointer-coarse:h-11`, so they are 44px on touch and 32px on a fine pointer, like every other form in the app. Only `AdminField.tsx`'s hand-rolled `SELECT_CLASS` had genuinely been missed, and it was fixed.
+- **Counts:** vitest 1291 passed (40 files), playwright 38 passed. Typecheck and lint clean.
+- **Next action:** Section 6 — the admin calendar, including the FullCalendar CSS block in `index.css`. Warn the subagent about `.bookly-event--conflict` (`admin-calendar.spec.ts:207`), `.fc-toolbar-title`, `.fc-daygrid-day`, `.fc-timegrid-col` and the `[data-kind]` chip innerText assertions.
+
 ---
 
 Updated 2026-09-21, after the Section 5 feature work. The reasoning behind each item is in `design-system/bookly/MASTER.md`, section 9. This file is the checklist; tick items off as they are done.

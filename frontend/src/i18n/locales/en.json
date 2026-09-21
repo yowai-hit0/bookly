@@ -115,6 +115,7 @@
     }
   },
   "admin": {
+    "skipToContent": "Skip to content",
     "signIn": {
       "title": "Admin sign in",
       "email": "Email",

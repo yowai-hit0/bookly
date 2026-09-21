@@ -1,3 +1,4 @@
+import { CircleSlash } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
@@ -135,13 +136,7 @@ export function AdminAvailability() {
       )
     }
 
-    const hoursText =
-      row.isOpen && row.opensMinute !== null && row.closesMinute !== null
-        ? t('admin:availability.hours.window', {
-            opens: formatMinuteOfDay(row.opensMinute),
-            closes: formatMinuteOfDay(row.closesMinute),
-          })
-        : t('admin:availability.hours.closed')
+    const isClosed = !(row.isOpen && row.opensMinute !== null && row.closesMinute !== null)
 
     return (
       <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 border-b py-2 last:border-b-0">
@@ -152,7 +147,21 @@ export function AdminAvailability() {
           <Badge variant="outline">
             {t(row.weekday === null ? 'admin:availability.hours.datedBadge' : 'admin:availability.hours.weeklyBadge')}
           </Badge>
-          <span className="text-muted-foreground text-sm">{hoursText}</span>
+          {/* A closed day is a different state, not a lesser one: an icon marks
+              it, never colour or opacity alone (`pages/availability.md`). */}
+          {isClosed ? (
+            <span className="text-muted-foreground inline-flex items-center gap-1 text-sm">
+              <CircleSlash aria-hidden="true" className="size-4" />
+              {t('admin:availability.hours.closed')}
+            </span>
+          ) : (
+            <span className="text-muted-foreground text-sm">
+              {t('admin:availability.hours.window', {
+                opens: formatMinuteOfDay(row.opensMinute ?? 0),
+                closes: formatMinuteOfDay(row.closesMinute ?? 0),
+              })}
+            </span>
+          )}
           {row.note !== null && <span className="text-muted-foreground text-sm">· {row.note}</span>}
         </div>
         <div className="flex flex-wrap gap-1">
@@ -244,8 +253,8 @@ export function AdminAvailability() {
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
       <div className="flex flex-col">
-        <h1 className="text-xl font-semibold">{t('admin:availability.title')}</h1>
-        <p className="text-muted-foreground text-xs">{t('admin:availability.intro')}</p>
+        <h1 className="text-2xl font-semibold">{t('admin:availability.title')}</h1>
+        <p className="text-muted-foreground text-sm">{t('admin:availability.intro')}</p>
       </div>
 
       {actionError !== null && (
@@ -275,7 +284,7 @@ export function AdminAvailability() {
               <CardTitle>
                 <h2>{t('admin:availability.hours.title')}</h2>
               </CardTitle>
-              <p className="text-muted-foreground text-xs">{t('admin:availability.hours.intro')}</p>
+              <p className="text-muted-foreground text-sm">{t('admin:availability.hours.intro')}</p>
             </CardHeader>
             <CardContent className="flex flex-col gap-2">
               {data.workingHours.length === 0 ? (
@@ -304,7 +313,7 @@ export function AdminAvailability() {
               <CardTitle>
                 <h2>{t('admin:availability.blocks.title')}</h2>
               </CardTitle>
-              <p className="text-muted-foreground text-xs">{t('admin:availability.blocks.intro')}</p>
+              <p className="text-muted-foreground text-sm">{t('admin:availability.blocks.intro')}</p>
             </CardHeader>
             <CardContent className="flex flex-col gap-2">
               {data.blocks.length === 0 ? (
