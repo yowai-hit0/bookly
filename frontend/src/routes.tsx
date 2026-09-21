@@ -1,5 +1,6 @@
 import { Navigate, type RouteObject } from 'react-router'
 import { AdminLayout } from '@/admin/AdminLayout'
+import { ClientShell } from '@/pages/ClientShell'
 import { Home } from '@/pages/Home'
 import { NotFound } from '@/pages/NotFound'
 import { AdminAvailability } from '@/pages/admin/AdminAvailability'
@@ -20,15 +21,24 @@ import { ServiceList } from '@/pages/services/ServiceList'
  * launch adds routes; it does not restructure these.
  */
 export const routes: RouteObject[] = [
-  { path: '/', element: <Home /> },
-  { path: '/services', element: <ServiceList /> },
-  { path: '/services/:slug', element: <ServiceDetail /> },
-  // The booking fee (plan.md Task 16): pay, then follow the payment until it settles.
-  { path: '/checkout/:reference/:token', element: <CheckoutPage /> },
-  { path: '/checkout/:reference/:token/payments/:ourRef', element: <PaymentProgressPage /> },
-  // The client's own booking, addressed by the token in the path (plan.md Task 18).
-  { path: '/booking/:token', element: <BookingPage /> },
-  { path: '/booking/:token/payments/:ourRef', element: <PaymentProgressPage /> },
+  // A pathless layout route: every client page gets the header and footer, and
+  // each keeps its own `main` (`pages/ClientShell.tsx`). `*` is inside it too --
+  // someone who mistyped a URL is exactly who needs a way out.
+  {
+    element: <ClientShell />,
+    children: [
+      { path: '/', element: <Home /> },
+      { path: '/services', element: <ServiceList /> },
+      { path: '/services/:slug', element: <ServiceDetail /> },
+      // The booking fee (plan.md Task 16): pay, then follow the payment until it settles.
+      { path: '/checkout/:reference/:token', element: <CheckoutPage /> },
+      { path: '/checkout/:reference/:token/payments/:ourRef', element: <PaymentProgressPage /> },
+      // The client's own booking, addressed by the token in the path (plan.md Task 18).
+      { path: '/booking/:token', element: <BookingPage /> },
+      { path: '/booking/:token/payments/:ourRef', element: <PaymentProgressPage /> },
+      { path: '*', element: <NotFound /> },
+    ],
+  },
   { path: '/admin/login', element: <AdminLogin /> },
   // Signed out by definition, so it sits outside the layout's session guard.
   // The emailed link carries its token in the fragment (plan.md Task 7).
@@ -54,5 +64,4 @@ export const routes: RouteObject[] = [
       { path: 'settings', element: <AdminSettings /> },
     ],
   },
-  { path: '*', element: <NotFound /> },
 ]

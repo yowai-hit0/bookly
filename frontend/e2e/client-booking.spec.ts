@@ -165,7 +165,8 @@ test('a link the API does not know shows one generic page that names no booking'
 
   await expect(page.getByRole('heading', { level: 1, name: 'This link is not valid' })).toBeVisible()
   await expect(page.getByText(REFERENCE)).toHaveCount(0)
-  await expect(page.getByRole('button')).toHaveCount(0)
+  // Scoped to the page: the client shell's header and footer are not what this asserts about (2026-09-21).
+  await expect(page.locator('main').getByRole('button')).toHaveCount(0)
   expect(await page.locator('main').innerText()).not.toMatch(/Portraits|Kigali Heights|RWF|Cancel/)
 })
 

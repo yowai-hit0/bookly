@@ -117,10 +117,11 @@ test('the pay page offers MTN MoMo only: no Airtel Money or card element exists 
 
   await expect(page.getByRole('radio', { name: 'Airtel Money' })).toHaveCount(0)
   await expect(page.getByRole('radio', { name: 'Card' })).toHaveCount(0)
-  await expect(page.getByText(/airtel/i)).toHaveCount(0)
-  await expect(page.getByText(/^card$/i)).toHaveCount(0)
+  // Scoped to the page: the client shell's header and footer are not what this asserts about (2026-09-21).
+  await expect(page.locator('main').getByText(/airtel/i)).toHaveCount(0)
+  await expect(page.locator('main').getByText(/^card$/i)).toHaveCount(0)
   await expect(page.locator('input[value="momo_airtel"], input[value="card"]')).toHaveCount(0)
-  await expect(page.locator('input:disabled, [aria-disabled="true"]')).toHaveCount(0)
+  await expect(page.locator('main').locator('input:disabled, [aria-disabled="true"]')).toHaveCount(0)
   expect(await page.locator('main').innerText()).not.toMatch(/airtel|card/i)
 
   await expect(page.getByText('20,000 RWF', { exact: true })).toBeVisible()

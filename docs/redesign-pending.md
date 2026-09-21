@@ -13,6 +13,20 @@ Append-only. The newest entry is last. Progress lives here and in git history, n
 - **Decision, not in the diff:** the three new page files put availability and settings on the 1.5rem `h1` side of the admin title inconsistency (section 5 below), and set the last two nav icons (`CalendarClock`, `Settings`) that `admin-shell.md` deferred to them.
 - **Next action:** Stage 2 — the client shell, landing page and tokenless lookup page. First check the backend for an existing resend / magic-link endpoint; if none exists, stop and report.
 
+### Stage 2 — client shell and landing page (2026-09-21) — DONE
+
+Stage 0's docs commit was `06f958a`.
+
+- `design:` page files `client-shell.md` and a rewritten `home.md`, then `feat:` (this commit): `pages/ClientShell.tsx`, a rewritten `pages/Home.tsx`, the layout route in `routes.tsx`, two new `en.json` namespaces (`shell`, `landing`, 67 lines added, nothing edited).
+- **Blocking check, answered:** there is **no public resend / magic-link endpoint**. The only resend is `POST /api/admin/bookings/:id/resend-link`, inside `adminRouter` behind the session guard; no public route takes an email or a reference. **User decision, 2026-09-21: ship the shell with one nav link ("Book now") and no lookup page** rather than invent an endpoint or fake the page. Section 2 below carries the follow-up.
+- **Decisions not obvious from the diff:**
+  - `ClientShell.tsx` lives in `pages/`, not `components/`, to stay inside the plan's allowed paths; `components/` holds only shadcn primitives.
+  - The five e2e tab-order tests were repaired by **taking the skip link**, not by loosening them: Tab, assert the skip link, Enter, then the original sequence. The journey is still keyboard-only from page load.
+  - Six page-wide e2e assertions (button, radio, list and text counts) were **scoped to `main`**. They still passed unscoped; scoping makes them pass by design rather than by luck of the footer's wording.
+  - Testing Library reports a page's inner `<header>` as a `banner`, so the routing test names the shell by its nav label instead. The DOM is correct; the role engine is loose.
+- **Counts:** vitest 1285 passed (39 files), playwright 38 passed. Typecheck and lint clean.
+- **Next action:** Stage 3 — spawn the Section 5 subagent (admin shell + login, plus the three pages from row 5b), sonnet, thinking high, one at a time.
+
 ---
 
 Updated 2026-09-21, after the Section 5 feature work. The reasoning behind each item is in `design-system/bookly/MASTER.md`, section 9. This file is the checklist; tick items off as they are done.
@@ -35,7 +49,8 @@ Decisions 6, 7 and 8, built as feature work on `main` (commit `d02bd41`) and mer
 ## 2. Waiting on you or the client
 
 - [ ] **Photographer contact details** (decision 9): phone, WhatsApp and/or email. Three messages tell clients to "contact the photographer" (`checkout:closed.body`, `booking:delivery.expired`, `booking:cancel.notCancellable`), but no page shows a contact detail. When you have them, choose where they appear. New `en.json` keys are allowed (additive only).
-- [ ] **A real landing page for `/`** (decision 4). `/` is an API-status stub for now, only restyled. A landing page needs your wording (hero, call to action). Nothing may be invented: no portfolio, testimonials, photographer name, logo, service names or prices unless supplied.
+- [x] **A real landing page for `/`** (decision 4). **Built 2026-09-21.** Hero, services preview, how-it-works, what-you-can-count-on, closing call to action, inside a new client shell (header and footer on every client page). Copy is new `en.json` keys under `landing:` and `shell:`. Nothing was invented: no portfolio, testimonial, photographer name, logo or written-in price, and the preview's service names and prices are **fetched from the API**. **Still yours:** the wording is the developer's, written to state only what the code already enforces. Replace any of it with your own — the keys are `landing:*` in `en.json`.
+- [ ] **"My booking" needs a public resend endpoint.** The header was designed with a second link, to a page where a client who lost their emailed link types their email or booking reference and has it re-sent. **No such endpoint exists** (checked 2026-09-21): the only resend is `POST /api/admin/bookings/:id/resend-link`, behind the admin session guard. Your decision, 2026-09-21: ship without it. When the endpoint is built — 202 whatever the input, like the admin password reset, so it cannot reveal who has a booking — the header grows the link and the page gets its own design file.
 - [ ] **Brand assets:** a logo and any brand colours the client already has (the current palette was picked by the design tool), the photographer's name, social links.
 - [ ] **Real service names, prices and cover images** (spec R-6). Cover images are URLs the admin pastes.
 - [ ] **Confirm working hours** with the photographer. Mon-Fri 09:00-17:00 was the developer's choice, and events often fall on weekends (spec R-4).

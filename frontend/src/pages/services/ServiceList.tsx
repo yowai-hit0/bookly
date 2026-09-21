@@ -69,7 +69,8 @@ export function ServiceList() {
   )
 }
 
-function ServiceCard({ service, priority }: { service: PublicService; priority: boolean }) {
+/** Exported so the landing page's preview shows the same card, not a copy of it. */
+export function ServiceCard({ service, priority }: { service: PublicService; priority: boolean }) {
   const { t } = useTranslation()
   const lowestPrice = service.packages.length === 0 ? null : Math.min(...service.packages.map((pkg) => pkg.priceRwf))
 

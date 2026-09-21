@@ -116,6 +116,13 @@ test('chooses a package, a date and a start by keyboard alone', async ({ page })
   await expect(page.getByRole('heading', { level: 1, name: 'Portraits' })).toBeVisible()
   await expect(page.getByText('Choose a package to see available times.')).toBeVisible()
 
+  // The client shell (2026-09-21) puts a header above every page, so the first
+  // Tab from load is the skip link. Taking it is the journey: it jumps the
+  // chrome and hands focus to the page, and the tab order below is unchanged.
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused()
+  await page.keyboard.press('Enter')
+
   await page.keyboard.press('Tab')
   await expect(page.getByRole('link', { name: 'All services' })).toBeFocused()
   await page.keyboard.press('Tab')

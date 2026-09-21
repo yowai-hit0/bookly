@@ -709,5 +709,72 @@
       "refund": "You are owed {{amount}} back. The photographer will contact you to arrange it."
     },
     "photos_one": "{{count}} photo"
+  },
+  "shell": {
+    "skipToContent": "Skip to content",
+    "nav": {
+      "label": "Main",
+      "bookNow": "Book now"
+    },
+    "footer": {
+      "label": "Footer",
+      "home": "Home",
+      "services": "Browse services",
+      "note": "Booking and payment for photography sessions in Kigali."
+    }
+  },
+  "landing": {
+    "hero": {
+      "title": "Book a photographer, and know the price before you do.",
+      "body": "Pick a service and a package, choose a time that is actually free, and hold it with a booking fee. The rest is paid on the day.",
+      "cta": "Book now",
+      "aside": "You see the full price, and what is due now, before you pay anything."
+    },
+    "preview": {
+      "title": "What you can book",
+      "more": "Browse services"
+    },
+    "how": {
+      "title": "How booking works",
+      "step1": {
+        "title": "Choose a service",
+        "body": "Each service has packages, and add-ons you can take or leave. Every price is listed."
+      },
+      "step2": {
+        "title": "Pick a time",
+        "body": "You only see times that are free. Picking one holds it while you pay."
+      },
+      "step3": {
+        "title": "Pay the booking fee",
+        "body": "A share of the total, paid by Mobile Money, confirms the booking. The rest is due on the day."
+      },
+      "step4": {
+        "title": "Get your link",
+        "body": "We email you a private link to your booking. It is where you check the details, pay the balance and find your photos."
+      }
+    },
+    "trust": {
+      "title": "What you can count on",
+      "price": {
+        "title": "The price is the price",
+        "body": "The total, the amount due now and the amount due later are all shown before you pay. Nothing is added afterwards."
+      },
+      "hold": {
+        "title": "Your time is held",
+        "body": "The slot is taken off the calendar while your payment goes through, so nobody books it out from under you."
+      },
+      "fee": {
+        "title": "The booking fee is not refunded",
+        "body": "If you cancel, the booking fee stays with the photographer and the time is released. We say so here, and again before you pay."
+      },
+      "link": {
+        "title": "One private link, yours",
+        "body": "Your booking lives on a link only you are emailed. You can check it, pay the balance or cancel from there."
+      }
+    },
+    "closing": {
+      "title": "Ready when you are.",
+      "cta": "Book now"
+    }
   }
 }

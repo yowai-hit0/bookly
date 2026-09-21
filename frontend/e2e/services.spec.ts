@@ -99,6 +99,13 @@ test('lists the active services and opens one from the keyboard', async ({ page 
   await expect(page.getByText('From 25,000 RWF')).toBeVisible()
   await expect(page.getByText('From 40,000 RWF')).toBeVisible()
 
+  // The client shell (2026-09-21) puts a header above every page, so the first
+  // Tab from load is the skip link. Taking it is the journey: it jumps the
+  // chrome and hands focus to the page, and the tab order below is unchanged.
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused()
+  await page.keyboard.press('Enter')
+
   await page.keyboard.press('Tab')
   await expect(page.getByRole('link', { name: 'Portraits' })).toBeFocused()
   await page.keyboard.press('Enter')
@@ -129,6 +136,13 @@ test('chooses a package and an add-on by keyboard alone, and the summary follows
   await expect(summary(page).getByText(NOTICE)).toBeVisible()
   await expect(mini).not.toBeChecked()
   await expect(standard).not.toBeChecked()
+
+  // The client shell (2026-09-21) puts a header above every page, so the first
+  // Tab from load is the skip link. Taking it is the journey: it jumps the
+  // chrome and hands focus to the page, and the tab order below is unchanged.
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused()
+  await page.keyboard.press('Enter')
 
   await page.keyboard.press('Tab')
   await expect(page.getByRole('link', { name: 'All services' })).toBeFocused()
@@ -175,13 +189,21 @@ test('chooses a package and an add-on by keyboard alone, and the summary follows
     return total !== undefined && paragraph !== undefined && (total.compareDocumentPosition(paragraph) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
   }, NOTICE)
   expect(noticeBelowTotal).toBe(true)
-  await expect(page.getByText(/processing/i)).toHaveCount(0)
+  // Scoped to the page: the client shell's header and footer are not what this asserts about (2026-09-21).
+  await expect(page.locator('main').getByText(/processing/i)).toHaveCount(0)
 })
 
 test('charges a service’s own rate: 15,000 now at 30% on a 50,000 basket', async ({ page }) => {
   await mockApi(page)
   await page.goto('/services/weddings')
   await expect(page.getByRole('heading', { level: 1, name: 'Weddings' })).toBeVisible()
+
+  // The client shell (2026-09-21) puts a header above every page, so the first
+  // Tab from load is the skip link. Taking it is the journey: it jumps the
+  // chrome and hands focus to the page, and the tab order below is unchanged.
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused()
+  await page.keyboard.press('Enter')
 
   await page.keyboard.press('Tab')
   await page.keyboard.press('Tab')
@@ -201,7 +223,7 @@ test('shows not-found for a deactivated service and for an unknown slug', async 
   for (const slug of [INACTIVE_SLUG, 'nothing-here']) {
     await page.goto(`/services/${slug}`)
     await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
-    await expect(page.getByText(NOTICE)).toHaveCount(0)
-    await expect(page.getByRole('radio')).toHaveCount(0)
+    await expect(page.locator('main').getByText(NOTICE)).toHaveCount(0)
+    await expect(page.locator('main').getByRole('radio')).toHaveCount(0)
   }
 })

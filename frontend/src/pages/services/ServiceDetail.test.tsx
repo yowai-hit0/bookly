@@ -533,7 +533,8 @@ describe('the slot picker on the service page', () => {
   }
 
   function listedTimes(): string[] {
-    return within(screen.getByRole('list')).getAllByRole('button').map((button) => button.textContent ?? '')
+    // Scoped to the page: the client shell's footer nav is a list too (2026-09-21).
+    return within(within(screen.getByRole('main')).getByRole('list')).getAllByRole('button').map((button) => button.textContent ?? '')
   }
 
   it('says to choose a package first, and asks for no availability until one is chosen', async () => {

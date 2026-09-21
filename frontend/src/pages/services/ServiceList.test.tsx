@@ -93,6 +93,15 @@ function user() {
   return userEvent.setup({ delay: null })
 }
 
+/**
+ * The page itself, without the client shell's header and footer (2026-09-21).
+ * Link, list and listitem counts are about the service list, not the chrome
+ * that now sits above and below it.
+ */
+function main() {
+  return within(screen.getByRole('main'))
+}
+
 /** The card of a listed service, found by its heading link. */
 function card(name: string): HTMLElement {
   const article = screen.getByRole('link', { name }).closest('article')
@@ -115,7 +124,7 @@ describe('the service list', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Services' })).toBeInTheDocument()
     expect(await screen.findByRole('status')).toHaveTextContent('Loading…')
-    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    expect(main().queryByRole('link')).not.toBeInTheDocument()
 
     answer(json({ services: [PORTRAITS] }))
 
@@ -150,8 +159,8 @@ describe('the service list', () => {
     renderAt()
 
     await screen.findByRole('link', { name: 'Portraits' })
-    expect(screen.getAllByRole('listitem')).toHaveLength(3)
-    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(['Weddings', 'Product shots', 'Portraits'])
+    expect(main().getAllByRole('listitem')).toHaveLength(3)
+    expect(main().getAllByRole('link').map((link) => link.textContent)).toEqual(['Weddings', 'Product shots', 'Portraits'])
     expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual([
       'Weddings',
       'Product shots',
@@ -179,7 +188,7 @@ describe('the service list', () => {
     renderAt()
 
     expect(await screen.findByText('No services are available to book right now.')).toBeInTheDocument()
-    expect(screen.queryByRole('list')).not.toBeInTheDocument()
+    expect(main().queryByRole('list')).not.toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
@@ -218,7 +227,7 @@ describe('loading the list', () => {
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Could not load services. Check your connection and try again.')
-    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    expect(main().queryByRole('link')).not.toBeInTheDocument()
 
     await user().click(within(alert).getByRole('button', { name: 'Try again' }))
 
