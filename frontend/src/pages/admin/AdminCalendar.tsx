@@ -1,4 +1,11 @@
-import type { CalendarOptions, DatesSetArg, EventContentArg, EventSourceFuncArg, FormatterInput } from '@fullcalendar/core'
+import type {
+  CalendarOptions,
+  DatesSetArg,
+  EventClickArg,
+  EventContentArg,
+  EventSourceFuncArg,
+  FormatterInput,
+} from '@fullcalendar/core'
 import enGbLocale from '@fullcalendar/core/locales/en-gb'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import luxonPlugin from '@fullcalendar/luxon3'
@@ -9,10 +16,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router'
 import { UnauthenticatedError, adminFetch } from '@/admin/api'
+import { availabilityApi, blockFormValues } from '@/admin/availability'
 import { CALENDAR_VIEWS, type CalendarView, isKigaliDate, kigaliDateOf } from '@/admin/calendar-dates'
 import { type CalendarData, type CalendarEntry, kigaliRangeOf, toEventInputs } from '@/admin/calendar-events'
 import { Button } from '@/components/ui/button'
 import { TIME_ZONE } from '@/lib/format'
+import { BlockForm } from './BlockForm'
 
 /**
  * The admin calendar (plan.md Task 9, spec §3.3 step 1): bookings, live holds
@@ -108,10 +117,38 @@ export function AdminCalendar() {
   // effect instead.
   const [shown, setShown] = useState<string | null>(null)
   const [viewType, setViewType] = useState(initial.view)
+  /** The Kigali dates the view spans, so "Block time" can open on a day in it. */
+  const [span, setSpan] = useState({ from: initial.date, to: initial.date })
   const onDatesSet = useCallback(({ view }: DatesSetArg) => {
     setViewType(view.type)
     setShown(`?view=${viewOf(view.type)}&date=${view.calendar.formatIso(view.currentStart, true)}`)
+    setSpan({
+      from: view.calendar.formatIso(view.currentStart, true).slice(0, 10),
+      to: view.calendar.formatIso(view.currentEnd, true).slice(0, 10),
+    })
   }, [])
+
+  /** Today when it is on screen, else the first day shown: the likeliest day to block. */
+  const today = kigaliDateOf(new Date())
+  const blockDate = today >= span.from && today < span.to ? today : span.from
+
+  const [blocking, setBlocking] = useState(false)
+
+  /**
+   * Opening what an event stands for: a booking its own page (plan.md Task 19),
+   * a block the availability page that edits it. FullCalendar puts every event
+   * in the tab order once this is registered and fires it for Enter as well as
+   * for a click, so both kinds lead somewhere rather than sitting focusable and
+   * inert.
+   */
+  const onEventClick = useCallback(
+    (arg: EventClickArg) => {
+      arg.jsEvent.preventDefault()
+      const entry = arg.event.extendedProps.entry as CalendarEntry
+      navigate(entry.kind === 'booking' ? `/admin/bookings/${entry.booking.id}` : '/admin/availability')
+    },
+    [navigate],
+  )
   useEffect(() => {
     if (shown !== null) navigate({ search: shown }, { replace: true })
   }, [shown, navigate])
@@ -144,10 +181,29 @@ export function AdminCalendar() {
 
   return (
     <main className="mx-auto flex max-w-7xl flex-col gap-4 p-4">
-      <div className="flex flex-col">
-        <h1 className="text-xl font-semibold">{t('admin:calendar.title')}</h1>
-        <p className="text-muted-foreground text-xs">{t('admin:calendar.timezoneNote')}</p>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex flex-col">
+          <h1 className="text-xl font-semibold">{t('admin:calendar.title')}</h1>
+          <p className="text-muted-foreground text-xs">{t('admin:calendar.timezoneNote')}</p>
+        </div>
+        {!blocking && <Button onClick={() => setBlocking(true)}>{t('admin:calendar.blockTime')}</Button>}
       </div>
+
+      {/* Blocking time is most often decided while looking at the calendar, so
+          the form opens here rather than sending him to the availability page. */}
+      {blocking && (
+        <BlockForm
+          title={t('admin:availability.blocks.new')}
+          submitLabel={t('admin:availability.create')}
+          values={blockFormValues(undefined, blockDate)}
+          onSave={async (payload) => {
+            await availabilityApi.createBlock(payload)
+            setBlocking(false)
+            calendarRef.current?.getApi().refetchEvents()
+          }}
+          onCancel={() => setBlocking(false)}
+        />
+      )}
 
       {loading && (
         <p className="text-muted-foreground text-sm" role="status">
@@ -187,6 +243,7 @@ export function AdminCalendar() {
         eventSourceFailure={ignoreFailure}
         loading={setLoading}
         datesSet={onDatesSet}
+        eventClick={onEventClick}
         eventContent={renderEventContent}
       />
     </main>

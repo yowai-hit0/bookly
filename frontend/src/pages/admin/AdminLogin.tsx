@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { apiUrl } from '@/admin/api'
 import { saveSession } from '@/admin/session'
 import { Button } from '@/components/ui/button'
@@ -84,6 +84,10 @@ export function AdminLogin() {
             <Button type="submit" disabled={status === 'submitting'}>
               {status === 'submitting' ? t('admin:signIn.submitting') : t('admin:signIn.submit')}
             </Button>
+            {/* The reset page asks for the address itself; this link carries nothing. */}
+            <Link to="/admin/reset-password" className="text-muted-foreground text-sm underline-offset-4 hover:underline">
+              {t('admin:signIn.forgot')}
+            </Link>
           </form>
         </CardContent>
       </Card>
