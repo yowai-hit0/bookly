@@ -116,6 +116,7 @@ Each apply step must first read `design-system/bookly/MASTER.md` and that page's
 | 3 | Checkout flow | `pages/checkout/{CheckoutPage,PaymentProgressPage,PaymentFields}.tsx` |
 | 4 | My booking (client magic-link page) | `pages/booking/BookingPage.tsx` (its `/payments/:ourRef` route reuses `PaymentProgressPage` from Section 3) |
 | 5 | Admin shell + login | `admin/AdminLayout.tsx`, `pages/admin/AdminLogin.tsx` |
+| 5b | Admin availability, settings, reset password | `pages/admin/{AdminAvailability,AdminSettings,AdminResetPassword,WorkingHoursForm,BlockForm,AdminField}.tsx` — added by the discovery rule 2026-09-21 (shipped as feature work in `d02bd41` with no design file). Design files: `pages/{availability,settings,admin-reset-password}.md`. Restyle with section 5, after the shell and login. |
 | 6 | Admin calendar | `pages/admin/AdminCalendar.tsx` + FullCalendar CSS block (`index.css` lines 131–179) — needs an explicit named pass since a tool scanning only `.tsx` files won't touch it |
 | 7 | Admin bookings | `pages/admin/{AdminBookings,AdminBookingDetail}.tsx` |
 | 8 | Admin catalogue | `pages/admin/{AdminCatalogue,EntityForm}.tsx` |
