@@ -185,3 +185,15 @@
 .fc .bookly-event--pending_payment {
     border-style: dashed;
 }
+
+/* Every event opens something -- a booking its own page, a block the page that
+   edits it -- and FullCalendar puts each one in the tab order, so they take the
+   same focus ring as any other control. */
+.fc .bookly-event {
+    cursor: pointer;
+}
+
+.fc .bookly-event:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+}

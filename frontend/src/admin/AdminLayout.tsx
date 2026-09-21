@@ -26,7 +26,7 @@ export function AdminLayout() {
       <header className="flex items-center justify-between border-b px-4 py-2">
         <nav className="flex items-center gap-4" aria-label={t('admin:nav.label')}>
           <span className="font-semibold">{t('common:appName')}</span>
-          {(['calendar', 'bookings', 'catalogue'] as const).map((page) => (
+          {(['calendar', 'bookings', 'catalogue', 'availability', 'settings'] as const).map((page) => (
             <NavLink
               key={page}
               to={`/admin/${page}`}

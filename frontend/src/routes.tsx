@@ -2,10 +2,13 @@ import { Navigate, type RouteObject } from 'react-router'
 import { AdminLayout } from '@/admin/AdminLayout'
 import { Home } from '@/pages/Home'
 import { NotFound } from '@/pages/NotFound'
+import { AdminAvailability } from '@/pages/admin/AdminAvailability'
 import { AdminBookingDetail } from '@/pages/admin/AdminBookingDetail'
 import { AdminBookings } from '@/pages/admin/AdminBookings'
 import { AdminCatalogue } from '@/pages/admin/AdminCatalogue'
 import { AdminLogin } from '@/pages/admin/AdminLogin'
+import { AdminResetPassword } from '@/pages/admin/AdminResetPassword'
+import { AdminSettings } from '@/pages/admin/AdminSettings'
 import { BookingPage } from '@/pages/booking/BookingPage'
 import { CheckoutPage } from '@/pages/checkout/CheckoutPage'
 import { PaymentProgressPage } from '@/pages/checkout/PaymentProgressPage'
@@ -27,6 +30,9 @@ export const routes: RouteObject[] = [
   { path: '/booking/:token', element: <BookingPage /> },
   { path: '/booking/:token/payments/:ourRef', element: <PaymentProgressPage /> },
   { path: '/admin/login', element: <AdminLogin /> },
+  // Signed out by definition, so it sits outside the layout's session guard.
+  // The emailed link carries its token in the fragment (plan.md Task 7).
+  { path: '/admin/reset-password', element: <AdminResetPassword /> },
   {
     path: '/admin',
     element: <AdminLayout />,
@@ -42,6 +48,10 @@ export const routes: RouteObject[] = [
       // Bookings: the list and one booking's lifecycle (plan.md Task 19).
       { path: 'bookings', element: <AdminBookings /> },
       { path: 'bookings/:id', element: <AdminBookingDetail /> },
+      // Working hours and blocks together (plan.md Task 8): one screen, because
+      // between them they answer when a client can book.
+      { path: 'availability', element: <AdminAvailability /> },
+      { path: 'settings', element: <AdminSettings /> },
     ],
   },
   { path: '*', element: <NotFound /> },

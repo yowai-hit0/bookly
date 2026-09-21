@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -365,5 +365,139 @@ describe('the admin layout around it', () => {
 
     expect(await screen.findByRole('heading', { name: 'Admin sign in' })).toBeInTheDocument()
     expect(readSession()).toBeNull()
+  })
+})
+
+/** A fetch that records what was written, for the block the calendar creates. */
+type Written = { method: string; url: string; body: unknown }
+
+function stubWritableFetch(data: CalendarData = OCTOBER) {
+  const written: Written[] = []
+  const mock = vi.fn((input: string | URL | Request, init: RequestInit = {}) =>
+    Promise.resolve().then(() => {
+      const url = String(input)
+      const method = init.method ?? 'GET'
+      if (method !== 'GET') {
+        written.push({ method, url, body: typeof init.body === 'string' ? JSON.parse(init.body) : undefined })
+        return json({ block: { id: 'new', startsAt: '', endsAt: '', isAllDay: true, reason: null } }, 201)
+      }
+      if (url.startsWith(CALENDAR_API)) return json(data)
+      return json({})
+    }),
+  )
+  vi.stubGlobal('fetch', mock)
+  return { written, mock }
+}
+
+describe('opening a booking from the calendar (plan.md Task 19)', () => {
+  it('opens the booking behind an event that is clicked', async () => {
+    signIn()
+    stubFetch()
+    const router = renderAt('/admin/calendar?view=month&date=2026-10-07')
+    await waitForEntries(5)
+
+    const event = document.querySelector<HTMLElement>('[data-kind="booking"]')
+    await user().click(event as HTMLElement)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/admin/bookings/b1'))
+  })
+
+  it('opens the page that edits a block when the block is clicked', async () => {
+    signIn()
+    stubFetch()
+    const router = renderAt('/admin/calendar?view=month&date=2026-10-07')
+    await waitForEntries(5)
+
+    await user().click(document.querySelector<HTMLElement>('[data-kind="block"]') as HTMLElement)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/admin/availability'))
+  })
+
+  it('puts every event in the tab order, so neither kind needs a mouse', async () => {
+    signIn()
+    stubFetch()
+    renderAt('/admin/calendar?view=month&date=2026-10-07')
+    await waitForEntries(5)
+
+    for (const kind of ['booking', 'block']) {
+      const event = document.querySelector<HTMLElement>(`[data-kind="${kind}"]`)?.closest('.fc-event')
+      expect(event, kind).toHaveAttribute('tabindex', '0')
+    }
+  })
+
+  it('opens the booking from the keyboard, not by mouse alone', async () => {
+    signIn()
+    stubFetch()
+    const router = renderAt('/admin/calendar?view=month&date=2026-10-07')
+    await waitForEntries(5)
+
+    const event = document.querySelector<HTMLElement>('[data-kind="booking"]')?.closest('.fc-event') as HTMLElement
+    event.focus()
+    expect(event).toHaveFocus()
+    await user().keyboard('{Enter}')
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/admin/bookings/b1'))
+  })
+})
+
+describe('blocking time from the calendar (spec §3.3 step 3)', () => {
+  it('opens the block form on the first day shown when today is elsewhere', async () => {
+    signIn()
+    stubWritableFetch()
+    renderAt('/admin/calendar?view=month&date=2026-10-07')
+    await waitForEntries(5)
+
+    await user().click(screen.getByRole('button', { name: 'Block time' }))
+
+    // The clock is already 1 November in Kigali, which October does not show.
+    expect(screen.getByLabelText('First day')).toHaveValue('2026-10-01')
+  })
+
+  it('opens it on today when today is on screen', async () => {
+    signIn()
+    stubWritableFetch({ bookings: [], blocks: [] })
+    renderAt('/admin/calendar')
+
+    await user().click(await screen.findByRole('button', { name: 'Block time' }))
+
+    expect(screen.getByLabelText('First day')).toHaveValue('2026-11-01')
+  })
+
+  it('creates the block and refetches the events so it appears', async () => {
+    signIn()
+    const { written, mock } = stubWritableFetch()
+    renderAt('/admin/calendar?view=month&date=2026-10-07')
+    await waitForEntries(5)
+    const loadsBefore = requestedUrls(mock).filter((url) => url.startsWith(CALENDAR_API)).length
+
+    await user().click(screen.getByRole('button', { name: 'Block time' }))
+    fireEvent.change(screen.getByLabelText('First day'), { target: { value: '2026-10-19' } })
+    fireEvent.change(screen.getByLabelText('Last day'), { target: { value: '2026-10-19' } })
+    await user().click(screen.getByRole('button', { name: 'Create' }))
+
+    await waitFor(() => expect(written).toHaveLength(1))
+    expect(written[0]).toMatchObject({
+      method: 'POST',
+      url: '/api/admin/blocks',
+      body: { isAllDay: true, startDate: '2026-10-19', endDate: '2026-10-19', confirm: false },
+    })
+    // The form closes and the calendar reloads, so the new block is on screen.
+    await waitFor(() => expect(screen.queryByRole('form', { name: 'New block' })).not.toBeInTheDocument())
+    await waitFor(() =>
+      expect(requestedUrls(mock).filter((url) => url.startsWith(CALENDAR_API)).length).toBeGreaterThan(loadsBefore),
+    )
+  })
+
+  it('closes the form without writing anything when he changes his mind', async () => {
+    signIn()
+    const { written } = stubWritableFetch()
+    renderAt('/admin/calendar?view=month&date=2026-10-07')
+    await waitForEntries(5)
+
+    await user().click(screen.getByRole('button', { name: 'Block time' }))
+    await user().click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('form', { name: 'New block' })).not.toBeInTheDocument()
+    expect(written).toHaveLength(0)
   })
 })

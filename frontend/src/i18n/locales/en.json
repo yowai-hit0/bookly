@@ -122,14 +122,40 @@
       "submit": "Sign in",
       "submitting": "Signing in…",
       "invalid": "That email and password did not work.",
-      "failed": "Could not sign in. Check your connection and try again."
+      "failed": "Could not sign in. Check your connection and try again.",
+      "forgot": "Forgot your password?"
+    },
+    "resetPassword": {
+      "requestTitle": "Reset your password",
+      "requestBody": "Enter the email you sign in with. If it can sign in here, we will send you a link.",
+      "email": "Email",
+      "requestSubmit": "Send the link",
+      "requestSubmitting": "Sending…",
+      "requestSent": "If that address can sign in here, a reset link is on its way. Check the inbox, and the spam folder.",
+      "requestFailed": "Could not send the link. Check your connection and try again.",
+      "chooseTitle": "Choose a new password",
+      "chooseBody": "This link works once. After you save, sign in with the new password.",
+      "newPassword": "New password",
+      "confirmPassword": "Repeat the new password",
+      "passwordHint": "At least 12 characters. A short sentence you will remember beats a short scramble you will not.",
+      "chooseSubmit": "Save the password",
+      "chooseSubmitting": "Saving…",
+      "tooShort": "Use at least 12 characters.",
+      "mismatch": "Those two passwords are not the same.",
+      "invalidToken": "That link has expired or has already been used. Ask for a new one.",
+      "chooseFailed": "Could not save the password. Check your connection and try again.",
+      "doneTitle": "Password changed",
+      "doneBody": "You can sign in with the new password now.",
+      "backToSignIn": "Back to sign in"
     },
     "nav": {
       "label": "Admin",
       "calendar": "Calendar",
       "catalogue": "Catalogue",
       "signOut": "Sign out",
-      "bookings": "Bookings"
+      "bookings": "Bookings",
+      "availability": "Availability",
+      "settings": "Settings"
     },
     "calendar": {
       "title": "Calendar",
@@ -153,7 +179,9 @@
         "completed": "Completed",
         "no_show": "No-show",
         "block": "Blocked"
-      }
+      },
+      "blockTime": "Block time",
+      "openBooking": "Open {{name}}'s booking"
     },
     "catalogue": {
       "title": "Catalogue",
@@ -233,6 +261,140 @@
         "priceRwf": "Enter a whole number of RWF, 0 or more.",
         "photoCount": "Enter a whole number, 0 or more.",
         "durationMinutes": "Enter a whole number of minutes, at least 1."
+      }
+    },
+    "availability": {
+      "title": "Availability",
+      "intro": "When clients can book. Working hours set the weekly pattern; blocks take time back out of it.",
+      "loading": "Loading availability…",
+      "loadFailed": "Could not load availability.",
+      "retry": "Try again",
+      "actionFailed": "That change didn't save. Try again.",
+      "saveFailed": "Could not save. Try again.",
+      "saving": "Saving…",
+      "save": "Save",
+      "create": "Create",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "delete": "Delete",
+      "weekdays": {
+        "0": "Sunday",
+        "1": "Monday",
+        "2": "Tuesday",
+        "3": "Wednesday",
+        "4": "Thursday",
+        "5": "Friday",
+        "6": "Saturday"
+      },
+      "hours": {
+        "title": "Working hours",
+        "intro": "The weekly pattern, plus single dates that differ from it. A date overrides the weekday it falls on.",
+        "empty": "No working hours yet, so clients can never find a slot. Add at least one open day.",
+        "add": "Add hours",
+        "new": "New working hours",
+        "editTitle": "Edit working hours",
+        "everyDay": "Every {{day}}",
+        "window": "{{opens}} to {{closes}}",
+        "closed": "Closed",
+        "weeklyBadge": "Weekly",
+        "datedBadge": "One date",
+        "editNamed": "Edit the hours for {{name}}",
+        "deleteNamed": "Delete the hours for {{name}}",
+        "confirmDeleteWeekly": "Delete the hours for {{name}}? That closes it until you add hours again.",
+        "confirmDeleteDated": "Delete the override for {{name}}? That date goes back to the usual weekly hours.",
+        "exists": "That day already has hours. Edit the existing row instead."
+      },
+      "blocks": {
+        "title": "Blocks",
+        "intro": "Time taken out of your working hours: holidays, other commitments, anything clients must not book.",
+        "empty": "No blocks. Every open hour is bookable.",
+        "add": "Add block",
+        "new": "New block",
+        "editTitle": "Edit block",
+        "allDayOne": "{{date}}, all day",
+        "allDayRange": "{{from}} to {{to}}, all day",
+        "timeRange": "{{date}}, {{start}} to {{end}}",
+        "noReason": "No reason given",
+        "editNamed": "Edit the block on {{name}}",
+        "deleteNamed": "Delete the block on {{name}}",
+        "confirmDelete": "Delete the block on {{name}}? That time becomes bookable again.",
+        "overlapTitle_one": "This block covers a confirmed booking",
+        "overlapTitle_other": "This block covers {{count}} confirmed bookings",
+        "overlapBody": "Saving it does not cancel them. They stay booked, and the calendar marks them as conflicts.",
+        "overlapConfirm": "Block anyway",
+        "overlapCancel": "Leave it",
+        "overlapSaving": "Blocking…"
+      },
+      "fields": {
+        "kind": "Applies to",
+        "kindWeekday": "Every week",
+        "kindDate": "One date",
+        "weekday": "Day of the week",
+        "effectiveDate": "Date",
+        "isOpen": "Open for bookings on this day",
+        "opens": "Opens",
+        "closes": "Closes",
+        "note": "Note",
+        "mode": "Length",
+        "modeAllDay": "Whole days",
+        "modeTimeRange": "Part of a day",
+        "startDate": "First day",
+        "endDate": "Last day",
+        "date": "Date",
+        "startTime": "From",
+        "endTime": "To",
+        "reason": "Reason"
+      },
+      "hints": {
+        "note": "Only you see this.",
+        "reason": "Only you see this. Clients are told the time is unavailable, never why.",
+        "endDate": "The same day as the first for a single day.",
+        "isOpen": "Clear this to close the day without deleting the row."
+      },
+      "invalid": {
+        "weekday": "Choose a day of the week.",
+        "effectiveDate": "Enter a date as YYYY-MM-DD.",
+        "opens": "Enter a time as HH:MM, for example 09:00.",
+        "closes": "Enter a closing time later than the opening time.",
+        "note": "Keep the note under 500 characters.",
+        "startDate": "Enter a date as YYYY-MM-DD.",
+        "endDate": "The last day cannot be before the first.",
+        "date": "Enter a date as YYYY-MM-DD.",
+        "startTime": "Enter a time as HH:MM, for example 14:00.",
+        "endTime": "Enter an end time later than the start time.",
+        "reason": "Keep the reason under 500 characters."
+      }
+    },
+    "settings": {
+      "title": "Settings",
+      "intro": "How bookings are priced and paced. Changes apply to new bookings; anything already booked keeps the fee and buffer it was sold.",
+      "loading": "Loading settings…",
+      "loadFailed": "Could not load the settings.",
+      "retry": "Try again",
+      "save": "Save settings",
+      "saving": "Saving…",
+      "saved": "Settings saved.",
+      "saveFailed": "Could not save the settings. Try again.",
+      "fields": {
+        "bookingFeePercent": "Booking fee (%)",
+        "minLeadTimeMinutes": "Minimum notice (minutes)",
+        "holdMinutes": "Hold time (minutes)",
+        "bufferMinutes": "Buffer between shoots (minutes)",
+        "deliveryExpiryDays": "Photo link lasts (days)"
+      },
+      "hints": {
+        "bookingFeePercent": "The share of the total paid now to secure a date. A service can override it.",
+        "minLeadTimeMinutes": "How far ahead a client must book. 1440 is one day.",
+        "holdMinutes": "How long a slot is held while a client pays the booking fee.",
+        "bufferMinutes": "Packing-up time kept free after every shoot.",
+        "deliveryExpiryDays": "How long a photo link keeps working after you send it."
+      },
+      "invalid": {
+        "bookingFeePercent": "Enter a percentage from 0 to 100, with at most one decimal place.",
+        "minLeadTimeMinutes": "Enter a whole number of minutes, 0 or more.",
+        "holdMinutes": "Enter a whole number of minutes, 1 or more.",
+        "bufferMinutes": "Enter a whole number of minutes, 0 or more.",
+        "deliveryExpiryDays": "Enter a whole number of days, 1 or more."
       }
     },
     "bookings": {
