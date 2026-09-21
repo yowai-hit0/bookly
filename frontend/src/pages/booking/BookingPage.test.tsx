@@ -565,6 +565,20 @@ describe('cancelling (spec §6.10)', () => {
     expect(screen.queryByRole('button', { name: /^Pay / })).not.toBeInTheDocument()
   })
 
+  // The confirm button is unmounted by its own success, so without this focus falls to the body
+  // and a screen reader is told nothing at all: the page silently becomes a different page.
+  it('moves focus to the heading of the section that replaces the cancel button', async () => {
+    stubApi()
+    await renderLoaded()
+
+    await user().click(screen.getByRole('button', { name: 'Cancel this booking' }))
+    await user().click(screen.getByRole('button', { name: 'Yes, cancel my booking' }))
+
+    const heading = await screen.findByRole('heading', { level: 2, name: 'This booking is cancelled' })
+    expect(heading).toHaveFocus()
+    expect(document.body).not.toHaveFocus()
+  })
+
   it('shows no refund line when nothing is owed back', async () => {
     stubApi({ cancel: () => json({ booking: { ...CANCELLED, totals: { ...CANCELLED.totals, refundDueRwf: 0 } } }) })
     await renderLoaded()

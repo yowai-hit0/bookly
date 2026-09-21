@@ -122,6 +122,20 @@ function BookingView({ token, booking: loadedBooking, methods, onMissing, onRelo
   // Lives here, not in the cancel section: a refusal usually arrives with a
   // booking that can no longer be cancelled, which takes that section away.
   const [refused, setRefused] = useState(false)
+  // Cancelling unmounts the button that was pressed, so focus would otherwise
+  // fall to the body with nothing said. It moves to the heading of the section
+  // that replaced it instead, which is also what announces the outcome.
+  const [announceCancelled, setAnnounceCancelled] = useState(false)
+  const cancelledHeadingRef = useRef<HTMLHeadingElement>(null)
+
+  useEffect(() => {
+    if (announceCancelled) cancelledHeadingRef.current?.focus()
+  }, [announceCancelled])
+
+  function settle(next: ClientBooking) {
+    setBooking(next)
+    if (next.cancelledAt !== null) setAnnounceCancelled(true)
+  }
 
   return (
     <>
@@ -177,7 +191,7 @@ function BookingView({ token, booking: loadedBooking, methods, onMissing, onRelo
         <Cancel
           token={token}
           booking={booking}
-          onCancelled={setBooking}
+          onCancelled={settle}
           onRefused={() => setRefused(true)}
           onMissing={onMissing}
         />
@@ -191,7 +205,10 @@ function BookingView({ token, booking: loadedBooking, methods, onMissing, onRelo
 
       {booking.cancelledAt !== null && (
         <section className="bg-card flex flex-col gap-2 rounded-xl border p-4 shadow-sm">
-          <h2 className="text-lg font-semibold">{t('booking:cancelled.title')}</h2>
+          {/* `tabIndex={-1}` only so focus can be moved here; it stays out of the tab order. */}
+          <h2 ref={cancelledHeadingRef} tabIndex={-1} className="text-lg font-semibold outline-none">
+            {t('booking:cancelled.title')}
+          </h2>
           {booking.cancellationReason !== null && <p className="text-sm wrap-anywhere">{booking.cancellationReason}</p>}
           {booking.totals.refundDueRwf > 0 && (
             <Callout icon={Undo2}>
