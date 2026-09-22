@@ -64,6 +64,18 @@ Section 6's commit was `65e4150`.
 - **Counts:** vitest 1291 passed (40 files), playwright 38 passed. Typecheck and lint clean.
 - **Next action:** Section 8 — `AdminCatalogue` and `EntityForm`. Warn the subagent about `[data-slot="card"]` (`admin-catalogue.spec.ts:99`, a shadcn internal), `'Weddings Active'` (`:100`) and the `·`-separated line (`:113`), all of which are concatenated visual text.
 
+### Stage 3, Section 8 — admin catalogue and EntityForm (2026-09-22) — DONE
+
+Section 7's commit was `0422665`.
+
+- **Found on resume, before any work:** `frontend/src/index.css` had an uncommitted change nobody in this run made (mtime 2026-09-21 23:34) that **swapped the `:root` and `.dark` selector names**, making the undesigned dark palette the app default — `/` painted `rgb(10,10,10)`. All 1291 vitest and 38 playwright passed with it in place, so **nothing in the gate catches a palette swap.** Reported and reverted on your instruction. Worth knowing: no test in this repo asserts a colour.
+- A genuinely small section: the page was already conformant. Verified rather than assumed — Edit and Activate are `outline sm`, Delete is `destructive sm`, the badge is `default`/`outline`, and `Card` usage is untouched shadcn, so `[data-slot="card"]` still matches. No protected file, no `components/ui/` file, no new `en.json` key, no e2e or unit assertion changed.
+- `EntityForm` becomes a filled sub-surface (`bg-muted/40`, `rounded-lg`, no border) so a nested form stops reading as a nested card, and its hint and error both move to `text-sm`.
+- **Contrast**, on the two real backgrounds the form sits on: destructive error **6.15:1** in a card, **5.90:1** on the page; muted hint **7.19:1** and **6.91:1**. All clear 4.5:1.
+- **The title inconsistency, mostly closed.** `docs/redesign-pending.md` section 5 flagged four admin pages at 1.25rem. Availability and Settings moved in Section 5, Catalogue moves here, so **only AdminCalendar is left at `text-xl`**. I also moved the catalogue intro from `text-xs` to `text-sm` to match Availability and Settings, and corrected `pages/admin-catalogue.md`, whose "h1 (xl) + text-xs intro" was the generator's original and never a deliberate choice. `pages/admin-calendar.md` line 11 still carries the same stale pair.
+- **Counts:** vitest 1291 passed (40 files), playwright 38 passed. Typecheck and lint clean.
+- **Next action:** Phase 4 — `/impeccable distill` across the whole app, then the full gate including e2e. **Carry into it:** AdminCalendar's `h1` is the last `text-xl` and its intro the last `text-xs`; fix both there and correct `pages/admin-calendar.md` line 11. Then `git diff main --stat` for protected-file hits, and a visual pass over every route.
+
 ---
 
 Updated 2026-09-21, after the Section 5 feature work. The reasoning behind each item is in `design-system/bookly/MASTER.md`, section 9. This file is the checklist; tick items off as they are done.

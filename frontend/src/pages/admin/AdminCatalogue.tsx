@@ -356,8 +356,8 @@ export function AdminCatalogue() {
     <main className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-col">
-          <h1 className="text-xl font-semibold">{t('admin:catalogue.title')}</h1>
-          <p className="text-muted-foreground text-xs">{t('admin:catalogue.intro')}</p>
+          <h1 className="text-2xl font-semibold">{t('admin:catalogue.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('admin:catalogue.intro')}</p>
         </div>
         {editing !== 'service:new' && <Button onClick={() => setEditing('service:new')}>{t('admin:catalogue.addService')}</Button>}
       </div>

@@ -9,7 +9,9 @@
 
 `main`, `max-w-5xl`, `p-4`, `gap-4`.
 
-1. **Header row:** `h1` (xl) + `text-xs` intro on the left; "Add service" (default) on the right, hidden while the new-service form is open. Wraps on narrow screens.
+1. **Header row:** `h1` + intro on the left; "Add service" (default) on the right, hidden while the new-service form is open. Wraps on narrow screens.
+
+   **Corrected 2026-09-22, at the Section 8 apply.** This line said `h1` **xl** and a `text-xs` intro. Both were the generator's originals and neither was ever a deliberate hierarchy choice. Availability, Settings, Bookings and Booking detail all title at **`text-2xl`** with a **`text-sm`** intro, and `text-xs` is too small for a sentence someone actually reads. The catalogue now matches them. `pages/admin-calendar.md` line 11 still carries the same stale pair; that one belongs to Section 6's file and is closed in Phase 4.
 2. Action error (`role="alert"`, destructive), then the **new-service `EntityForm`** when open.
 3. Loading / load failed (alert + outline retry) / empty.
 4. **One `Card` per service**, then a final card for **shared add-ons** (hint text + the add-on section).
@@ -31,7 +33,7 @@ Active = default (filled, primary tint) and inactive = outline. With the recomme
 ## `EntityForm` (inline editor)
 
 - Today: `rounded-md border p-3`, i.e. a second border and a smaller radius inside cards that use `rounded-xl`. Make it a **filled sub-surface** (`muted` or `muted/40`, `rounded-lg`, no extra border) so nested forms do not look like nested cards, and the radii agree with the rest of the app.
-- Fields: `grid sm:grid-cols-2 gap-3`; the textarea and the checkbox span both columns. Label above, `Input` (16px mobile text, 44px touch height), hint under the field (`text-xs` -> `text-sm`), error under it (destructive, linked by `aria-describedby`).
+- Fields: `grid sm:grid-cols-2 gap-3`; the textarea and the checkbox span both columns. Label above, `Input` (16px mobile text, 44px touch height), hint under the field (`text-xs` -> `text-sm`), error under it (destructive, linked by `aria-describedby`). **The error moves to `text-sm` with the hint** (applied 2026-09-22): they stack under one field in the same role, and leaving the error a size smaller than the hint above it would be an inconsistency invented at the apply.
 - Form-level failure: destructive `role="alert"`. Footer: submit (default; it uses `disabled` while saving) + "Cancel" (ghost).
 - Only one form is open at a time; opening another replaces it in place. Keep it findable: same position in the card, no layout jump to unrelated sections.
 

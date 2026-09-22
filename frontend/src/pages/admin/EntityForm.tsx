@@ -89,7 +89,7 @@ export function EntityForm<T>({ title, submitLabel, fields, values, schema, onSa
   }
 
   return (
-    <form className="flex flex-col gap-3 rounded-md border p-3" aria-label={title} noValidate onSubmit={onSubmit}>
+    <form className="bg-muted/40 flex flex-col gap-3 rounded-lg p-3" aria-label={title} noValidate onSubmit={onSubmit}>
       <h3 className="text-sm font-medium">{title}</h3>
       <div className="grid gap-3 sm:grid-cols-2">
         {fields.map((field) => {
@@ -124,9 +124,9 @@ export function EntityForm<T>({ title, submitLabel, fields, values, schema, onSa
               ) : (
                 <Input {...inputProps} type="text" inputMode={field.kind === 'number' ? 'numeric' : undefined} />
               )}
-              {field.hint && <p className="text-muted-foreground text-xs">{t(`admin:catalogue.hints.${field.name}`)}</p>}
+              {field.hint && <p className="text-muted-foreground text-sm">{t(`admin:catalogue.hints.${field.name}`)}</p>}
               {isInvalid && (
-                <p id={errorId} className="text-destructive text-xs">
+                <p id={errorId} className="text-destructive text-sm">
                   {t(showsSlugTaken ? 'admin:catalogue.invalid.slugTaken' : `admin:catalogue.invalid.${field.name}`)}
                 </p>
               )}
