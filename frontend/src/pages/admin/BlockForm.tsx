@@ -180,12 +180,10 @@ export function BlockForm({ title, submitLabel, values, onSave, onCancel }: Prop
           </ul>
           <p className="text-muted-foreground text-sm">{t('admin:availability.blocks.overlapBody')}</p>
           <div className="flex flex-wrap gap-2">
-            {/* Irreversible, so it is a solid red button rather than the tinted
-                variant (MASTER section 6); the override is here, not a new variant. */}
+            {/* Irreversible, so it is the solid red variant (MASTER section 6). */}
             <Button
               type="button"
-              variant="destructive"
-              className="bg-destructive text-white hover:bg-[color-mix(in_oklch,var(--destructive),black_12%)] focus-visible:border-ring focus-visible:ring-ring/50"
+              variant="destructive-solid"
               disabled={saving}
               onClick={() => void save({ ...overlap.payload, confirm: true })}
             >

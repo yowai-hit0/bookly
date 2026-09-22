@@ -8,7 +8,9 @@
 
 ## Layout (keep)
 
-`main`, `max-w-7xl`, `p-4`, `gap-4`. Order: title block (`h1` xl semibold + `text-xs` muted timezone note) -> loading `role="status"` -> failed `role="alert"` with outline `sm` retry -> the calendar.
+`main`, `max-w-7xl`, `p-4`, `gap-4`. Order: title block (`h1` semibold + muted timezone note) -> loading `role="status"` -> failed `role="alert"` with outline `sm` retry -> the calendar.
+
+**Corrected 2026-09-22, in Phase 4.** This line said `h1` **xl** and a `text-xs` note. Both were the generator's originals, not a deliberate choice, and the calendar was the last admin page still wearing them. It now titles at **`text-2xl`** with a **`text-sm`** note, like every other page inside the admin shell. This closes the title inconsistency recorded in `docs/redesign-pending.md` section 5. The FullCalendar toolbar's own `1.125rem` title is a separate thing and stays as section 6 set it.
 
 Do not change the constants in the TSX: `TIME_GRID_HEIGHT` (760), `SCROLL_TIME` (08:00), `HEADER_TOOLBAR`, the view options. They are behaviour, not styling.
 

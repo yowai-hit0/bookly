@@ -475,11 +475,10 @@ function Cancel({ token, booking, onCancelled, onRefused, onMissing }: CancelPro
           </Callout>
           {/* Stacked and full width on a phone, like the pay button: equal targets whose edges line up with the notice above. */}
           <div className="flex flex-col gap-2 sm:flex-row">
-            {/* Irreversible, so it is a solid red button rather than the tinted variant (MASTER section 6); the override is here, not a new variant. */}
+            {/* Irreversible, so it is the solid red variant rather than the tinted one that merely opens the question (MASTER section 6). */}
             <Button
               ref={confirmRef}
-              variant="destructive"
-              className="bg-destructive text-white hover:bg-[color-mix(in_oklch,var(--destructive),black_12%)] focus-visible:border-ring focus-visible:ring-ring/50"
+              variant="destructive-solid"
               onClick={() => void cancel()}
               aria-disabled={cancelling}
               aria-busy={cancelling}

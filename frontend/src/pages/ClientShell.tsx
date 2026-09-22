@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Link, Outlet } from 'react-router'
 import { Button } from '@/components/ui/button'
+import { SkipLink } from '@/components/ui/skip-link'
 
 /**
  * The header and footer every client page wears (`design-system/bookly/pages/
@@ -24,14 +25,7 @@ export function ClientShell() {
 
   return (
     <div className="flex min-h-svh flex-col">
-      {/* A plain anchor, not a router Link: the browser's own fragment
-          navigation is what moves focus to the target's `tabIndex={-1}`. */}
-      <a
-        href="#main-content"
-        className="bg-primary text-primary-foreground focus-visible:ring-ring/50 sr-only rounded-lg px-4 py-2 text-sm font-medium focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus-visible:ring-3"
-      >
-        {t('shell:skipToContent')}
-      </a>
+      <SkipLink targetId="main-content">{t('shell:skipToContent')}</SkipLink>
 
       {/* Static, not sticky: a bar that follows the page can obscure focus over
           the slot picker and the payment form. */}

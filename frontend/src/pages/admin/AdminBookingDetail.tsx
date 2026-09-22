@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDate, formatDateTime, formatMoney, formatTime } from '@/lib/format'
+import { SELECT_CLASS } from './AdminField'
 import { cn } from '@/lib/utils'
 
 /**
@@ -570,7 +571,7 @@ function AddonForm({
           id={`${fieldId}addon`}
           value={addonId}
           onChange={(event) => setAddonId(event.target.value)}
-          className="border-input bg-card pointer-coarse:h-11 h-8 rounded-lg border px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          className={SELECT_CLASS}
         >
           <option value="">{t('admin:booking.addons.choose')}</option>
           {choices.map((addon) => (
@@ -664,12 +665,11 @@ function CancelForm({ busy, onSubmit }: { busy: boolean; onSubmit: (reason: stri
         <Textarea id={fieldId} name="reason" rows={2} />
       </div>
       <div className="flex flex-wrap gap-2">
-        {/* Irreversible, so it is a solid red button rather than the tinted variant (MASTER section 6), the same override the client booking page uses. */}
+        {/* Irreversible, so it is the solid red variant, the same one the client booking page uses (MASTER section 6). */}
         <Button
           type="submit"
-          variant="destructive"
+          variant="destructive-solid"
           size="sm"
-          className="bg-destructive text-white hover:bg-[color-mix(in_oklch,var(--destructive),black_12%)] focus-visible:border-ring focus-visible:ring-ring/50"
           aria-disabled={busy}
         >
           {t('admin:booking.cancel.confirm')}

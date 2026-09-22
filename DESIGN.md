@@ -137,7 +137,7 @@ Bookly should feel like the front desk of a well-run studio: someone calm at the
 
 One system serves two people. Clients book on a phone or a laptop, with no account, usually once. The photographer runs the business from the admin on a desktop. Both get the same tokens and the same primitives; the admin is denser (the low end of the spacing scale), never different in kind. The feel is calm and exact: precise numbers, plain labels, no flourish. Decoration is non-textual (an icon or a dot beside words that already say the thing) and stays small.
 
-Visual rejections recorded in the design system (`design-system/bookly/MASTER.md` section 2; the first three are also enforced by Impeccable's design hook): no gradient text, no glow shadows, no coloured left-edge stripes, no modals, no 3D, parallax or scroll-driven effects, no emoji as icons, and no site header or footer on public pages. The theme is light only; the `.dark` block in `index.css` is unreachable and undesigned.
+Visual rejections recorded in the design system (`design-system/bookly/MASTER.md` section 2; the first three are also enforced by Impeccable's design hook): no gradient text, no glow shadows, no coloured left-edge stripes, no modals, no 3D, parallax or scroll-driven effects, no emoji as icons. The theme is light only; the `.dark` block in `index.css` is unreachable and undesigned.
 
 The palette and the type pairing were chosen by a design tool and accepted by the user. The client has supplied no logo or brand colours yet, so nothing here is brand-derived. If brand colours arrive, they replace Available Green and Calendar Blue in `frontend/src/index.css` and nothing else changes.
 
@@ -148,7 +148,9 @@ The palette and the type pairing were chosen by a design tool and accepted by th
 - Hairline borders plus `shadow-sm`; no heavy shadows.
 - Every status and every amount is written in words; colour and icons only repeat them.
 
-**State of the build (snapshot, 2026-09-20).** Tokens, fonts and the shadcn primitives are shipped and apply app-wide. Home, NotFound and the whole services flow (the list, the service page with its calendar and times, the details form, the price summary and the held booking), the checkout (the pay page, its notices and the payment-progress page) and the client booking page, with its status pill, have their redesigned page layout, so every client page is done. All admin pages are still their pre-redesign layouts wearing the new tokens. What is designed but not built is listed at the end of Components.
+**State of the build (snapshot, 2026-09-22).** Every page of the app now has its redesigned layout. Tokens, fonts and the shadcn primitives apply app-wide; the whole client journey (the landing page, the service list, the service page with its calendar and times, the details form, the price summary, the held booking, the checkout and its payment-progress page, and the client booking page) and the whole admin (the shell, login, reset password, calendar, bookings, booking detail, catalogue, availability and settings) are done.
+
+Two things changed the shape of the system after the 2026-09-20 snapshot. **Public pages now carry a shared header and footer** (`pages/ClientShell.tsx`), which the earlier snapshot listed as a rejection: a client arriving on `/checkout/...` or `/booking/...` from an email had no route to anything else, and `/` was an API-status stub with no link at all. **`/` is now a real landing page**, built from facts the code enforces and from services fetched from the API; nothing about a photographer, a portfolio or a price is written into it. What is designed but not built is listed at the end of Components.
 
 ## Colors
 
@@ -190,7 +192,7 @@ A cool sky-and-slate ground with one confident green for action and one blue hel
 
 ### Hierarchy
 - **Headline** (600, 1.875rem, 1.2): the title of a client page (Home wordmark, services, service detail, booking, checkout, held).
-- **Title** (600, 1.5rem, 1.333): the title of an error, invalid-link or payment-progress state, and of admin pages such as bookings. Two admin pages (calendar and catalogue) currently title at 1.25rem; later sections settle that.
+- **Title** (600, 1.5rem, 1.333): the title of an error, invalid-link or payment-progress state, and of every page inside the admin shell. Settled 2026-09-22: calendar, catalogue, availability and settings used to title at 1.25rem with a 0.75rem intro; all four now match bookings at 1.5rem with a 0.875rem intro. Login and reset password, which sit outside the shell on a card, stay at 1.25rem.
 - **Section** (600, 1.125rem, 1.556): every `h2` and card section title ("Price summary"). Fieldset legends ("Choose a package") are the same size and weight and take the heading font by hand (`font-heading`), because only `h1`-`h3` get it from the base layer; inside a card that has its own `h2` (the session-fee card on the client booking page) a legend drops to 1rem so the two do not compete.
 - **Body** (400, 0.875rem, 1.429): almost all text. Inputs are 1rem on phones (so iOS does not zoom) and 0.875rem from `md`.
 - **Label** (500, 0.875rem): buttons and form labels.
@@ -204,7 +206,7 @@ A cool sky-and-slate ground with one confident green for action and one blue hel
 
 ## Layout
 
-Mobile first, designed at 375px. Public pages are a single centred column with no site header or footer; each page keeps its own maximum width: `max-w-md` for Home and NotFound, `max-w-2xl` for the flows (pay, progress, my booking), `max-w-5xl` for the service list and detail. Admin pages are denser and each centres in its own width (`3xl` booking detail, `5xl` catalogue, `6xl` bookings, `7xl` calendar).
+Mobile first, designed at 375px. Public pages sit inside a shared shell: a static `bg-card` header with the wordmark and one "Book now" link, the page's own `main`, and a footer. The header and footer are **siblings** of that `main`, never a wrapper around it, so there is exactly one `main` per page. Each page still keeps its own maximum width: `max-w-6xl` for the landing sections, `max-w-md` for NotFound, `max-w-2xl` for the flows (pay, progress, my booking), `max-w-5xl` for the service list and detail. Admin pages are denser and each centres in its own width (`3xl` booking detail, `5xl` catalogue, `6xl` bookings, `7xl` calendar).
 
 Spacing follows Tailwind's 4px scale: 8px inside a group (`gap-2`, the most common), 12px (`gap-3`) and 16px (`gap-4`) between related blocks, 16px inside cards (`p-4`), 24px between sections (`gap-6`), 32px of vertical page padding (`py-8`). Breakpoints are Tailwind's (`sm` 40rem, `md` 48rem, `lg` 64rem) and are used lightly; input modality matters more than width, so controls grow to 44px under `pointer-coarse:` and stay 32px otherwise. Stub pages centre vertically with `min-h-svh`. Long unpredictable text (an API error, a name) sits in a shrinkable child with `min-w-0 wrap-anywhere` so it can never force horizontal scroll. Status pages (the notices and the payment outcomes) limit their words to 36rem, about 72ch, and balance their headings, so a phone never strands one word on a last line.
 
@@ -228,7 +230,7 @@ Everything derives from one `--radius` of 0.5rem: controls are 8px (`rounded-lg`
 ### Buttons
 - **Shape:** 8px radius (`rounded-lg`), 1px transparent border, label in Open Sans medium 14px.
 - **Primary (default):** Available Green fill, white label, 10px side padding. Hover darkens to Available Green, pressed. Pressing nudges down 1px.
-- **Outline:** white fill and a Field Slate edge (3.27:1 on the page, the same as a text field), Ink Navy label; hover fills Powder Blue. It used to draw a Hairline Blue edge, about 1.1:1, which made every outline button read as floating text; the variant itself was fixed. **Ghost:** no fill, Powder Blue on hover. **Destructive:** a tinted button (Cancel Red at 10% fill, Cancel Red label), used for cancel actions; the irreversible confirmation on the client booking page ("Yes, cancel my booking") is a solid Cancel Red fill with a white label (6.47:1) through a `className` override at the call site, not a new variant, and the admin's is meant to follow. **Secondary and link** variants exist and no page uses `secondary`.
+- **Outline:** white fill and a Field Slate edge (3.27:1 on the page, the same as a text field), Ink Navy label; hover fills Powder Blue. It used to draw a Hairline Blue edge, about 1.1:1, which made every outline button read as floating text; the variant itself was fixed. **Ghost:** no fill, Powder Blue on hover. **Destructive:** a tinted button (Cancel Red at 10% fill, Cancel Red label), used for cancel actions; the irreversible confirmation is a solid Cancel Red fill with a white label (6.47:1). Since 2026-09-22 that is a real variant, `destructive-solid`, and the three places that confirm something irreversible use it: the client's "Yes, cancel my booking", the admin's booking cancel, and "Block anyway" on an overlap warning. It keeps the neutral focus ring, since the button is already red. The tinted `destructive` opens the question; the solid one answers it. **Secondary and link** variants exist and no page uses `secondary`.
 - **Size:** 32px high on a mouse, 44px under `pointer-coarse:` (icon buttons 32px and 44px). The small size also grows to 44px on touch; the extra-small size grows to 36px. A submit button (Pay) and the two-button cancel confirmation are full width on a phone and hug their labels from `sm`; a standalone button always hugs its label.
 - **Busy and disabled:** pages set `aria-disabled` (not `disabled`) while a request runs, which fades the button to 50% opacity with a not-allowed cursor and keeps it focusable. Native `disabled` fades to 50% and drops pointer events.
 - **Focus:** the border turns Calendar Blue with a 3px ring at 50%.
@@ -243,7 +245,7 @@ Everything derives from one `--radius` of 0.5rem: controls are 8px (`rounded-lg`
 - **Corner Style:** 11.2px (`rounded-xl`).
 - **Background:** Studio White, with Ink Navy text.
 - **Shadow Strategy:** Card lift plus a 1px Hairline Blue border (see Elevation & Depth).
-- **Internal Padding:** 16px (`p-4`); a `sm` size uses 12px. The hand-rolled cards on the services pages, the checkout and the client booking page carry the border and `shadow-sm`; the admin's still carry only the border until Section 7 adds it, so there is one card look.
+- **Internal Padding:** 16px (`p-4`); a `sm` size uses 12px. Every hand-rolled card, client and admin alike, carries the border and `shadow-sm`, so there is one card look across the app (the admin's booking-detail sections gained it in Section 7).
 
 ### Badges
 - **Style:** a pill, 20px high, caption text, 8px side padding. The active badge is Available Green with white text; the outline badge is a Hairline Blue edge with Ink Navy text; a destructive badge is Cancel Red at 10% with Cancel Red text. A booking status is not one of these: it uses the status badge below.

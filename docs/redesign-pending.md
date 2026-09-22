@@ -76,6 +76,21 @@ Section 7's commit was `0422665`.
 - **Counts:** vitest 1291 passed (40 files), playwright 38 passed. Typecheck and lint clean.
 - **Next action:** Phase 4 — `/impeccable distill` across the whole app, then the full gate including e2e. **Carry into it:** AdminCalendar's `h1` is the last `text-xl` and its intro the last `text-xs`; fix both there and correct `pages/admin-calendar.md` line 11. Then `git diff main --stat` for protected-file hits, and a visual pass over every route.
 
+### Phase 4 — distill and the cross-cutting pass (2026-09-22) — DONE
+
+Section 8's commit was `d3c542d`.
+
+- **The title inconsistency is closed.** AdminCalendar was the last page at `text-xl` with a `text-xs` intro; it now matches the other five in-shell admin pages at `text-2xl` / `text-sm`, and `pages/admin-calendar.md` line 11 is corrected. Login and reset password stay at `text-xl`: they sit outside the shell on a card, which is a different thing.
+- **Three real duplications removed** (the whole point of distill — nothing was removed for its own sake):
+  - the solid-red irreversible confirmation was an identical hand-written `className` in **three** files (client cancel, admin cancel, "Block anyway"). It is now a `destructive-solid` Button variant. The tinted `destructive` opens the question; the solid one answers it.
+  - the skip link was the same long class list in both shells; it is now `components/ui/skip-link.tsx`.
+  - `AdminBookingDetail`'s add-on `<select>` hand-rolled what `SELECT_CLASS` already provided. Measured before and after: **223px both ways**, so no layout change.
+- **Visual pass, all 13 routes at 1280px and at Pixel 7:** no React error boundary and no horizontal overflow anywhere. (Two crashes during the pass were my own mock's payload shape, not the app; the second was `sharedAddons`.)
+- **`git diff main` scope check.** No hit on the logic files or `components.json` / `vite.config.ts`. `en.json` is **68 added, 0 removed**. Outside the normally allowed paths: `PRODUCT.md`, `DESIGN.md`, `.impeccable/design.json`, this file, the e2e specs — all already on the pre-merge list below — **plus `frontend/package.json` and `frontend/package-lock.json`**, which are the Phase 2 font swap (Geist out, Poppins and Open Sans in) in commits `c37410b` and `2bb949e`. The guardrail asks that lockfiles never ride along in a visual commit; they did not, so this is accounted for rather than a violation. Add it to the pre-merge list.
+- **DESIGN.md and its sidecar corrected, not regenerated.** Six claims had gone false: "no site header or footer on public pages" (a rejection the client shell overturned on your instruction), "all admin pages are still their pre-redesign layouts", the 1.25rem titles, the public-page layout description, the destructive override, and the admin cards' missing shadow. The sidecar also carried a **"Don't add ... a site header or footer on public pages"** rule, which would have told a future Impeccable run to delete the client shell. **I corrected those in place rather than re-running `/impeccable document`,** because a full regeneration rewrites all 310 lines and discards the hand-review that `MASTER.md` cites. If you want the regeneration anyway, it is still open.
+- **Final counts:** typecheck clean, lint clean, **vitest 1291 passed (40 files)**, **playwright 38 passed**. No `.skip`, `.only` or `fixme` anywhere in either suite.
+- **Next action:** Stage 4 — walk the shipped app against `docs/user-journeys.md` sections 5, 6 and 7, rewrite its route map and gap list, then the closing test sweep.
+
 ---
 
 Updated 2026-09-21, after the Section 5 feature work. The reasoning behind each item is in `design-system/bookly/MASTER.md`, section 9. This file is the checklist; tick items off as they are done.

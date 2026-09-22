@@ -189,8 +189,8 @@ export function AdminCalendar() {
     <main className="mx-auto flex max-w-7xl flex-col gap-4 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex flex-col">
-          <h1 className="text-xl font-semibold">{t('admin:calendar.title')}</h1>
-          <p className="text-muted-foreground text-xs">{t('admin:calendar.timezoneNote')}</p>
+          <h1 className="text-2xl font-semibold">{t('admin:calendar.title')}</h1>
+          <p className="text-muted-foreground text-sm">{t('admin:calendar.timezoneNote')}</p>
         </div>
         {!blocking && <Button onClick={() => setBlocking(true)}>{t('admin:calendar.blockTime')}</Button>}
       </div>

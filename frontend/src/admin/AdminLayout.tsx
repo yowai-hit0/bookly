@@ -2,6 +2,7 @@ import { CalendarClock, CalendarDays, ClipboardList, LogOut, Package, Settings }
 import { useTranslation } from 'react-i18next'
 import { NavLink, Navigate, Outlet, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
+import { SkipLink } from '@/components/ui/skip-link'
 import { cn } from '@/lib/utils'
 import { clearSession, readSession } from './session'
 
@@ -38,14 +39,7 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-svh lg:flex">
-      {/* A plain anchor, not a router Link: the browser's own fragment
-          navigation is what moves focus to the target's `tabIndex={-1}`. */}
-      <a
-        href="#admin-content"
-        className="bg-primary text-primary-foreground focus-visible:ring-ring/50 sr-only rounded-lg px-4 py-2 text-sm font-medium focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus-visible:ring-3"
-      >
-        {t('admin:skipToContent')}
-      </a>
+      <SkipLink targetId="admin-content">{t('admin:skipToContent')}</SkipLink>
 
       <aside className="bg-card flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-3 lg:sticky lg:top-0 lg:h-svh lg:w-60 lg:shrink-0 lg:flex-col lg:items-stretch lg:gap-1 lg:overflow-y-auto lg:border-r lg:border-b-0 lg:bg-sidebar lg:px-3 lg:py-4">
         <span className="font-heading text-sidebar-foreground order-1 flex items-center gap-2 px-1 text-lg font-semibold">
