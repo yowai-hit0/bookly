@@ -64,11 +64,15 @@ describe('the client shell', () => {
     expect(within(banner).getAllByRole('link')).toHaveLength(2)
   })
 
-  it('adds no button and no radio anywhere: the e2e suite counts both page-wide', () => {
-    renderShell()
+  it('adds no button and no form control anywhere: the e2e suite counts these page-wide', () => {
+    const { container } = renderShell()
 
     expect(screen.queryAllByRole('button')).toHaveLength(0)
     expect(screen.queryAllByRole('radio')).toHaveLength(0)
+    // checkout.spec.ts counts `input:disabled, [aria-disabled="true"]`; that
+    // assertion is scoped to `main`, so the chrome's side of it is proved here.
+    expect(container.querySelectorAll('input, select, textarea')).toHaveLength(0)
+    expect(container.querySelectorAll('[aria-disabled="true"]')).toHaveLength(0)
   })
 
   it('puts no definition list in the footer: booking.spec.ts reads `dl dt` page-wide', () => {

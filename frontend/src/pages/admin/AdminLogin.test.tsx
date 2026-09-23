@@ -79,6 +79,19 @@ describe('AdminLogin', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  // The reset page is reachable only from here. The page itself is tested in
+  // AdminResetPassword.test.tsx; without this, nothing proved the way in exists
+  // (the gap list's row 2, closed 2026-09-21 and checked here since).
+  it('offers the way to the reset page, carrying nothing with it', async () => {
+    stubLogin(() => json(LOGIN_OK))
+    renderLogin()
+
+    const forgot = screen.getByRole('link', { name: 'Forgot your password?' })
+    expect(forgot).toHaveAttribute('href', '/admin/reset-password')
+    // No email, no token, no query: the reset page asks for the address itself.
+    expect(forgot.getAttribute('href')).not.toMatch(/[?#]/)
+  })
+
   it('posts the email and password as JSON to the login endpoint', async () => {
     const mock = stubLogin(() => json(LOGIN_OK))
     renderLogin()

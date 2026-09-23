@@ -1,6 +1,6 @@
 # Bookly user journeys: current and ideal
 
-Written 2026-09-20 from the code at commit `7cf03ea` (branch `redesign/visual-only`, Phase 3 sections 1-2 applied). Nothing here was run in a browser: the current journeys come from reading the routes, pages, backend routes and email templates; the ideal journeys come from `docs/brief.md`, `docs/specs_v2.md`, `docs/clien-answers.md` and `PRODUCT.md`, plus a few proposals that are marked as such.
+Written 2026-09-20 from the code at commit `7cf03ea` (branch `redesign/visual-only`, Phase 3 sections 1-2 applied). **Sections 1 and 7 were rewritten 2026-09-23, after the redesign finished, by walking the app in Chromium with `/api` mocked.** Sections 2-6, 8 and 9 still date from 2026-09-20. Originally, nothing here was run in a browser: the current journeys come from reading the routes, pages, backend routes and email templates; the ideal journeys come from `docs/brief.md`, `docs/specs_v2.md`, `docs/clien-answers.md` and `PRODUCT.md`, plus a few proposals that are marked as such.
 
 **Status tags** used below: `[exists]` works today, `[partial]` works with a gap, `[missing]` not built. **Priority:** **Must** before launch, **Should** soon after or when cheap, **Could** worth considering, **Decision** needs an answer first.
 
@@ -8,43 +8,44 @@ Written 2026-09-20 from the code at commit `7cf03ea` (branch `redesign/visual-on
 
 ## 1. Route map (current)
 
+**Rewritten 2026-09-23, walked in a browser** (Chromium, the `/api` responses mocked) rather than read from the routes file. Every row below was opened; the claims in section 7 were each re-checked the same way.
+
 ### Public (no sign-in)
+
+All of these sit inside a pathless layout route, `ClientShell`, added 2026-09-21. It puts a static header (the wordmark, one "Book now" link) and a footer on every client page, as **siblings** of the page's own `<main>` -- there is exactly one `main` per page. A skip link is the first focusable element.
 
 | Route | Page | What it is |
 |---|---|---|
-| `/` | Home | An API-status stub (app name, "API reachable", "Check again"). No links to anything. |
+| `/` | Home | **A landing page** (was an API-status stub with no links). Hero and call to action, a preview of the first three services the API lists, the four booking steps, four facts the code enforces -- including that the booking fee is not refunded -- and a closing call to action. No photographer name, logo, portfolio, testimonial or written-in price: none were supplied. |
 | `/services` | ServiceList | Grid of active services with a "From X RWF" line. |
 | `/services/:slug` | ServiceDetail | The whole booking funnel on one page. On success the same URL shows the "held" summary. An unknown or deactivated slug shows Not found. |
 | `/checkout/:reference/:token` | CheckoutPage | Pay the booking fee. States: pay, paid, closed, expired, invalid link. |
 | `/checkout/:reference/:token/payments/:ourRef` | PaymentProgressPage | Follows one payment until it settles (polls every 3 s, gives up after 10 min). |
 | `/booking/:token` | BookingPage | The client's private booking page (the emailed "magic link"). |
 | `/booking/:token/payments/:ourRef` | PaymentProgressPage | Same progress page, used for the session fee. |
-| `*` | NotFound | "Page not found" with an "All services" link. |
+| `*` | NotFound | "Page not found" with an "All services" link. Inside the shell too: someone who mistyped a URL is exactly who needs a way out. |
 
 ### Admin (one photographer)
 
 | Route | Page | What it is |
 |---|---|---|
-| `/admin/login` | AdminLogin | Email and password. Outside the shell. |
+| `/admin/login` | AdminLogin | Email and password, plus a **"Forgot your password?"** link to the reset page. Outside the shell. |
+| `/admin/reset-password` | AdminResetPassword | **Exists now.** One route, two jobs: ask for the link, or choose the new password. The token arrives in the URL *fragment*, so it reaches no server log or referrer. Outside the shell, since it is used signed out. |
 | `/admin` | (redirect) | Goes to `/admin/calendar`. |
-| `/admin/calendar?view=month\|week\|day&date=YYYY-MM-DD` | AdminCalendar | Read-only FullCalendar of bookings, live holds and blocks. |
-| `/admin/bookings?status=…&from=…&to=…&search=…` | AdminBookings | Filterable table, 25 per page, sorted by start time, newest first. |
+| `/admin/calendar?view=month\|week\|day&date=YYYY-MM-DD` | AdminCalendar | FullCalendar of bookings, live holds and blocks. **Every event now opens something** -- a booking its own page, a block the page that edits it. Verified: one click on a month-view booking lands on `/admin/bookings/:id`. |
+| `/admin/bookings?status=...&from=...&to=...&search=...` | AdminBookings | Filterable table, 25 per page, sorted by start time, newest first. |
 | `/admin/bookings/:id` | AdminBookingDetail | One booking and every action on it. |
 | `/admin/catalogue` | AdminCatalogue | Services, packages and add-ons (create, edit, activate, delete). |
+| `/admin/availability` | AdminAvailability | **Exists now.** Weekly working hours, dated overrides and blocks on one page, with the spec 6.4 overlap warning. |
+| `/admin/settings` | AdminSettings | **Exists now.** The five operating values: booking-fee rate, minimum notice, hold, buffer, delivery days. |
 
-All `/admin/*` pages except login sit inside `AdminLayout`, which redirects to login without a live session (a token in `sessionStorage`, valid 8 hours). The API refuses the data itself as well.
+All `/admin/*` pages except login and reset sit inside `AdminLayout`, which redirects to login without a live session (a token in `sessionStorage`, valid 8 hours) and carries its own skip link and nav. The API refuses the data itself as well. The nav is five links: calendar, bookings, catalogue, availability, settings.
+
+**Verified 2026-09-23:** a signed-out visitor who asks for `/admin/settings` lands on `/admin/login`, and **the URL carries nothing about where they wanted to go** -- gap 11 is still open.
 
 ### Not routes (no page exists)
 
-`/privacy`, `/admin/reset-password`, and any page for working hours, availability blocks or settings.
-
-### API used by the journeys
-
-- **Client:** `GET /api/services`, `/api/services/:slug`, `/api/availability`, `POST /api/bookings`, `GET /api/payment-methods`, `GET /api/checkout/:reference/:token`, `POST …/payments`, `GET /api/payments/:ourRef`, `GET /api/booking/:token`, `POST /api/booking/:token/payments`, `POST /api/booking/:token/cancel`. Provider callbacks arrive at `/api/webhooks/mtn-momo/…`.
-- **Admin:** `POST /api/admin/auth/login`, `GET /api/admin/calendar`, `/bookings`, `/bookings/:id`, `POST …/reschedule|cancel|complete|no-show|resend-link|addons|session-fee|delivery/send`, `PUT …/delivery`, `DELETE …/addons/:addonId`, `POST /api/admin/payments/:id/refund`, and create / update / delete for services, packages and add-ons.
-- **Backend only, no UI:** `/api/admin/working-hours`, `/api/admin/blocks`, `/api/admin/settings`, `/api/admin/auth/password-reset/request` and `/confirm`.
-
----
+`/privacy` (still answers with the Not found page, checked), and any tokenless "email me my booking link" lookup page. The latter is blocked, not merely unbuilt: see gap 19.
 
 ## 2. Current client journey
 
@@ -53,7 +54,7 @@ Clients are guests: no account. Their identity is the token in the URL.
 ```mermaid
 flowchart TD
   A["Link sent by the photographer, for example on WhatsApp"] --> S["/services"]
-  H["/ (status stub)"] -.-> S
+  H["/ (landing page)"] --> S
   S --> D["/services/:slug"]
   D -->|"unknown slug"| NF["Not found"]
   D -->|"submit"| HELD["Held summary, same URL, 30 min hold"]
@@ -69,7 +70,7 @@ flowchart TD
   BK --> CX["Cancel, two steps"]
 ```
 
-The dotted line from `/` is a hope, not a link: Home has nothing that leads to `/services`.
+**Corrected 2026-09-23:** that arrow used to be dotted, because `/` was a status stub with nothing leading to `/services`. It is a real link now -- the landing page carries three routes into `/services`, and the shell's header carries a fourth from every client page. The rest of this section still describes 2026-09-20.
 
 ### 2.1 Main path: book a shoot
 
@@ -160,7 +161,7 @@ flowchart TD
 | 1 | `/admin/login` | Email and password. Wrong credentials, an unknown email and a locked account all show the same message. | A lockout also emails the admin. |
 | 2 | → `/admin/calendar` | Always lands on the month view for today. | An email deep link to a specific day is lost here if the session had ended. |
 | 3 | any admin page | Session lives in `sessionStorage`: a reload keeps it, closing the tab signs out. After 8 hours, or on any 401, back to login. | Login never returns you to where you were. |
-| – | – | **Forgot password:** nothing. The backend sends a reset email that links to `/admin/reset-password`, which shows "Page not found". | |
+| – | – | ~~**Forgot password:** nothing. The backend sends a reset email that links to `/admin/reset-password`, which shows "Page not found".~~ **Corrected 2026-09-23:** the login page carries a "Forgot your password?" link and `/admin/reset-password` is a real page. | |
 
 ### 3.2 Daily loop: a booking arrives
 
@@ -286,42 +287,64 @@ Email or bookmark → **Bookings** opens on upcoming and unpaid → open a booki
 
 ## 7. Gap list: current to ideal
 
-| # | Gap | Journey | Needs | Priority | Source |
-|---|---|---|---|---|---|
-| 1 | Working hours, blocks and settings pages | Admin | Pages, copy, design files; backend exists | **Must** | Brief 4.2; spec P-15, P-16, P-24, P-30; decided in `redesign-pending.md` |
-| 2 | Password reset page and "Forgot password" link | Admin | Page, copy | **Must** | Backend email already links to it |
-| 3 | Calendar event opens the booking | Admin | Code in `AdminCalendar.tsx`, `calendar-events.ts` | **Must** | Decided in `redesign-pending.md` |
-| 4 | Photographer contact channel | Client | Real details from the client; copy | **Must** | Three messages point clients to it |
-| 5 | Privacy notice and consent link | Client | Page, copy; erasure routine (Task 23) | **Must** | Spec 4.1 |
-| 6 | `/` leads to `/services` (interim) or a real landing page | Client | Redirect now; landing needs the client's wording | **Must** / **Decision** | `PRODUCT.md`; `redesign-pending.md` section 2 |
-| 7 | Real service names, prices, images | Client | Content from the client (R-6) | **Must** | Spec R-6 |
-| 8 | "View my booking" after the fee is paid | Client | API returns the booking link once; a button | **Should** | Principle 3 |
-| 9 | Airtel Money and card | Client | Flutterwave adapter (Task 25) | **Should** | Brief 4.4; client said yes to card |
-| 10 | Google Calendar mirror | Admin | Task 22 | **Should** | Client uses Google Calendar |
-| 11 | Sign in returns to the page asked for | Admin | Small code change | **Should** | – |
-| 12 | Bookings opens on "needs attention"; refund and unpaid filters | Admin | List defaults and filters | **Should** | Principle 4 |
-| 13 | Phone: running total in view; calendar in day view | Both | Design decision; code | **Should** | Phone use |
-| 14 | Keep the form after a lost hold | Client | Draft in memory or storage | **Should** | – |
-| 15 | Confirm working hours with the photographer | Admin | An answer, then the hours page | **Must** | Spec R-4 |
-| 16 | Reminder before the shoot | Client | Email, maybe SMS / WhatsApp | **Could** / **Decision** | Client answer "both would be ideal" |
-| 17 | Add-to-calendar file | Client | Small backend addition | **Could** | – |
-| 18 | Guided post-shoot steps | Admin | Copy, layout | **Could** | – |
-| 19 | Self-service lost-link resend | Client | Backend, abuse and privacy review | **Could** / **Decision** | Client answer on magic links |
-| 20 | French | Both | Content and routes | **Could** (later) | Client answer |
+**Rewritten 2026-09-23.** Each row was re-checked against the running app, not against the plan. "Closed" means it was opened in a browser and seen to work.
 
----
+### Closed since this list was written
+
+| # | Gap | How it closed | Checked |
+|---|---|---|---|
+| 1 | Working hours, blocks and settings pages | Built as feature work (`d02bd41`), designed in `pages/{availability,settings}.md`, restyled in Section 5 | `/admin/availability` and `/admin/settings` both render, titled "Availability" and "Settings" |
+| 2 | Password reset page and "Forgot password" link | Built in `d02bd41`, designed in `pages/admin-reset-password.md`, restyled in Section 5 | `/admin/login` carries one "Forgot your password?" link to `/admin/reset-password`, which renders "Reset your password" |
+| 3 | Calendar event opens the booking | Built in `d02bd41` | One click on a month-view booking landed on `/admin/bookings/b9` |
+| 6 | `/` leads somewhere useful | A real landing page shipped 2026-09-21, ahead of the interim redirect this row proposed | `/` titles "Book a photographer, and know the price before you do.", carries three routes into `/services`, and wears the shell's header and footer |
+
+Gap 6's **Decision** half is not closed: the landing copy is the developer's, written to state only what the code enforces. Replacing it with the photographer's own words is still open, and the keys are `landing:*` in `en.json`.
+
+### Still open
+
+| # | Gap | Journey | Needs | Priority | Checked 2026-09-23 |
+|---|---|---|---|---|---|
+| 4 | Photographer contact channel | Client | Real details from the client; copy | **Must** | No contact detail appears on `/`, `/services` or a service page. Three messages still tell clients to "contact the photographer" |
+| 5 | Privacy notice and consent link | Client | Page, copy; erasure routine (Task 23) | **Must** | `/privacy` still answers with the Not found page |
+| 7 | Real service names, prices, images | Client | Content from the client (R-6) | **Must** | Unchanged; the landing preview deliberately reads them from the API rather than hard-coding any |
+| 8 | "View my booking" after the fee is paid | Client | API returns the booking link once; a button | **Should** | The `confirmed` view on the progress page has a heading and body and **no link onward** |
+| 9 | Airtel Money and card | Client | Flutterwave adapter (Task 25) | **Should** | Unchanged |
+| 10 | Google Calendar mirror | Admin | Task 22 | **Should** | Unchanged |
+| 11 | Sign in returns to the page asked for | Admin | Small code change | **Should** | Asking for `/admin/settings` signed out lands on `/admin/login` with no record of the destination |
+| 12 | Bookings opens on "needs attention"; refund and unpaid filters | Admin | List defaults and filters | **Should** | Unchanged |
+| 13 | Phone: running total in view; calendar in day view | Both | Design decision; code | **Should** | The calendar opens in **Month** view on a Pixel 7, not day view |
+| 14 | Keep the form after a lost hold | Client | Draft in memory or storage | **Should** | Unchanged |
+| 15 | Confirm working hours with the photographer | Admin | An answer, then the hours page | **Must** | The page now exists to receive the answer; the answer does not |
+| 16 | Reminder before the shoot | Client | Email, maybe SMS / WhatsApp | **Could** / **Decision** | Unchanged |
+| 17 | Add-to-calendar file | Client | Small backend addition | **Could** | Unchanged |
+| 18 | Guided post-shoot steps | Admin | Copy, layout | **Could** | Unchanged |
+| 19 | Self-service lost-link resend | Client | **A public endpoint that does not exist** | **Could** / **Decision** | Checked in the backend 2026-09-21: the only resend is `POST /api/admin/bookings/:id/resend-link`, inside `adminRouter` behind the session guard. No public route takes an email or a reference. **This blocks a second header link.** The client shell was designed with "My booking" beside "Book now"; on the user's decision it shipped with one link rather than a page that cannot work. When the endpoint exists -- answering 202 whatever the input, like the admin password reset, so it cannot reveal who has a booking -- the link and the page follow |
+| 20 | French | Both | Content and routes | **Could** (later) | Unchanged |
+
+### Ideal-journey steps the app still cannot do
+
+Reading sections 5 and 6 against the walked app, these remain impossible rather than merely rough:
+
+- **Client, "Change or cancel":** cancelling works, but "reach the photographer in one tap" cannot be done at all -- there is no contact detail anywhere in the product (gap 4).
+- **Client, "Details":** the consent tick cannot link to a privacy notice, because there is no notice (gap 5).
+- **Client, "Confirmed":** the client cannot get from a successful payment to their booking without the email arriving (gap 8).
+- **Client, "Lost link":** a client who loses the email has no self-service route back; only the photographer can resend (gap 19).
+- **Client, "Before the shoot":** no reminder is sent (gap 16).
+- **Admin, "Sign in and recover":** recovery works end to end now; the "return to the page that was asked for" half does not (gap 11).
+- **Admin, "Work the list":** the list still opens on everything, newest first, rather than on what needs attention (gap 12).
 
 ## 8. Open questions
 
 1. Is the admin used on a phone? If yes, gaps 3, 11 and 13 move from Should to Must.
-2. Can the interim `/` redirect to `/services` go ahead, or should `/` wait for a landing page?
+2. ~~Can the interim `/` redirect to `/services` go ahead, or should `/` wait for a landing page?~~ **Overtaken 2026-09-21:** a real landing page shipped instead of the redirect. What remains is whether its copy should be replaced with the photographer's own words (`landing:*` in `en.json`).
 3. What are the photographer's contact details, and where should they appear (booking page, expired and closed messages, emails)?
 4. Are reminders wanted, and by email only, or SMS and WhatsApp too?
 5. Should a phone stay signed in for the token's 8 hours, or should closing the tab keep signing out?
-6. Do working hours and blocks share one admin page (`docs/redesign-pending.md`, section 1, last item)?
+6. ~~Do working hours and blocks share one admin page?~~ **Answered 2026-09-21: yes**, one Availability page, because between them they answer one question -- when can a client book?
 
 ## 9. Confidence
 
 - **High:** routes, page contents, admin actions, statuses, the email templates and their links, the sign-in behaviour, the bookings list order (all read in code).
 - **Medium:** email trigger timing and the cancellation email recipients (from the spec and template names, not exercised).
-- **Not checked:** behaviour in a browser, on a phone, or against a running backend and database.
+- **Checked in a browser 2026-09-23** (Chromium at 1280px and emulated Pixel 7, `/api` mocked): every route in section 1 renders, and every section 7 row marked "checked" was exercised. This covers sections 1 and 7 only.
+- **Still not checked:** behaviour against a running backend and database, and on real hardware rather than emulation. Sections 2-6 remain as read from the code on 2026-09-20 and were not re-walked.
