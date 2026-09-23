@@ -58,11 +58,16 @@ still serves v3 with `verif-hash`, so do not use it).
   `error.type` (e.g. `MOBILE_MONEY_NETWORK_NOT_SUPPORTED`) is a clean short code for `reason`.
 - **Lookup:** `GET /charges?reference=<uuid>` → 200 `{ data: [charge], meta.page_info.total: 1 }`.
   Unknown reference → 200 with `data: []`, which returns null.
-- **Sandbox success:** default-flow charges stayed `pending` for over 3½ minutes, and `issuer:approved` does not force a
-  success. The "auto-authorizes after a few seconds" claim did not hold on first observation (a longer poll is running).
+- **Sandbox success cannot be forced.** Two default-flow charges (`chg_wzRkqRwy6C` MTN, `chg_NKpm6gvu6x`
+  Airtel), polled once a minute, were still `pending` / `02` about 19 minutes after creation (16:13 → 16:33 UTC).
+  `issuer:approved` doesn't force success either. The "auto-authorizes after a few seconds" claim does not hold in this
+  sandbox. The success path is therefore proven by unit tests and signed fake webhooks, and only a live-mode
+  charge exercises it for real. The decline path *is* sandbox-testable with `issuer:insufficient_funds`.
 
 ## Run state
-- Stage: 0, findings recorded. Nothing committed yet. Branch `feat/flutterwave-v4` off c07aece.
-- In flight: a 15-minute poll of two default-flow charges (`chg_wzRkqRwy6C` MTN, `chg_NKpm6gvu6x` Airtel)
-  to see whether the sandbox ever settles them.
-- Next action: record the poll result, commit this doc as Stage 0, then start Stage 1 (flutterwave.ts).
+- Stage: 0 complete (39feb63, plus this poll result). Branch `feat/flutterwave-v4` off c07aece.
+- In flight: nothing.
+- Awaiting from the user: whether a dashboard Secret hash is set (does not block Stage 1), and any objection to
+  the proposed decisions (redirect → rejected `redirect_required`; Flutterwave stays in `providers.all` whenever
+  configured; the one "flutterwave throws" test in providers.test.ts is replaced).
+- Next action: Stage 1, backend/src/payments/flutterwave.ts.
