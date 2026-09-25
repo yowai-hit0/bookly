@@ -5,7 +5,7 @@ import { Link } from 'react-router'
 import { type PublicService, fetchServices } from '@/catalogue/api'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { ServiceCard } from '@/pages/services/ServiceList'
+import { ServiceCard, ServiceGridSkeleton } from '@/pages/services/ServiceList'
 
 /**
  * The public entry point (`design-system/bookly/pages/home.md`). Until
@@ -24,7 +24,10 @@ const PREVIEW_COUNT = 3
 
 export function Home() {
   const { t } = useTranslation()
-  const [preview, setPreview] = useState<PublicService[]>([])
+  // Null while loading. The API can take close to a minute to wake (Render's
+  // free tier), so the section shows placeholder cards meanwhile (decided
+  // 2026-09-25, reversing `home.md`'s "render nothing while loading").
+  const [preview, setPreview] = useState<PublicService[] | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -33,13 +36,14 @@ export function Home() {
       // Deliberately quiet: this is a marketing section, not the funnel. A
       // failure here renders nothing, and `/services` shows the real error
       // with the real retry.
-      .catch(() => undefined)
+      .catch(() => !controller.signal.aborted && setPreview([]))
     return () => controller.abort()
   }, [])
 
+  const loading = preview === null
   // The preview is the first of the three white sections when it has anything
-  // to show; when it does not, the steps take its border.
-  const hasPreview = preview.length > 0
+  // to show, or is still loading; when it has nothing, the steps take its border.
+  const hasPreview = loading || preview.length > 0
 
   return (
     <main className="flex flex-col text-pretty">
@@ -58,13 +62,22 @@ export function Home() {
         <section className="bg-card border-t px-4 py-12 sm:py-16">
           <div className="mx-auto flex max-w-6xl flex-col gap-6">
             <h2 className="text-2xl font-semibold sm:text-3xl">{t('landing:preview.title')}</h2>
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
-              {preview.map((service, index) => (
-                <li key={service.id}>
-                  <ServiceCard service={service} priority={index === 0} />
-                </li>
-              ))}
-            </ul>
+            {loading ? (
+              <div aria-busy="true">
+                <p className="sr-only" role="status">
+                  {t('services:loading')}
+                </p>
+                <ServiceGridSkeleton count={PREVIEW_COUNT} />
+              </div>
+            ) : (
+              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+                {preview.map((service, index) => (
+                  <li key={service.id}>
+                    <ServiceCard service={service} priority={index === 0} />
+                  </li>
+                ))}
+              </ul>
+            )}
             <Link to="/services" className="inline-flex min-h-6 items-center rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:min-h-11 self-start text-sm font-medium">
               {t('landing:preview.more')}
             </Link>

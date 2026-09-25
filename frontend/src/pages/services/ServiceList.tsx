@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { type PublicService, fetchServices } from '@/catalogue/api'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { formatMoney } from '@/lib/format'
 
 /**
@@ -12,6 +13,9 @@ import { formatMoney } from '@/lib/format'
  */
 
 type Loaded = { status: 'ok'; services: PublicService[] } | { status: 'failed' }
+
+/** Placeholder cards while the list loads: one row at the widest breakpoint. */
+const SKELETON_COUNT = 3
 
 export function ServiceList() {
   const { t } = useTranslation()
@@ -39,9 +43,13 @@ export function ServiceList() {
       </header>
 
       {loaded === null && (
-        <p className="text-muted-foreground text-sm" role="status">
-          {t('services:loading')}
-        </p>
+        <div aria-busy="true">
+          {/* The wait is announced once, in words; the cards are decoration. */}
+          <p className="sr-only" role="status">
+            {t('services:loading')}
+          </p>
+          <ServiceGridSkeleton count={SKELETON_COUNT} />
+        </div>
       )}
 
       {loaded?.status === 'failed' && (
@@ -103,5 +111,31 @@ export function ServiceCard({ service, priority }: { service: PublicService; pri
         )}
       </div>
     </article>
+  )
+}
+
+/**
+ * The grid of placeholder cards shown while services load: the same grid and
+ * card frame as the real list, so the page does not jump when they arrive.
+ * No image block: a card without a cover image has none either
+ * (`pages/services.md`), and today no service has one. Hidden from assistive
+ * technology; the caller announces the wait.
+ */
+export function ServiceGridSkeleton({ count }: { count: number }) {
+  return (
+    <ul aria-hidden="true" data-testid="service-skeletons" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+      {Array.from({ length: count }, (_, index) => (
+        <li key={index}>
+          <div className="bg-card flex h-full flex-col gap-2 overflow-hidden rounded-xl border p-4 shadow-sm">
+            {/* One line of `text-lg` title, three of `text-sm` description, then the price. */}
+            <Skeleton className="h-7 w-2/3" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="mt-2 h-5 w-1/3" />
+          </div>
+        </li>
+      ))}
+    </ul>
   )
 }

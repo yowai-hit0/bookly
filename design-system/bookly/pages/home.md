@@ -64,7 +64,9 @@ Section headings `h2` at `text-2xl sm:text-3xl`, heading font. Body `text-base`,
 
 ## States
 
-The page has effectively one state. The services preview has three (loading, some, none/failed) and **two of them render nothing**: no skeleton that shifts the page, no spinner. Reserve the grid's height only if a loaded state would otherwise jump the fold.
+The page has effectively one state. The services preview has three (loading, some, none/failed). **Loading shows the section with placeholder cards** (`ServiceGridSkeleton`, one per preview slot, `aria-hidden`, the wait announced once in an `sr-only` status); some shows the cards; none/failed renders nothing, no alert, no retry.
+
+**Decided 2026-09-25 (user), reversing "loading renders nothing":** the API sits on Render's free tier and can take close to a minute to wake, and an empty band for that long read as a broken page. The cost is accepted: when the fetch fails or returns nothing, the placeholder section goes and the page below moves up once.
 
 ## Accessibility
 

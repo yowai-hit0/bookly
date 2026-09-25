@@ -23,7 +23,7 @@
 
 ## States
 
-- loading: muted `role="status"` line. Skeleton cards are allowed (same grid, no new text) but optional.
+- loading: placeholder cards (`ServiceGridSkeleton` in `ServiceList.tsx`, three, same grid and card frame, `aria-hidden`), with the `role="status"` line kept for screen readers only (`sr-only`). Built 2026-09-25 (user request: the API's cold start can take close to a minute). No image block in the placeholder, per the no-cover rule below.
 - failed: inline `role="alert"`, destructive text + outline `sm` "Retry" button.
 - empty: muted sentence.
 

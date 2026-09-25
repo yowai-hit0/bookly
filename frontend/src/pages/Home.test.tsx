@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@/i18n'
@@ -78,7 +78,27 @@ describe('the landing page', () => {
     renderHome()
 
     expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'What you can book' })).not.toBeInTheDocument()
+    // The section shows placeholders while loading, then goes when there is nothing.
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'What you can book' })).not.toBeInTheDocument())
+    expect(screen.queryByTestId('service-skeletons')).not.toBeInTheDocument()
+  })
+
+  it('shows placeholder cards in the preview while the services load (2026-09-25)', async () => {
+    let answer: (res: Response) => void = () => {}
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => (answer = resolve))))
+    renderHome()
+
+    expect(screen.getByRole('heading', { name: 'What you can book' })).toBeInTheDocument()
+    const skeletons = screen.getByTestId('service-skeletons')
+    expect(skeletons).toHaveAttribute('aria-hidden', 'true')
+    expect(skeletons.querySelectorAll('li')).toHaveLength(3)
+    expect(screen.getByRole('status')).toHaveTextContent('Loading…')
+
+    answer(new Response(JSON.stringify({ services: SERVICES })))
+
+    expect(await screen.findByRole('link', { name: 'Portraits' })).toBeInTheDocument()
+    expect(screen.queryByTestId('service-skeletons')).not.toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   it('drops the preview silently when the API fails: no alert, no retry, and the page still works', async () => {
@@ -89,9 +109,10 @@ describe('the landing page', () => {
     renderHome()
 
     expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'What you can book' })).not.toBeInTheDocument())
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'What you can book' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('service-skeletons')).not.toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'Book now' })).toHaveLength(2)
   })
 

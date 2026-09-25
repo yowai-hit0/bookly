@@ -132,6 +132,26 @@ describe('the service list', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
+  it('shows placeholder cards while loading, hidden from assistive technology, then the real cards (2026-09-25)', async () => {
+    let answer: (res: Response) => void = () => {}
+    stubApi({ [SERVICES_API]: () => new Promise<Response>((resolve) => (answer = resolve)) })
+    renderAt()
+
+    const skeletons = await screen.findByTestId('service-skeletons')
+    expect(skeletons).toHaveAttribute('aria-hidden', 'true')
+    expect(skeletons.querySelectorAll('li')).toHaveLength(3)
+    expect(skeletons.closest('[aria-busy="true"]')).not.toBeNull()
+    // Decoration only: nothing in it can be reached or read.
+    expect(skeletons.querySelectorAll('a, button, h2')).toHaveLength(0)
+    expect(skeletons.textContent).toBe('')
+
+    answer(json({ services: [PORTRAITS] }))
+
+    expect(await screen.findByRole('link', { name: 'Portraits' })).toBeInTheDocument()
+    expect(screen.queryByTestId('service-skeletons')).not.toBeInTheDocument()
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull()
+  })
+
   it('renders each service’s name as a link to its page, with its description and lowest price', async () => {
     stubApi()
     renderAt()
