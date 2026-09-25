@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { hashPassword } from '../auth/password.js';
+import { type DemoSummary, seedDemoData } from './seed-demo.js';
 
 /** Mon-Fri, 09:00-17:00 (data-model_v2.md §13). R-4 is still open: these hours
  *  were chosen by the developer, not stated by the photographer. Confirm
@@ -20,11 +21,15 @@ export type SeedSummary = {
   adminUserCreated: boolean;
   settingCreated: boolean;
   workingHoursCreated: number;
+  /** Null in production, or with SEED_DEMO_DATA=false. */
+  demo: DemoSummary | null;
 };
 
 /**
  * Idempotent (plan.md Task 4): running this twice leaves the same row counts.
- * Seeds the one admin, the one settings row, and Mon-Fri working hours.
+ * Seeds the one admin, the one settings row, and Mon-Fri working hours --
+ * and, outside production, demo data (`seed-demo.ts`): a small catalogue and
+ * one confirmed, fee-paid booking. SEED_DEMO_DATA=false skips the demo.
  */
 export async function seedDatabase(
   prisma: PrismaClient,
@@ -34,6 +39,7 @@ export async function seedDatabase(
     adminUserCreated: await seedAdminUser(prisma, env),
     settingCreated: await seedSetting(prisma),
     workingHoursCreated: await seedWorkingHours(prisma),
+    demo: env.NODE_ENV === 'production' || env.SEED_DEMO_DATA === 'false' ? null : await seedDemoData(prisma),
   };
 }
 
