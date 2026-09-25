@@ -18,6 +18,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { StatusIcon } from '@/components/ui/status-icon'
 import { formatDate, formatMoney, formatTime } from '@/lib/format'
 import { reportError } from '@/lib/report-error'
+import { forgetBookingToken, rememberBookingToken } from '@/lib/stored-booking'
 import { cn } from '@/lib/utils'
 import { PaymentFields } from '@/pages/checkout/PaymentFields'
 
@@ -49,6 +50,10 @@ export function BookingPage() {
     Promise.all([fetchClientBooking(token, controller.signal), fetchPaymentMethods(controller.signal).catch(() => [])])
       .then(([booking, methods]) => {
         if (controller.signal.aborted) return
+        // This device remembers the last booking it opened, for the header's
+        // "My booking"; a link that no longer works is forgotten (2026-09-25).
+        if (booking === null) forgetBookingToken(token)
+        else rememberBookingToken(token)
         setLoaded(booking === null ? { key, status: 'missing' } : { key, status: 'ok', booking, methods })
       })
       .catch((error: unknown) => {
@@ -89,7 +94,10 @@ export function BookingPage() {
           token={token}
           booking={current.booking}
           methods={current.methods}
-          onMissing={() => setLoaded({ key, status: 'missing' })}
+          onMissing={() => {
+            forgetBookingToken(token)
+            setLoaded({ key, status: 'missing' })
+          }}
           onReload={reload}
         />
       )}

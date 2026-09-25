@@ -740,7 +740,8 @@
     "nav": {
       "label": "Main",
       "bookNow": "Book now",
-      "adminLogin": "Admin login"
+      "adminLogin": "Admin login",
+      "myBooking": "My booking"
     },
     "footer": {
       "label": "Footer",

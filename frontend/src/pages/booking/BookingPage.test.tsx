@@ -177,6 +177,7 @@ function payButton() {
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
+  localStorage.clear()
 })
 
 // --- The booking ---------------------------------------------------------------------------
@@ -229,6 +230,48 @@ describe('a valid link', () => {
     await renderLoaded()
 
     expect(screen.getByText(words)).toBeInTheDocument()
+  })
+})
+
+// --- Remembered on this device (2026-09-25) -------------------------------------------------
+
+describe('remembering the link on this device', () => {
+  it('keeps the token of a booking that opened, and the header leads back to it', async () => {
+    stubApi()
+    renderAt()
+
+    await screen.findByText(REFERENCE)
+    expect(localStorage.getItem('bookly.bookingToken')).toBe(TOKEN)
+    expect(within(screen.getByRole('banner')).getByRole('link', { name: 'My booking' })).toHaveAttribute('href', PATH)
+  })
+
+  it('forgets a remembered token the API no longer knows', async () => {
+    localStorage.setItem('bookly.bookingToken', TOKEN)
+    stubApi({ booking: () => json({ error: 'not_found' }, 404) })
+    renderAt()
+
+    await screen.findByRole('heading', { level: 1, name: 'This link is not valid' })
+    expect(localStorage.getItem('bookly.bookingToken')).toBeNull()
+    expect(within(screen.getByRole('banner')).getByRole('link', { name: 'My booking' })).toHaveAttribute('href', '/my-booking')
+  })
+
+  it('leaves a different remembered booking alone when this link is dead', async () => {
+    localStorage.setItem('bookly.bookingToken', 'another-token-0123456789abcdef')
+    stubApi({ booking: () => json({ error: 'not_found' }, 404) })
+    renderAt()
+
+    await screen.findByRole('heading', { level: 1, name: 'This link is not valid' })
+    expect(localStorage.getItem('bookly.bookingToken')).toBe('another-token-0123456789abcdef')
+  })
+
+  it('still shows the booking when storage cannot be written', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked')
+    })
+    stubApi()
+    renderAt()
+
+    expect(await screen.findByText(REFERENCE)).toBeInTheDocument()
   })
 })
 

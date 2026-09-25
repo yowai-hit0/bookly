@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { Link, Outlet } from 'react-router'
+import { bookingPath } from '@/catalogue/booking-access'
 import { Button } from '@/components/ui/button'
+import { useStoredBookingToken } from '@/lib/stored-booking'
 import { SkipLink } from '@/components/ui/skip-link'
 
 /**
@@ -53,6 +55,12 @@ export function ClientShell() {
                   {t('shell:footer.services')}
                 </Link>
               </li>
+              {/* Only where the top bar has no room for it (below `sm`). */}
+              <li className="sm:hidden">
+                <Link to="/admin/login" className="inline-flex min-h-6 items-center rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:min-h-11">
+                  {t('shell:nav.adminLogin')}
+                </Link>
+              </li>
             </ul>
           </nav>
         </div>
@@ -62,8 +70,9 @@ export function ClientShell() {
 }
 
 /**
- * The client top bar: the wordmark home, the photographer's way into admin,
- * and the one primary action. Also worn by `/admin/login` (decided 2026-09-25),
+ * The client top bar: the wordmark home, "My booking" (the booking this device
+ * last opened, else `/my-booking`), the photographer's way into admin, and the
+ * one primary action. Also worn by `/admin/login` (decided 2026-09-25),
  * which hides the admin link -- it would point at the page itself.
  *
  * The admin link is a quiet ghost, never a second primary: "Book now" is the
@@ -72,6 +81,9 @@ export function ClientShell() {
  */
 export function ClientHeader({ showAdminLogin = true }: { showAdminLogin?: boolean }) {
   const { t } = useTranslation()
+  // The booking this device last opened, else the page that emails a new link (2026-09-25).
+  const storedToken = useStoredBookingToken()
+  const myBooking = storedToken === null ? '/my-booking' : bookingPath(storedToken)
 
   return (
     // Static, not sticky: a bar that follows the page can obscure focus over
@@ -88,8 +100,13 @@ export function ClientHeader({ showAdminLogin = true }: { showAdminLogin?: boole
           {t('common:appName')}
         </Link>
         <div className="flex items-center gap-2">
+          <Button asChild variant="ghost">
+            <Link to={myBooking}>{t('shell:nav.myBooking')}</Link>
+          </Button>
+          {/* Four items need ~413px, so below `sm` the admin link moves to the
+              footer (user decision, 2026-09-25): clients rarely need it. */}
           {showAdminLogin && (
-            <Button asChild variant="ghost">
+            <Button asChild variant="ghost" className="hidden sm:inline-flex">
               <Link to="/admin/login">{t('shell:nav.adminLogin')}</Link>
             </Button>
           )}
