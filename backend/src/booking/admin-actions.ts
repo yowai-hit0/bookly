@@ -2,7 +2,8 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import { isSlotTaken, isTransactionConflict } from '../db/errors.js';
 import { enqueue } from '../outbox/enqueue.js';
 import { getSettings } from '../settings/index.js';
-import { accessTokenExpiry, generateAccessToken } from './access-token.js';
+import { issueAccessToken } from './access-link.js';
+import { hashAccessToken } from './access-token.js';
 import { type AdminBooking, findAdminBooking } from './admin-view.js';
 import { expireOverlappingStaleHolds } from './claim.js';
 
@@ -240,13 +241,9 @@ export async function resendAccessLink(deps: AdminActionDeps, bookingId: string)
   if (booking.confirmedAt === null) return { status: 'not_allowed' };
 
   const now = deps.now();
-  const { token, hash } = generateAccessToken();
 
   await deps.prisma.$transaction(async (tx) => {
-    await tx.booking.update({
-      where: { id: booking.id },
-      data: { accessTokenHash: hash, accessTokenExpiresAt: accessTokenExpiry(now), accessTokenLastUsedAt: null },
-    });
+    const token = await issueAccessToken(tx, booking.id, now);
     await enqueue(tx, {
       kind: 'email',
       template: 'access_link_resend',
@@ -255,7 +252,7 @@ export async function resendAccessLink(deps: AdminActionDeps, bookingId: string)
       // Each resend is its own message; the previous one stays in the history.
       // Keyed by the token it carries, because a resend whose email were
       // dropped as a duplicate would leave the client holding a dead link.
-      dedupeKey: `email:access_link_resend:${booking.id}:${hash.slice(0, 16)}`,
+      dedupeKey: `email:access_link_resend:${booking.id}:${hashAccessToken(token).slice(0, 16)}`,
       payload: {
         locale: booking.locale,
         reference: booking.reference,

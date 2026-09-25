@@ -111,6 +111,15 @@
       "intro": "Here is a new link to your booking for {{service}} on {{date}}.",
       "oldLinks": "Any link we sent you before no longer works. Keep this email, and please do not share the link."
     },
+    "bookingLinks": {
+      "subject": "Your booking links",
+      "preheader": "New links to your bookings.",
+      "heading": "Here are your booking links",
+      "intro": "You asked for the links to your bookings. Each button below opens one of them.",
+      "open": "Open booking {{reference}}",
+      "oldLinks": "Any link we sent you before no longer works. Keep this email, and please do not share the links.",
+      "notYou": "If you did not ask for this, you can ignore this email: your bookings have not changed, only their links."
+    },
     "adminAlert": {
       "paymentReceived": {
         "subject": "Payment received: {{amount}} from {{client}} ({{reference}})",
@@ -139,6 +148,7 @@
           "cancellation": "Cancellation notice to the client",
           "reschedule": "Reschedule notice to the client",
           "access_link_resend": "New booking link to the client",
+        "booking_links": "Booking links the client asked for",
           "admin_alert": "Alert to you",
           "gcal_create": "Adding the booking to your Google Calendar",
           "gcal_update": "Updating the booking in your Google Calendar",

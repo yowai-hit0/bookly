@@ -17,6 +17,9 @@ export const FIXTURE_WEB_ORIGIN = 'https://bookly.example';
 export const FIXTURE_ACCESS_TOKEN = 'Zx9Q2mT7vL4pR8sK1nB6yH3cF5dG0wJe';
 export const FIXTURE_RESET_TOKEN = 'rS3tT0k3n_aB9cD8eF7gH6iJ5kL4mN3o';
 export const FIXTURE_REFERENCE = 'BKY-2610-7K3MQ';
+/** A second booking of the same client, for the email that lists several. */
+export const FIXTURE_SECOND_REFERENCE = 'BKY-2610-9P2RT';
+export const FIXTURE_SECOND_ACCESS_TOKEN = 'Qw8E1rT5yU2iO9pA3sD7fG4hJ6kL0zXc';
 
 export type EmailFixture = {
   /** Unique; used as the snapshot name. */
@@ -130,6 +133,25 @@ export const EMAIL_FIXTURES: readonly EmailFixture[] = [
     name: 'access_link_resend',
     template: 'access_link_resend',
     payload: { ...basics, accessToken: FIXTURE_ACCESS_TOKEN },
+  },
+  {
+    name: 'booking_links',
+    template: 'booking_links',
+    payload: {
+      locale: 'en',
+      clientName: 'Aline Uwase',
+      bookings: [
+        { reference: FIXTURE_REFERENCE, serviceName: 'Portrait', packageName: 'Standard', startsAt: basics.startsAt, endsAt: basics.endsAt, accessToken: FIXTURE_ACCESS_TOKEN },
+        {
+          reference: FIXTURE_SECOND_REFERENCE,
+          serviceName: 'Events',
+          packageName: 'Half day',
+          startsAt: '2026-10-09T09:00:00Z',
+          endsAt: '2026-10-09T13:00:00Z',
+          accessToken: FIXTURE_SECOND_ACCESS_TOKEN,
+        },
+      ],
+    },
   },
   {
     name: 'admin_alert payment_received',

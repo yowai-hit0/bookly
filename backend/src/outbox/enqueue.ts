@@ -21,7 +21,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 export const OUTBOX_KINDS = ['email', 'gcal_create', 'gcal_update', 'gcal_delete'] as const;
 export type OutboxKind = (typeof OUTBOX_KINDS)[number];
 
-/** `outbox_template_allowed`: the nine transactional emails (spec §4.1). */
+/** `outbox_template_allowed`: the transactional emails (spec §4.1, plus `booking_links` from 2026-09-25). */
 export const EMAIL_TEMPLATES = [
   'booking_confirmation',
   'admin_new_booking',
@@ -32,6 +32,7 @@ export const EMAIL_TEMPLATES = [
   'reschedule',
   'access_link_resend',
   'admin_alert',
+  'booking_links',
 ] as const;
 export type EmailTemplate = (typeof EMAIL_TEMPLATES)[number];
 

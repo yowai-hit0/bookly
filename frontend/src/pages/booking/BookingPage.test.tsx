@@ -250,6 +250,15 @@ describe('a link that is not valid', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
+  it('offers a way to get a new link by email, as a link (2026-09-25)', async () => {
+    stubApi({ booking: () => json({ error: 'not_found' }, 404) })
+    renderAt()
+
+    await screen.findByRole('heading', { level: 1, name: 'This link is not valid' })
+    const main = within(screen.getByRole('main'))
+    expect(main.getByRole('link', { name: 'Get a new link by email' })).toHaveAttribute('href', '/my-booking')
+  })
+
   it.each([
     ['an unknown token', `/booking/${TOKEN}`],
     ['an expired token', '/booking/expired-token-0123456789abcdef'],

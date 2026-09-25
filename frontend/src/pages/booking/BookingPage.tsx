@@ -104,6 +104,13 @@ function InvalidLink() {
       <StatusIcon icon={Unlink} tone="neutral" />
       <h1 className="text-2xl font-semibold text-balance">{t('booking:invalidLink.title')}</h1>
       <p className="text-muted-foreground text-sm">{t('booking:invalidLink.body')}</p>
+      {/* The way back in when the link is gone (2026-09-25): a link, not a button. */}
+      <Link
+        to="/my-booking"
+        className="inline-flex min-h-6 items-center self-start rounded-sm text-sm font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:min-h-11"
+      >
+        {t('booking:invalidLink.getNewLink')}
+      </Link>
     </section>
   )
 }

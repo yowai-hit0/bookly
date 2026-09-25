@@ -11,6 +11,8 @@ import {
   FIXTURE_ACCESS_TOKEN,
   FIXTURE_REFERENCE,
   FIXTURE_RESET_TOKEN,
+  FIXTURE_SECOND_ACCESS_TOKEN,
+  FIXTURE_SECOND_REFERENCE,
   FIXTURE_WEB_ORIGIN,
   emailFixture,
 } from '../test/email-fixtures.js';
@@ -84,7 +86,7 @@ function urlsIn(content: string): string[] {
 // --- Every template ------------------------------------------------------------
 
 describe('the fixtures', () => {
-  it('cover all nine templates and every admin_alert variant', () => {
+  it('cover every template and every admin_alert variant', () => {
     expect([...new Set(EMAIL_FIXTURES.map((fixture) => fixture.template))].sort()).toEqual([...EMAIL_TEMPLATES].sort());
 
     const variants = EMAIL_FIXTURES.filter((fixture) => fixture.template === 'admin_alert').map(
@@ -395,6 +397,7 @@ describe('escaping', () => {
     ['cancellation (by client)', 'clientName', HOSTILE],
     ['reschedule', 'locationText', HOSTILE],
     ['access_link_resend', 'serviceName', HOSTILE],
+    ['booking_links', 'clientName', HOSTILE],
     ['admin_alert payment_received', 'clientName', HOSTILE],
     ['admin_alert retries_exhausted', 'lastError', HOSTILE],
     ['admin_alert refund_due', 'paymentReference', HOSTILE],
@@ -619,6 +622,37 @@ describe('content rules', () => {
   it('booking_confirmation says paid in full only when nothing is outstanding', () => {
     expect(renderWith('booking_confirmation', { outstandingRwf: 0 }).text).toContain('paid in full');
     expect(renderFixture(emailFixture('booking_confirmation')).text).not.toMatch(/paid in full/i);
+  });
+
+  it('booking_links lists every booking with its own link, each token only inside its own link (2026-09-25)', () => {
+    const email = renderFixture(emailFixture('booking_links'));
+    const links = [FIXTURE_ACCESS_TOKEN, FIXTURE_SECOND_ACCESS_TOKEN].map((token) => `${FIXTURE_WEB_ORIGIN}/booking/${token}`);
+
+    expect(email.subject).not.toMatch(new RegExp(`${FIXTURE_ACCESS_TOKEN}|${FIXTURE_SECOND_ACCESS_TOKEN}`));
+    for (const body of [email.text, email.html]) {
+      expect(body).toContain(FIXTURE_REFERENCE);
+      expect(body).toContain(FIXTURE_SECOND_REFERENCE);
+      let rest = body;
+      for (const link of links) {
+        expect(rest).toContain(link);
+        rest = rest.replaceAll(link, '<link>');
+      }
+      expect(rest).not.toContain(FIXTURE_ACCESS_TOKEN);
+      expect(rest).not.toContain(FIXTURE_SECOND_ACCESS_TOKEN);
+    }
+    for (const url of [...urlsIn(email.text), ...hrefs(email.html)].filter((u) => u.includes('/booking/'))) {
+      expect(links).toContain(url);
+    }
+    expect(email.text).toContain('Any link we sent you before no longer works.');
+  });
+
+  it('booking_links refuses a payload with no bookings, or a token that is not one', () => {
+    const fixture = emailFixture('booking_links');
+    expect(() => renderEmail('booking_links', { ...fixture.payload, bookings: [] }, { webOrigin: FIXTURE_WEB_ORIGIN })).toThrow(EmailPayloadError);
+    const [first] = (fixture.payload as { bookings: Record<string, unknown>[] }).bookings;
+    expect(() =>
+      renderEmail('booking_links', { ...fixture.payload, bookings: [{ ...first, accessToken: 'short' }] }, { webOrigin: FIXTURE_WEB_ORIGIN }),
+    ).toThrow(EmailPayloadError);
   });
 
   it('access_link_resend says older links no longer work', () => {

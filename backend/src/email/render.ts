@@ -5,6 +5,7 @@ import { accessLinkResend } from './templates/access-link-resend.js';
 import { adminAlert } from './templates/admin-alert.js';
 import { adminNewBooking } from './templates/admin-new-booking.js';
 import { bookingConfirmation } from './templates/booking-confirmation.js';
+import { bookingLinks } from './templates/booking-links.js';
 import { cancellation } from './templates/cancellation.js';
 import { paymentReceipt } from './templates/payment-receipt.js';
 import { photoDelivery } from './templates/photo-delivery.js';
@@ -32,6 +33,7 @@ export const TEMPLATES: Record<EmailTemplate, AnyEmailTemplate> = {
   reschedule,
   access_link_resend: accessLinkResend,
   admin_alert: adminAlert,
+  booking_links: bookingLinks,
 };
 
 export type RenderOptions = {

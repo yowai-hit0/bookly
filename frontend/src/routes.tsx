@@ -11,6 +11,7 @@ import { AdminLogin } from '@/pages/admin/AdminLogin'
 import { AdminResetPassword } from '@/pages/admin/AdminResetPassword'
 import { AdminSettings } from '@/pages/admin/AdminSettings'
 import { BookingPage } from '@/pages/booking/BookingPage'
+import { MyBookingPage } from '@/pages/booking/MyBookingPage'
 import { CheckoutPage } from '@/pages/checkout/CheckoutPage'
 import { PaymentProgressPage } from '@/pages/checkout/PaymentProgressPage'
 import { ServiceDetail } from '@/pages/services/ServiceDetail'
@@ -34,6 +35,8 @@ export const routes: RouteObject[] = [
       { path: '/checkout/:reference/:token', element: <CheckoutPage /> },
       { path: '/checkout/:reference/:token/payments/:ourRef', element: <PaymentProgressPage /> },
       // The client's own booking, addressed by the token in the path (plan.md Task 18).
+      // Lost the link: get a fresh one by email (2026-09-25).
+      { path: '/my-booking', element: <MyBookingPage /> },
       { path: '/booking/:token', element: <BookingPage /> },
       { path: '/booking/:token/payments/:ourRef', element: <PaymentProgressPage /> },
       { path: '*', element: <NotFound /> },

@@ -8,6 +8,7 @@ import { healthRouter } from './routes/health.js';
 import { clientBookingRouter } from './routes/client-booking.js';
 import { type PaymentWebhooksDeps, paymentWebhooksRouter } from './routes/payment-webhooks.js';
 import { availabilityRouter } from './routes/public-availability.js';
+import { type BookingLinksDeps, bookingLinksRouter } from './routes/public-booking-links.js';
 import { bookingsRouter } from './routes/public-bookings.js';
 import { checkoutRouter } from './routes/public-checkout.js';
 import { publicCatalogueRouter } from './routes/public-catalogue.js';
@@ -31,6 +32,8 @@ export type AppOptions = {
      *  `/api/payments/*`) and puts a checkout token on each created booking
      *  (plan.md Task 16). `secret` is `SESSION_SECRET`. */
     payments?: { provider: PaymentProvider; secret: string; providerTimeoutMs?: number };
+    /** "Email me my links" (`/api/booking-links`): its limiter and hooks, for tests. */
+    bookingLinks?: Pick<BookingLinksDeps, 'limiter' | 'onWork' | 'log'>;
   };
   /** Mounts `/api/webhooks/*` (plan.md Task 17), ahead of the JSON parser. */
   webhooks?: PaymentWebhooksDeps;
@@ -41,6 +44,9 @@ export function createApp(options: AppOptions = {}): Express {
 
   const app = express();
   app.disable('x-powered-by');
+  // One proxy in front (Render's), so `req.ip` is the visitor's address. Only
+  // the booking-links limiter reads it (2026-09-25).
+  app.set('trust proxy', 1);
   // Allowlisted to the admin UI's origin. No `credentials`: admin auth is a
   // bearer token in the Authorization header, not a cookie, so no request needs
   // the browser to attach credentials on its behalf (plan.md Task 7, rev 2.3).
@@ -59,6 +65,8 @@ export function createApp(options: AppOptions = {}): Express {
     if (options.publicApi.payments) {
       app.use('/api', checkoutRouter({ prisma, ...options.publicApi.payments }));
     }
+    // "Email me my links", the public side of the resend (2026-09-25).
+    app.use('/api/booking-links', bookingLinksRouter({ prisma, now, ...options.publicApi.bookingLinks }));
     // The client's own booking, addressed by its access token (plan.md Task 18).
     const clientPayments = options.publicApi.payments;
     app.use(

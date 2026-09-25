@@ -664,7 +664,8 @@
     "retry": "Try again",
     "invalidLink": {
       "title": "This link is not valid",
-      "body": "Check that you opened the whole link from your email. If it has been replaced, use the most recent email we sent you."
+      "body": "Check that you opened the whole link from your email. If it has been replaced, use the most recent email we sent you.",
+      "getNewLink": "Get a new link by email"
     },
     "title": "Your booking",
     "status": {
@@ -718,6 +719,21 @@
       "refund": "You are owed {{amount}} back. The photographer will contact you to arrange it."
     },
     "photos_one": "{{count}} photo"
+  },
+  "myBooking": {
+    "title": "Find your booking",
+    "intro": "Enter the email you booked with. We will email you a new link to each of your current bookings.",
+    "email": "Email",
+    "hint": "Any link we sent you before stops working once the new one is sent.",
+    "invalid": "Enter a valid email address.",
+    "submit": "Email me my links",
+    "sending": "Sending…",
+    "failed": "We could not send that. Check your connection and try again.",
+    "sent": {
+      "title": "Check your inbox",
+      "body": "If we found a current booking for that address, we have emailed you a link. It can take a few minutes, so check your spam folder too.",
+      "again": "Use a different address"
+    }
   },
   "shell": {
     "skipToContent": "Skip to content",
