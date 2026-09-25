@@ -108,8 +108,15 @@ async function startServer(): Promise<Started> {
     SESSION_SECRET: 'shutdown-test-secret-that-is-at-least-32-characters',
     MAIL_OUTPUT_DIR: mailDir,
     BOOKLY_TEST_SLOW_MAIL_MS: String(SLOW_MAIL_MS),
+    // The child's `dotenv/config` would otherwise read backend/.env and fill in
+    // whatever is missing here: a live mail key (real email to test addresses)
+    // or the developer's PAYMENT_PROVIDER. Point it at a file that is not there.
+    DOTENV_CONFIG_PATH: join(workDir, 'no-such.env'),
   };
-  delete env.RESEND_API_KEY;
+  // This process loaded backend/.env too; none of it reaches the child.
+  for (const key of ['RESEND_API_KEY', 'BREVO_API_KEY', 'PAYMENT_PROVIDER', 'API_ORIGIN', 'MAIL_FROM', 'MAIL_REPLY_TO', 'DIRECT_URL']) {
+    delete env[key];
+  }
 
   const spawned = spawn(process.execPath, ['--import', 'tsx', '--import', pathToFileURL(preload).href, 'src/server.ts'], {
     cwd: BACKEND_DIR,

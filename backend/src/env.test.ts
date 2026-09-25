@@ -32,6 +32,16 @@ describe('parseEnv', () => {
     expect(parseEnv({ ...valid, SESSION_SECRET: 'x'.repeat(32) }).SESSION_SECRET).toHaveLength(32);
   });
 
+  it.each(['WEB_ORIGIN', 'API_ORIGIN'] as const)('drops a trailing slash from %s, so CORS and links match', (key) => {
+    expect(parseEnv({ ...valid, [key]: 'https://bookly.example/' })[key]).toBe('https://bookly.example');
+    expect(parseEnv({ ...valid, [key]: 'http://localhost:5173' })[key]).toBe('http://localhost:5173');
+  });
+
+  it.each(['WEB_ORIGIN', 'API_ORIGIN'] as const)('refuses a %s with a path rather than dropping it', (key) => {
+    expect(() => parseEnv({ ...valid, [key]: 'https://bookly.example/app' })).toThrow(new RegExp(`${key}.*no path`));
+    expect(() => parseEnv({ ...valid, [key]: 'https://bookly.example/?x=1' })).toThrow(new RegExp(key));
+  });
+
   it('rejects an unknown payment provider', () => {
     expect(() => parseEnv({ ...valid, PAYMENT_PROVIDER: 'stripe' })).toThrow(EnvValidationError);
   });

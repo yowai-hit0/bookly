@@ -10,15 +10,32 @@ export class EnvValidationError extends Error {
   }
 }
 
+/**
+ * A scheme, host and optional port -- `https://bookly.example` -- stored with no
+ * trailing slash. Browsers send `Origin` without one and CORS compares strings
+ * exactly, so `https://bookly.example/` would refuse every request from the
+ * site; links built from it would get a double slash. A pasted slash is
+ * forgiven; a real path is refused rather than silently dropped.
+ */
+const origin = z
+  .url()
+  .refine((value) => {
+    // Not a URL at all: z.url() has already said so.
+    if (!URL.canParse(value)) return true;
+    const url = new URL(value);
+    return url.pathname === '/' && url.search === '' && url.hash === '';
+  }, 'must be an origin like https://example.com, with no path')
+  .transform((value) => new URL(value).origin);
+
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().max(65535).default(4000),
   DATABASE_URL: z.url(),
   /** Public origin the site is served from. Emails link here, never at the API host. */
-  WEB_ORIGIN: z.url(),
+  WEB_ORIGIN: origin,
   /** Public origin of this API. Payment providers call back on it. Defaults to
    *  localhost on PORT outside production, where no provider can reach it anyway. */
-  API_ORIGIN: z.url().optional(),
+  API_ORIGIN: origin.optional(),
   /** Deploy configuration, never a database row (data-model_v2.md §5.2). */
   PAYMENT_PROVIDER: z.enum(['mtn_momo_direct', 'flutterwave']).default('mtn_momo_direct'),
   /** MTN MoMo Collections (plan.md Task 16). Sandbox by default; production
