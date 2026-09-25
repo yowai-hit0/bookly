@@ -6,6 +6,8 @@ import { adminAlert } from './templates/admin-alert.js';
 import { adminNewBooking } from './templates/admin-new-booking.js';
 import { bookingConfirmation } from './templates/booking-confirmation.js';
 import { bookingLinks } from './templates/booking-links.js';
+import { emailChangeConfirm } from './templates/email-change-confirm.js';
+import { emailChangedNotice } from './templates/email-changed-notice.js';
 import { cancellation } from './templates/cancellation.js';
 import { paymentReceipt } from './templates/payment-receipt.js';
 import { photoDelivery } from './templates/photo-delivery.js';
@@ -34,6 +36,8 @@ export const TEMPLATES: Record<EmailTemplate, AnyEmailTemplate> = {
   access_link_resend: accessLinkResend,
   admin_alert: adminAlert,
   booking_links: bookingLinks,
+  email_change_confirm: emailChangeConfirm,
+  email_changed_notice: emailChangedNotice,
 };
 
 export type RenderOptions = {

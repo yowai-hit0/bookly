@@ -21,6 +21,10 @@ export type ClientBooking = {
   reference: string
   status: string
   clientName: string
+  /** Where the booking's emails go, masked by the API (`a•••••@example.com`): never the full address. */
+  maskedEmail: string
+  /** A change waiting on a click from the new address, masked; null when there is none. */
+  pendingMaskedEmail: string | null
   startsAt: string
   endsAt: string
   serviceName: string
@@ -132,6 +136,65 @@ export async function startSessionFeePayment(
     // Not the JSON this status promises.
   }
   return { status: 'failed' }
+}
+
+export type EmailChangeResult =
+  /** A confirmation link is on its way to the new address; nothing changes until it is used. */
+  | { status: 'requested'; booking: ClientBooking | null }
+  /** It is the address the booking already has. */
+  | { status: 'unchanged'; booking: ClientBooking | null }
+  | { status: 'invalid' }
+  /** The booking no longer stands. */
+  | { status: 'not_allowed'; booking: ClientBooking | null }
+  | { status: 'rate_limited' }
+  | { status: 'not_found' }
+  | { status: 'failed' }
+
+/** Asks to change the booking's contact email (2026-09-25): `POST /api/booking/:token/email`. */
+export async function requestEmailChange(token: string, email: string): Promise<EmailChangeResult> {
+  let res: Response
+  try {
+    res = await fetch(`${env.VITE_API_BASE_URL}/booking/${encodeURIComponent(token)}/email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+  } catch {
+    return { status: 'failed' }
+  }
+  if (res.status === 404) return { status: 'not_found' }
+  if (res.status === 422) return { status: 'invalid' }
+  if (res.status === 429) return { status: 'rate_limited' }
+  try {
+    const booking = bookingOf(await res.json())
+    if (res.status === 202) return { status: 'requested', booking }
+    if (res.status === 200) return { status: 'unchanged', booking }
+    if (res.status === 409) return { status: 'not_allowed', booking }
+  } catch {
+    // Not the JSON this status promises.
+  }
+  return { status: 'failed' }
+}
+
+/** Where a contact-email confirmation link lands. The emails link here (`EMAIL_CONFIRM_PAGE_PATH` on the API). */
+export function emailConfirmPath(token: string): string {
+  return `/email-confirm/${encodeURIComponent(token)}`
+}
+
+/** Confirms a contact-email change from its link: `POST /api/email-confirmations/:token`. */
+export async function confirmEmailChange(token: string): Promise<'confirmed' | 'invalid' | 'failed'> {
+  let res: Response
+  try {
+    res = await fetch(`${env.VITE_API_BASE_URL}/email-confirmations/${encodeURIComponent(token)}`, {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+    })
+  } catch {
+    return 'failed'
+  }
+  if (res.status === 200) return 'confirmed'
+  if (res.status === 404) return 'invalid'
+  return 'failed'
 }
 
 async function get(path: string, signal?: AbortSignal): Promise<unknown> {

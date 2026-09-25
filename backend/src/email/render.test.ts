@@ -9,6 +9,7 @@ import {
   EMAIL_FIXTURES,
   type EmailFixture,
   FIXTURE_ACCESS_TOKEN,
+  FIXTURE_CONFIRM_TOKEN,
   FIXTURE_REFERENCE,
   FIXTURE_RESET_TOKEN,
   FIXTURE_SECOND_ACCESS_TOKEN,
@@ -339,7 +340,14 @@ describe('links point at WEB_ORIGIN, never at the API host', () => {
       (fixture) => fixture.name,
     );
     expect(withoutLinks.sort()).toEqual(
-      ['admin_alert booking_cancelled', 'admin_alert retries_exhausted', 'cancellation (by admin)', 'cancellation (by client)'].sort(),
+      [
+        'admin_alert booking_cancelled',
+        'admin_alert retries_exhausted',
+        'cancellation (by admin)',
+        'cancellation (by client)',
+        // To the old address after an email change: it must not get a way into the booking.
+        'email_changed_notice',
+      ].sort(),
     );
   });
 
@@ -398,6 +406,8 @@ describe('escaping', () => {
     ['reschedule', 'locationText', HOSTILE],
     ['access_link_resend', 'serviceName', HOSTILE],
     ['booking_links', 'clientName', HOSTILE],
+    ['email_change_confirm', 'newEmail', HOSTILE],
+    ['email_changed_notice', 'newEmail', HOSTILE],
     ['admin_alert payment_received', 'clientName', HOSTILE],
     ['admin_alert retries_exhausted', 'lastError', HOSTILE],
     ['admin_alert refund_due', 'paymentReference', HOSTILE],
@@ -653,6 +663,26 @@ describe('content rules', () => {
     expect(() =>
       renderEmail('booking_links', { ...fixture.payload, bookings: [{ ...first, accessToken: 'short' }] }, { webOrigin: FIXTURE_WEB_ORIGIN }),
     ).toThrow(EmailPayloadError);
+  });
+
+  it('email_change_confirm carries its token only inside its own link, and no booking link (2026-09-25)', () => {
+    const email = renderFixture(emailFixture('email_change_confirm'));
+    const link = `${FIXTURE_WEB_ORIGIN}/email-confirm/${FIXTURE_CONFIRM_TOKEN}`;
+
+    expect(email.subject).not.toContain(FIXTURE_CONFIRM_TOKEN);
+    for (const body of [email.text, email.html]) {
+      expect(body).toContain(link);
+      expect(body).toContain('aline.new@example.com');
+      expect(body.replaceAll(link, '<link>')).not.toContain(FIXTURE_CONFIRM_TOKEN);
+      expect(body).not.toContain('/booking/');
+    }
+  });
+
+  it('email_changed_notice names the new address and carries no link at all', () => {
+    const email = renderFixture(emailFixture('email_changed_notice'));
+
+    expect(email.text).toContain('aline.new@example.com');
+    expect(hrefs(email.html)).toEqual([]);
   });
 
   it('access_link_resend says older links no longer work', () => {

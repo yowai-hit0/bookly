@@ -265,6 +265,13 @@ model Booking {
   accessTokenExpiresAt  DateTime? @map("access_token_expires_at") @db.Timestamptz(6)
   accessTokenLastUsedAt DateTime? @map("access_token_last_used_at") @db.Timestamptz(6)
 
+  // A contact-email change the client asked for, waiting on a click from the
+  // new address (2026-09-25). All three or none (CHECK booking_pending_email_complete);
+  // the hash is unique through a partial index Prisma does not know about.
+  pendingContactEmail   String?   @map("pending_contact_email")
+  pendingEmailTokenHash String?   @map("pending_email_token_hash")
+  pendingEmailExpiresAt DateTime? @map("pending_email_expires_at") @db.Timestamptz(6)
+
   // Delivery — folded from v1's delivery table. No download tracking exists:
   // under hybrid delivery the files sit on a third party (§5.9).
   /// The external host's link. CHECK-constrained to https.

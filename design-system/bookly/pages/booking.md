@@ -25,6 +25,15 @@ The client opens this from an email, usually on a phone. The token in the URL is
 
 Cards: one visual definition shared with the rest of the app (see MASTER "Card surface").
 
+## Your email (2026-09-25, user decisions; prompt item 6)
+
+A card after the booking facts and amounts (`ContactEmail` in `BookingPage.tsx`), only while the booking is `confirmed` or `completed`: an `h2` "Your email", one line "We write to a•••••@example.com about this booking.", and an outline `sm` "Change email" that opens an inline form (New email, a hint that nothing changes until the new address uses our link, **Send the link** default `sm`, **Keep this email** outline `sm`).
+
+- **The page never carries a full email** (user decision, 2026-09-25, keeping the older "no email in the view" rule in spirit): the API sends `maskedEmail` and `pendingMaskedEmail`, the first character, five dots and the domain. A forwarded or leaked link does not give the address away. The one exception is on the client's own screen: straight after they type a new address, the "check your inbox" message repeats what they typed.
+- After asking: an info callout (`role="status"`), "Check <typed address> for our link to confirm the change. Until then we keep writing to <masked current>." While a change waits, on any later visit: "Waiting for you to confirm <masked pending> from its inbox…".
+- The change takes effect only from the link sent to the new address (`/email-confirm/:token`, `pages/email-confirm.md`); the old address is told once it does. The booking's own link keeps working.
+- Refusals in words: an invalid address on the field; three requests a day, then "Try again tomorrow"; "That is already the email we write to."
+
 ## Status pill
 
 Today every status renders in one `bg-muted rounded-full` style, and `muted` is nearly invisible on the page background. Use the shared treatments in MASTER "Booking status treatments". The text label is always shown; tone and icon are secondary. This pill and the admin badges must look like the same system.

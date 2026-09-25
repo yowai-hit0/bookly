@@ -667,6 +667,22 @@
       "body": "Check that you opened the whole link from your email. If it has been replaced, use the most recent email we sent you.",
       "getNewLink": "Get a new link by email"
     },
+    "contact": {
+      "title": "Your email",
+      "current": "We write to {{email}} about this booking.",
+      "change": "Change email",
+      "newEmail": "New email",
+      "hint": "We will send a link to the new address. Nothing changes until you use it.",
+      "invalid": "Enter a valid email address.",
+      "save": "Send the link",
+      "saving": "Sending…",
+      "keep": "Keep this email",
+      "failed": "We could not send that. Check your connection and try again.",
+      "rateLimited": "You have asked to change the email three times today. Try again tomorrow.",
+      "unchanged": "That is already the email we write to.",
+      "sent": "Check {{email}} for our link to confirm the change. Until then we keep writing to {{current}}.",
+      "pending": "Waiting for you to confirm {{email}} from its inbox. Until then we keep writing to {{current}}."
+    },
     "title": "Your booking",
     "status": {
       "pending_payment": "Waiting for payment",
@@ -719,6 +735,18 @@
       "refund": "You are owed {{amount}} back. The photographer will contact you to arrange it."
     },
     "photos_one": "{{count}} photo"
+  },
+  "emailConfirm": {
+    "title": "Confirm your new email",
+    "intro": "Press the button to use this address for your booking from now on.",
+    "confirm": "Confirm this email",
+    "confirming": "Confirming…",
+    "done": "Done. We will write to your new address from now on.",
+    "failed": "We could not confirm that. Check your connection and try again.",
+    "invalid": {
+      "title": "This confirmation link is not valid",
+      "body": "It may have expired, been used already, or been replaced by a newer request. You can ask again from your booking page."
+    }
   },
   "myBooking": {
     "title": "Find your booking",

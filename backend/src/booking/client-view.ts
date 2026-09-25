@@ -1,5 +1,6 @@
 import { kigaliDateOf } from '../availability/engine.js';
 import type { AccessedBooking } from './access.js';
+import { maskEmail, pendingMaskedEmailOf } from './email-change.js';
 import { bookingTotals } from './totals.js';
 
 /**
@@ -21,6 +22,14 @@ export type ClientBookingView = {
   reference: string;
   status: string;
   clientName: string;
+  /**
+   * Where the booking's emails go, masked (`a•••••@example.com`) so the client
+   * can recognise it and whoever else holds the link cannot read it (2026-09-25).
+   * The full address is never in this view.
+   */
+  maskedEmail: string;
+  /** A change asked for and not yet confirmed from the new address, masked; null once its link lapses. */
+  pendingMaskedEmail: string | null;
   startsAt: string;
   endsAt: string;
   serviceName: string;
@@ -61,6 +70,8 @@ export function clientBookingView(booking: AccessedBooking, now: Date): ClientBo
     reference: booking.reference,
     status: booking.status,
     clientName: booking.contactName,
+    maskedEmail: maskEmail(booking.contactEmail),
+    pendingMaskedEmail: pendingMaskedEmailOf(booking, now),
     startsAt: booking.startsAt.toISOString(),
     endsAt: booking.endsAt.toISOString(),
     serviceName: booking.serviceNameSnapshot,

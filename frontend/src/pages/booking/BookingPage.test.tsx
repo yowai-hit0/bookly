@@ -34,6 +34,8 @@ const BOOKING: ClientBooking = {
   reference: REFERENCE,
   status: 'confirmed',
   clientName: 'Aline Uwase',
+  maskedEmail: 'a•••••@example.com',
+  pendingMaskedEmail: null,
   startsAt: '2026-10-07T07:30:00.000Z',
   endsAt: '2026-10-07T09:00:00.000Z',
   serviceName: 'Portraits',
@@ -100,6 +102,7 @@ type Api = {
   methods?: () => Reply
   cancel?: (call: number) => Reply
   pay?: (body: unknown, call: number) => Reply
+  email?: (body: unknown) => Reply
 }
 
 /** Answers the booking, the methods, a cancellation, a payment and a payment's progress. */
@@ -107,6 +110,7 @@ function stubApi(api: Api = {}) {
   const calls: string[] = []
   const payBodies: unknown[] = []
   const cancelRequests: RequestInit[] = []
+  const emailBodies: unknown[] = []
   let bookingCalls = 0
   let cancelCalls = 0
   vi.stubGlobal(
@@ -131,11 +135,16 @@ function stubApi(api: Api = {}) {
         payBodies.push(JSON.parse(String(init?.body)))
         return api.pay ? api.pay(payBodies.at(-1), payBodies.length) : json({ payment: { ourRef: OUR_REF, status: 'pending' } }, 201)
       }
+      if (method === 'POST' && url === `${BOOKING_API}/email`) {
+        const body = JSON.parse(String(init?.body))
+        emailBodies.push(body)
+        return api.email ? api.email(body) : json({ booking: { ...BOOKING, pendingMaskedEmail: 'n\u2022\u2022\u2022\u2022\u2022@example.com' } }, 202)
+      }
       if (method === 'GET' && url.startsWith('/api/payments/')) return json(PENDING_PROGRESS)
       return json({ error: 'not_found' }, 404)
     }),
   )
-  return { calls, payBodies, cancelRequests }
+  return { calls, payBodies, cancelRequests, emailBodies }
 }
 
 function renderAt(path = PATH) {
@@ -272,6 +281,87 @@ describe('remembering the link on this device', () => {
     renderAt()
 
     expect(await screen.findByText(REFERENCE)).toBeInTheDocument()
+  })
+})
+
+// --- The contact email (2026-09-25) ---------------------------------------------------------
+
+describe('the contact email', () => {
+  function card() {
+    return within(screen.getByRole('heading', { level: 2, name: 'Your email' }).closest('section') as HTMLElement)
+  }
+
+  async function changeTo(email: string) {
+    await user().click(card().getByRole('button', { name: 'Change email' }))
+    await user().type(card().getByLabelText('New email'), email)
+    await user().click(card().getByRole('button', { name: 'Send the link' }))
+  }
+
+  it('shows the address it writes to, masked as the API sends it', async () => {
+    stubApi()
+    await renderLoaded()
+
+    expect(card().getByText('We write to a•••••@example.com about this booking.')).toBeInTheDocument()
+  })
+
+  it('asks the new address to confirm, and says so, keeping the old one until then', async () => {
+    const { emailBodies } = stubApi()
+    await renderLoaded()
+
+    await changeTo('aline.new@example.com')
+
+    expect(emailBodies).toEqual([{ email: 'aline.new@example.com' }])
+    expect(await card().findByRole('status')).toHaveTextContent(
+      'Check aline.new@example.com for our link to confirm the change. Until then we keep writing to a•••••@example.com.',
+    )
+    expect(card().queryByLabelText('New email')).not.toBeInTheDocument()
+  })
+
+  it('shows a change still waiting on its confirmation', async () => {
+    stubApi({ booking: () => json({ booking: { ...BOOKING, pendingMaskedEmail: 'n\u2022\u2022\u2022\u2022\u2022@example.com' } }) })
+    await renderLoaded()
+
+    expect(card().getByText(/Waiting for you to confirm n\u2022\u2022\u2022\u2022\u2022@example\.com/)).toBeInTheDocument()
+  })
+
+  it('marks a malformed address and sends nothing', async () => {
+    const { emailBodies } = stubApi()
+    await renderLoaded()
+
+    await changeTo('nope')
+
+    expect(card().getByText('Enter a valid email address.')).toBeInTheDocument()
+    expect(card().getByLabelText('New email')).toHaveAttribute('aria-invalid', 'true')
+    expect(emailBodies).toEqual([])
+  })
+
+  it('says when it is already the address, and when the day\u2019s limit is reached', async () => {
+    stubApi({ email: (body) => ((body as { email: string }).email === 'same@example.com' ? json({ booking: BOOKING }) : json({ error: 'too_many_requests' }, 429)) })
+    await renderLoaded()
+
+    await changeTo('same@example.com')
+    expect(await card().findByText('That is already the email we write to.')).toBeInTheDocument()
+
+    await changeTo('other@example.com')
+    expect(await card().findByRole('alert')).toHaveTextContent('You have asked to change the email three times today.')
+  })
+
+  it('keeps the address when the form is closed', async () => {
+    const { emailBodies } = stubApi()
+    await renderLoaded()
+
+    await user().click(card().getByRole('button', { name: 'Change email' }))
+    await user().click(card().getByRole('button', { name: 'Keep this email' }))
+
+    expect(card().queryByLabelText('New email')).not.toBeInTheDocument()
+    expect(emailBodies).toEqual([])
+  })
+
+  it('is not offered on a booking that no longer stands', async () => {
+    stubApi({ booking: () => json({ booking: CANCELLED }) })
+    await renderLoaded()
+
+    expect(screen.queryByRole('heading', { level: 2, name: 'Your email' })).not.toBeInTheDocument()
   })
 })
 

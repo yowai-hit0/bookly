@@ -131,6 +131,16 @@ export function bookingLink(ctx: EmailContext, token: string): string {
   return siteUrl(ctx, `${BOOKING_PAGE_PATH}/${token}`);
 }
 
+/**
+ * Where a client confirms a new contact email (2026-09-25): the token in the
+ * path, as the booking page's is. The page posts it; opening it changes nothing.
+ */
+export const EMAIL_CONFIRM_PAGE_PATH = '/email-confirm';
+
+export function emailConfirmLink(ctx: EmailContext, token: string): string {
+  return siteUrl(ctx, `${EMAIL_CONFIRM_PAGE_PATH}/${token}`);
+}
+
 /** The admin calendar, open on the day of `startsAt` (plan.md Task 9). */
 export function adminCalendarLink(ctx: EmailContext, startsAt: string): string {
   return siteUrl(ctx, `/admin/calendar?view=day&date=${kigaliDateOf(new Date(startsAt))}`);

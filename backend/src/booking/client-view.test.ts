@@ -107,6 +107,9 @@ describe('the whole view', () => {
       reference: booking.reference,
       status: 'confirmed',
       clientName: CLIENT.name,
+      // Masked, never the address itself (2026-09-25).
+      maskedEmail: 'a•••••@example.com',
+      pendingMaskedEmail: null,
       startsAt: booking.startsAt.toISOString(),
       endsAt: booking.endsAt.toISOString(),
       serviceName: 'Portraits',
@@ -551,6 +554,20 @@ describe('what the view never carries', () => {
       // `waitingPayment.ourRef` is the client's own attempt, and this booking has none.
       expect(serialised).not.toContain(key);
     }
+  });
+
+  it('masks the email it carries, and a pending change, to the first letter and the domain (2026-09-25)', async () => {
+    const { booking } = await insertBookingWithToken(prisma, world);
+    await prisma.booking.update({
+      where: { id: booking.id },
+      data: { pendingContactEmail: 'zoe.new@other.example', pendingEmailTokenHash: 'f'.repeat(64), pendingEmailExpiresAt: new Date(NOW.getTime() + 60_000) },
+    });
+
+    const view = await viewOf(booking.id);
+
+    expect(view.maskedEmail).toBe('a•••••@example.com');
+    expect(view.pendingMaskedEmail).toBe('z•••••@other.example');
+    expect(JSON.stringify(view)).not.toContain('zoe.new');
   });
 
   it('carries the client’s own name, which is theirs to see (spec §2.2 P-13)', async () => {

@@ -3,6 +3,7 @@ import { type Response, Router } from 'express';
 import { z } from 'zod';
 import { findBookingByToken } from '../booking/access.js';
 import { cancelByClient } from '../booking/cancel.js';
+import { requestEmailChange } from '../booking/email-change.js';
 import { type ClientBookingView, clientBookingView } from '../booking/client-view.js';
 import { normalizePhone } from '../booking/phone.js';
 import { startSessionFeePayment } from '../payments/initiate.js';
@@ -22,6 +23,14 @@ import { parseOrReject } from './validation.js';
  *        200 { booking }            now cancelled_by_client
  *        404 not_found
  *        409 not_cancellable        already cancelled, or the shoot has passed
+ *
+ *   POST /api/booking/:token/email   { email }            (2026-09-25)
+ *        202 { booking }                 a confirmation link is on its way to the new address
+ *        200 { booking }                 it is the address the booking already has
+ *        404 not_found
+ *        409 not_allowed { booking }     a booking that no longer stands
+ *        422 validation_failed { fields }
+ *        429 too_many_requests           three requests a day per booking
  *
  *   POST /api/booking/:token/payments   { method, phone }
  *        201 { payment: { ourRef, status: 'pending' } }
@@ -46,6 +55,16 @@ export type ClientBookingDeps = {
 };
 
 const PHONE_MAX_LENGTH = 40;
+const EMAIL_MAX_LENGTH = 254;
+const emailFormat = z.email();
+const emailBody = z.strictObject({
+  // A refinement, not z.email(): a mistyped address is a 422 the form can mark.
+  email: z
+    .string()
+    .trim()
+    .max(EMAIL_MAX_LENGTH)
+    .refine((value) => emailFormat.safeParse(value).success, 'Invalid email'),
+});
 
 export function clientBookingRouter(deps: ClientBookingDeps): Router {
   const { prisma, now } = deps;
@@ -80,6 +99,35 @@ export function clientBookingRouter(deps: ClientBookingDeps): Router {
       return;
     }
     res.json({ booking: clientBookingView(result.booking, now()) });
+  });
+
+  router.post('/:token/email', async (req, res) => {
+    const booking = await findBookingByToken(prisma, req.params.token);
+    if (booking === null) {
+      notFound(res);
+      return;
+    }
+    const body = parseOrReject(emailBody, req.body, res);
+    if (body === undefined) return;
+
+    const result = await requestEmailChange({ prisma, now }, booking, body.email);
+    const fresh = await findBookingByToken(prisma, req.params.token);
+    const view = fresh === null ? null : clientBookingView(fresh, now());
+    switch (result.status) {
+      case 'requested':
+        // No address in the answer: the page knows what it sent, and the view masks it.
+        res.status(202).json({ booking: view });
+        return;
+      case 'unchanged':
+        res.json({ booking: view });
+        return;
+      case 'not_allowed':
+        res.status(409).json({ error: 'not_allowed', booking: view });
+        return;
+      case 'rate_limited':
+        res.status(429).json({ error: 'too_many_requests' });
+        return;
+    }
   });
 
   const payments = deps.payments;

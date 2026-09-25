@@ -1,4 +1,4 @@
-import { ExternalLink, Info, Smartphone, TriangleAlert, Undo2, Unlink } from 'lucide-react'
+import { ExternalLink, Info, MailCheck, Smartphone, TriangleAlert, Undo2, Unlink } from 'lucide-react'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -8,12 +8,15 @@ import {
   bookingPaymentPath,
   cancelBooking,
   fetchClientBooking,
+  requestEmailChange,
   startSessionFeePayment,
 } from '@/catalogue/booking-access'
 import { isPlausiblePhone } from '@/catalogue/bookings'
 import { type PaymentMethod, fetchPaymentMethods, needsPhoneFor } from '@/catalogue/payments'
 import { Button } from '@/components/ui/button'
 import { Callout } from '@/components/ui/callout'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { StatusIcon } from '@/components/ui/status-icon'
 import { formatDate, formatMoney, formatTime } from '@/lib/format'
@@ -190,6 +193,10 @@ function BookingView({ token, booking: loadedBooking, methods, onMissing, onRelo
         <Amounts booking={booking} />
       </section>
 
+      {CHANGEABLE_EMAIL_STATUSES.includes(booking.status) && (
+        <ContactEmail token={token} booking={booking} onChanged={setBooking} onMissing={onMissing} />
+      )}
+
       {booking.delivery !== null && <Delivery delivery={booking.delivery} />}
 
       {booking.sessionFee !== null && (
@@ -233,6 +240,151 @@ function BookingView({ token, booking: loadedBooking, methods, onMissing, onRelo
         </section>
       )}
     </>
+  )
+}
+
+/** A booking that still stands can still have its emails redirected; the API checks again. */
+const CHANGEABLE_EMAIL_STATUSES = ['confirmed', 'completed']
+
+/**
+ * Where the booking's emails go, and changing it (2026-09-25). The API only
+ * ever sends the address masked (`a•••••@example.com`), so a link that is
+ * forwarded or leaked does not give the email away. A change is only asked
+ * for here: it takes effect once the NEW address clicks the link we send it,
+ * and until then the page says so.
+ */
+function ContactEmail({
+  token,
+  booking,
+  onChanged,
+  onMissing,
+}: {
+  token: string
+  booking: ClientBooking
+  onChanged: (booking: ClientBooking) => void
+  onMissing: () => void
+}) {
+  const { t } = useTranslation()
+  const fieldId = useId()
+  const fieldRef = useRef<HTMLInputElement>(null)
+  const [editing, setEditing] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'sending' | 'invalid' | 'failed' | 'rate_limited'>('idle')
+  const [message, setMessage] = useState<{ kind: 'sent'; email: string } | { kind: 'unchanged' } | null>(null)
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (status === 'sending') return
+    const form = event.currentTarget
+    const email = String(new FormData(form).get('email') ?? '').trim()
+    if (email === '' || !form.checkValidity()) {
+      setStatus('invalid')
+      fieldRef.current?.focus()
+      return
+    }
+    setStatus('sending')
+    const result = await requestEmailChange(token, email)
+    switch (result.status) {
+      case 'requested':
+      case 'unchanged':
+      case 'not_allowed':
+        if (result.booking !== null) onChanged(result.booking)
+        setEditing(false)
+        setStatus('idle')
+        // The address just typed is the client's own, so it may be shown back in full.
+        setMessage(result.status === 'requested' ? { kind: 'sent', email } : result.status === 'unchanged' ? { kind: 'unchanged' } : null)
+        return
+      case 'not_found':
+        onMissing()
+        return
+      case 'invalid':
+        setStatus('invalid')
+        fieldRef.current?.focus()
+        return
+      default:
+        setStatus(result.status)
+    }
+  }
+
+  return (
+    <section className="bg-card flex flex-col gap-3 rounded-xl border p-4 shadow-sm">
+      <h2 className="text-lg font-semibold">{t('booking:contact.title')}</h2>
+      <p className="text-sm">{t('booking:contact.current', { email: booking.maskedEmail })}</p>
+
+      {message?.kind === 'sent' ? (
+        <Callout icon={MailCheck} role="status">
+          <p>{t('booking:contact.sent', { email: message.email, current: booking.maskedEmail })}</p>
+        </Callout>
+      ) : (
+        booking.pendingMaskedEmail !== null && (
+          <Callout icon={MailCheck}>
+            <p>{t('booking:contact.pending', { email: booking.pendingMaskedEmail, current: booking.maskedEmail })}</p>
+          </Callout>
+        )
+      )}
+      {message?.kind === 'unchanged' && (
+        <p className="text-muted-foreground text-sm" role="status">
+          {t('booking:contact.unchanged')}
+        </p>
+      )}
+
+      {editing ? (
+        <form onSubmit={submit} noValidate className="flex flex-col gap-2">
+          <Label htmlFor={fieldId}>{t('booking:contact.newEmail')}</Label>
+          <Input
+            ref={fieldRef}
+            id={fieldId}
+            name="email"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            required
+            aria-invalid={status === 'invalid' || undefined}
+            aria-describedby={`${fieldId}-hint${status === 'invalid' ? ` ${fieldId}-error` : ''}`}
+          />
+          <p id={`${fieldId}-hint`} className="text-muted-foreground text-sm">
+            {t('booking:contact.hint')}
+          </p>
+          {status === 'invalid' && (
+            <p id={`${fieldId}-error`} className="text-destructive text-sm">
+              {t('booking:contact.invalid')}
+            </p>
+          )}
+          {(status === 'failed' || status === 'rate_limited') && (
+            <p className="text-destructive text-sm" role="alert">
+              {t(status === 'failed' ? 'booking:contact.failed' : 'booking:contact.rateLimited')}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" size="sm" aria-disabled={status === 'sending'}>
+              {status === 'sending' ? t('booking:contact.saving') : t('booking:contact.save')}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditing(false)
+                setStatus('idle')
+              }}
+            >
+              {t('booking:contact.keep')}
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start"
+          onClick={() => {
+            setMessage(null)
+            setEditing(true)
+          }}
+        >
+          {t('booking:contact.change')}
+        </Button>
+      )}
+    </section>
   )
 }
 

@@ -4,7 +4,10 @@ import {
   bookingPath,
   bookingPaymentPath,
   cancelBooking,
+  confirmEmailChange,
+  emailConfirmPath,
   fetchClientBooking,
+  requestEmailChange,
   startSessionFeePayment,
 } from './booking-access'
 import { PaymentApiError } from './payments'
@@ -31,6 +34,8 @@ const BOOKING: ClientBooking = {
   reference: 'BKY-2610-7K3QX',
   status: 'confirmed',
   clientName: 'Aline Uwase',
+  maskedEmail: 'a•••••@example.com',
+  pendingMaskedEmail: null,
   startsAt: '2026-10-07T07:30:00.000Z',
   endsAt: '2026-10-07T09:00:00.000Z',
   serviceName: 'Portraits',
@@ -355,5 +360,55 @@ describe('startSessionFeePayment', () => {
     await startSessionFeePayment('a/b', request)
 
     expect(sentRequest(mock).url).toBe('/api/booking/a%2Fb/payments')
+  })
+})
+
+describe('requestEmailChange (2026-09-25)', () => {
+  function stubOnce(status: number, body: unknown) {
+    const mock = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify(body), { status }))
+    vi.stubGlobal('fetch', mock)
+    return mock
+  }
+
+  it('posts only the email, to the token\u2019s own path', async () => {
+    const mock = stubOnce(202, { booking: BOOKING })
+
+    await expect(requestEmailChange(TOKEN, 'aline.new@example.com')).resolves.toEqual({ status: 'requested', booking: BOOKING })
+
+    const [url, init] = mock.mock.calls[0] ?? []
+    expect([url, init?.method]).toEqual([`/api/booking/${TOKEN}/email`, 'POST'])
+    expect(JSON.parse(String(init?.body))).toStrictEqual({ email: 'aline.new@example.com' })
+  })
+
+  it.each([
+    [200, { booking: BOOKING }, { status: 'unchanged', booking: BOOKING }],
+    [409, { error: 'not_allowed', booking: BOOKING }, { status: 'not_allowed', booking: BOOKING }],
+    [404, { error: 'not_found' }, { status: 'not_found' }],
+    [422, { error: 'validation_failed', fields: ['email'] }, { status: 'invalid' }],
+    [429, { error: 'too_many_requests' }, { status: 'rate_limited' }],
+    [500, {}, { status: 'failed' }],
+  ])('reads %i', async (status, body, expected) => {
+    stubOnce(status, body)
+    await expect(requestEmailChange(TOKEN, 'aline.new@example.com')).resolves.toEqual(expected)
+  })
+})
+
+describe('confirmEmailChange (2026-09-25)', () => {
+  it.each([
+    [200, 'confirmed'],
+    [404, 'invalid'],
+    [500, 'failed'],
+  ] as const)('reads %i as %s', async (status, expected) => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status })))
+    await expect(confirmEmailChange('Cf7mN2bV9cX4zL1kJ8hG5fD3sA6pO0iU')).resolves.toBe(expected)
+  })
+
+  it('is failed when the API cannot be reached', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('network'))))
+    await expect(confirmEmailChange('Cf7mN2bV9cX4zL1kJ8hG5fD3sA6pO0iU')).resolves.toBe('failed')
+  })
+
+  it('builds the page path the email links to', () => {
+    expect(emailConfirmPath('a/b')).toBe('/email-confirm/a%2Fb')
   })
 })

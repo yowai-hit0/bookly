@@ -111,6 +111,22 @@
       "intro": "Here is a new link to your booking for {{service}} on {{date}}.",
       "oldLinks": "Any link we sent you before no longer works. Keep this email, and please do not share the link."
     },
+    "emailChangeConfirm": {
+      "subject": "Confirm your new email ({{reference}})",
+      "preheader": "One click to use this address for your booking.",
+      "heading": "Confirm your new email",
+      "intro": "You asked to use {{email}} for your booking. Confirm it, and we will write to this address from now on.",
+      "button": "Confirm this email",
+      "expiry": "This link works for 24 hours. Until you confirm, we keep writing to the address we had.",
+      "notYou": "If you did not ask for this, ignore this email: nothing changes unless the button is used."
+    },
+    "emailChangedNotice": {
+      "subject": "Your booking email was changed ({{reference}})",
+      "preheader": "We will now write to a different address.",
+      "heading": "Your booking email was changed",
+      "intro": "The email for your booking is now {{email}}. This is the last message about it we will send to this address.",
+      "notYou": "If you did not make this change, reply to this email straight away so the photographer can put it back."
+    },
     "bookingLinks": {
       "subject": "Your booking links",
       "preheader": "New links to your bookings.",
@@ -149,6 +165,8 @@
           "reschedule": "Reschedule notice to the client",
           "access_link_resend": "New booking link to the client",
         "booking_links": "Booking links the client asked for",
+        "email_change_confirm": "Confirmation link to a new client email",
+        "email_changed_notice": "Notice to an old client email",
           "admin_alert": "Alert to you",
           "gcal_create": "Adding the booking to your Google Calendar",
           "gcal_update": "Updating the booking in your Google Calendar",

@@ -11,6 +11,7 @@ import { AdminLogin } from '@/pages/admin/AdminLogin'
 import { AdminResetPassword } from '@/pages/admin/AdminResetPassword'
 import { AdminSettings } from '@/pages/admin/AdminSettings'
 import { BookingPage } from '@/pages/booking/BookingPage'
+import { EmailConfirmPage } from '@/pages/booking/EmailConfirmPage'
 import { MyBookingPage } from '@/pages/booking/MyBookingPage'
 import { CheckoutPage } from '@/pages/checkout/CheckoutPage'
 import { PaymentProgressPage } from '@/pages/checkout/PaymentProgressPage'
@@ -37,6 +38,8 @@ export const routes: RouteObject[] = [
       // The client's own booking, addressed by the token in the path (plan.md Task 18).
       // Lost the link: get a fresh one by email (2026-09-25).
       { path: '/my-booking', element: <MyBookingPage /> },
+      // A contact-email change, confirmed from the new address (2026-09-25).
+      { path: '/email-confirm/:token', element: <EmailConfirmPage /> },
       { path: '/booking/:token', element: <BookingPage /> },
       { path: '/booking/:token/payments/:ourRef', element: <PaymentProgressPage /> },
       { path: '*', element: <NotFound /> },

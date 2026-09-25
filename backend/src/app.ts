@@ -6,6 +6,7 @@ import type { PaymentProvider } from './payments/provider.js';
 import { adminRouter } from './routes/admin.js';
 import { healthRouter } from './routes/health.js';
 import { clientBookingRouter } from './routes/client-booking.js';
+import { emailConfirmationsRouter } from './routes/email-confirmations.js';
 import { type PaymentWebhooksDeps, paymentWebhooksRouter } from './routes/payment-webhooks.js';
 import { availabilityRouter } from './routes/public-availability.js';
 import { type BookingLinksDeps, bookingLinksRouter } from './routes/public-booking-links.js';
@@ -67,6 +68,8 @@ export function createApp(options: AppOptions = {}): Express {
     }
     // "Email me my links", the public side of the resend (2026-09-25).
     app.use('/api/booking-links', bookingLinksRouter({ prisma, now, ...options.publicApi.bookingLinks }));
+    // The new address's confirmation of a contact-email change (2026-09-25).
+    app.use('/api/email-confirmations', emailConfirmationsRouter({ prisma, now }));
     // The client's own booking, addressed by its access token (plan.md Task 18).
     const clientPayments = options.publicApi.payments;
     app.use(

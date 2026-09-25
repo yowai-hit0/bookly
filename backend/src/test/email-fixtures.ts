@@ -20,6 +20,8 @@ export const FIXTURE_REFERENCE = 'BKY-2610-7K3MQ';
 /** A second booking of the same client, for the email that lists several. */
 export const FIXTURE_SECOND_REFERENCE = 'BKY-2610-9P2RT';
 export const FIXTURE_SECOND_ACCESS_TOKEN = 'Qw8E1rT5yU2iO9pA3sD7fG4hJ6kL0zXc';
+/** A contact-email confirmation token: not an access token, and never in a booking link. */
+export const FIXTURE_CONFIRM_TOKEN = 'Cf7mN2bV9cX4zL1kJ8hG5fD3sA6pO0iU';
 
 export type EmailFixture = {
   /** Unique; used as the snapshot name. */
@@ -133,6 +135,16 @@ export const EMAIL_FIXTURES: readonly EmailFixture[] = [
     name: 'access_link_resend',
     template: 'access_link_resend',
     payload: { ...basics, accessToken: FIXTURE_ACCESS_TOKEN },
+  },
+  {
+    name: 'email_change_confirm',
+    template: 'email_change_confirm',
+    payload: { ...basics, newEmail: 'aline.new@example.com', confirmToken: FIXTURE_CONFIRM_TOKEN },
+  },
+  {
+    name: 'email_changed_notice',
+    template: 'email_changed_notice',
+    payload: { ...basics, newEmail: 'aline.new@example.com' },
   },
   {
     name: 'booking_links',

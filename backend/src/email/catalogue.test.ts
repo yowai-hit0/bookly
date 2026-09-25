@@ -78,9 +78,9 @@ describe('outbox_template_allowed and the templates', () => {
     }
   });
 
-  it('there are ten: the nine of spec §4.1 and booking_links (2026-09-25)', () => {
-    expect(templateFiles()).toHaveLength(10);
-    expect(EMAIL_TEMPLATES).toHaveLength(10);
+  it('there are twelve: the nine of spec §4.1 and the three client-access emails (2026-09-25)', () => {
+    expect(templateFiles()).toHaveLength(12);
+    expect(EMAIL_TEMPLATES).toHaveLength(12);
   });
 });
 
