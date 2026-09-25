@@ -101,6 +101,9 @@ describe('the admin shell', () => {
 
     // Below `sm` only the icon shows; the accessible name must survive that.
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+    // Red, as a way out (2026-09-25): the destructive text colour, not a solid fill.
+    expect(screen.getByRole('button', { name: 'Sign out' })).toHaveClass('text-destructive')
+    expect(screen.getByRole('button', { name: 'Sign out' })).not.toHaveClass('bg-destructive')
   })
 
   it('sends a visitor with no session to sign in, and renders no shell there', () => {

@@ -75,8 +75,10 @@ export function AdminLayout() {
           onClick={signOut}
           // `ml-auto` puts it at the right of the top bar's first row
           // (`admin-shell.md`); in the sidebar's column it would push it
-          // sideways instead, so it is reset from `lg`.
-          className="order-2 ml-auto lg:order-3 lg:mt-auto lg:ml-0 lg:w-full lg:justify-start lg:border-t lg:pt-3"
+          // sideways instead, so it is reset from `lg`. Red text and a red hover
+          // tint mark it as leaving (2026-09-25); ghost weight, not a solid fill:
+          // it is not a destructive confirmation.
+          className="text-destructive hover:bg-destructive/10 hover:text-destructive dark:hover:bg-destructive/15 order-2 ml-auto lg:order-3 lg:mt-auto lg:ml-0 lg:w-full lg:justify-start lg:border-t lg:pt-3"
         >
           <LogOut aria-hidden="true" />
           <span className="sr-only sm:not-sr-only">{t('admin:nav.signOut')}</span>

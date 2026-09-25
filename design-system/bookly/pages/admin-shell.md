@@ -43,7 +43,7 @@
   - keyboard focus: the ring (`focus-visible:ring-3 ring-ring/50`).
 - **No left-edge stripe** for the active item: Impeccable's detector flags one-sided accent borders (`side-tab`). Do not use a solid green fill either: the active item would compete with the page's primary action (one primary CTA per screen).
 - Bookings stays highlighted on `/admin/bookings/:id` (`NavLink` matches by prefix; leave `end` off).
-- **Sign-out:** bottom of the sidebar, `border-t` above it, ghost button, full width, left-aligned, `LogOut` icon + `admin:nav.signOut`.
+- **Sign-out:** bottom of the sidebar, `border-t` above it, ghost button, full width, left-aligned, `LogOut` icon + `admin:nav.signOut`.  **Red since 2026-09-25 (user request):** `text-destructive`, hover `bg-destructive/10`. Still ghost weight, never a solid fill, which is reserved for confirming something irreversible.
 
 ## Below lg (top bar; verify at 375px)
 
