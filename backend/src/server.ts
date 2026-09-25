@@ -6,7 +6,7 @@ import { createMailProvider } from './email/mailer.js';
 import { EnvValidationError, parseEnv } from './env.js';
 import { startOutboxWorker } from './outbox/worker.js';
 import { createPaymentProviders } from './payments/providers.js';
-import { startPaymentReconciler } from './payments/reconcile.js';
+import { SANDBOX_RECONCILE_MIN_AGE_SECONDS, SANDBOX_RECONCILE_SCHEDULE, startPaymentReconciler } from './payments/reconcile.js';
 
 function boot(): void {
   let env;
@@ -55,10 +55,16 @@ function boot(): void {
   const holdSweeper = startHoldSweeper(prisma);
 
   // Lost callbacks, and the MTN sandbox that sends none, settle through a status
-  // lookup. Without credentials there is nothing to ask.
+  // lookup. Without credentials there is nothing to ask. In the sandbox the
+  // lookup is the only signal, so it runs every few seconds rather than a minute.
+  const mtnSandbox = env.MTN_MOMO_TARGET_ENVIRONMENT === 'sandbox';
   const reconcilers = Object.values(payments.all)
     .filter((provider) => provider.configured)
-    .map((provider) => startPaymentReconciler({ prisma, provider }));
+    .map((provider) =>
+      provider.id === 'mtn_momo_direct' && mtnSandbox
+        ? startPaymentReconciler({ prisma, provider, minAgeSeconds: SANDBOX_RECONCILE_MIN_AGE_SECONDS }, SANDBOX_RECONCILE_SCHEDULE)
+        : startPaymentReconciler({ prisma, provider }),
+    );
 
   // Everything the system sends goes through the outbox (plan.md Task 14).
   // Calendar kinds get their handler with Task 22; until then they wait.

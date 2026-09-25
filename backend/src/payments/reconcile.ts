@@ -22,16 +22,19 @@ export const RECONCILE_SCHEDULE = '* * * * *';
 export const RECONCILE_MIN_AGE_SECONDS = 60;
 /** Past the hold and then some; a request unanswered this long is not coming back. */
 export const RECONCILE_MAX_AGE_MINUTES = 60;
+/** MTN's sandbox settles at once but never calls back, so the lookup is its only signal: ask often and early. */
+export const SANDBOX_RECONCILE_SCHEDULE = '*/5 * * * * *';
+export const SANDBOX_RECONCILE_MIN_AGE_SECONDS = 3;
 const RECONCILE_BATCH_SIZE = 20;
 const LOOKUP_TIMEOUT_MS = 15_000;
 
-export type ReconcileDeps = WebhookDeps & { provider: PaymentProvider };
+export type ReconcileDeps = WebhookDeps & { provider: PaymentProvider; minAgeSeconds?: number };
 
 /** Looks up every waiting payment due a check; returns how many settled. */
 export async function reconcilePendingPayments(deps: ReconcileDeps): Promise<number> {
   const { prisma, provider } = deps;
   const log = deps.log ?? defaultLog;
-  const waiting = await dueForLookup(prisma, provider.id);
+  const waiting = await dueForLookup(prisma, provider.id, deps.minAgeSeconds ?? RECONCILE_MIN_AGE_SECONDS);
 
   let settled = 0;
   for (const { our_ref: ourRef } of waiting) {
@@ -48,13 +51,13 @@ export async function reconcilePendingPayments(deps: ReconcileDeps): Promise<num
   return settled;
 }
 
-function dueForLookup(prisma: PrismaClient, providerId: string): Promise<{ our_ref: string }[]> {
+function dueForLookup(prisma: PrismaClient, providerId: string, minAgeSeconds: number): Promise<{ our_ref: string }[]> {
   return prisma.$queryRaw<{ our_ref: string }[]>`
     SELECT our_ref::text AS our_ref
       FROM payment
      WHERE provider = ${providerId}
        AND status = 'pending'
-       AND initiated_at <= now() - make_interval(secs => ${RECONCILE_MIN_AGE_SECONDS}::double precision)
+       AND initiated_at <= now() - make_interval(secs => ${minAgeSeconds}::double precision)
        AND initiated_at > now() - make_interval(mins => ${RECONCILE_MAX_AGE_MINUTES}::integer)
      ORDER BY initiated_at
      LIMIT ${RECONCILE_BATCH_SIZE}`;

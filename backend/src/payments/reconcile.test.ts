@@ -15,7 +15,7 @@ import {
   stubProvider,
 } from '../test/payment-fixtures.js';
 import { readEvent } from './mtn-momo.js';
-import { RECONCILE_MAX_AGE_MINUTES, RECONCILE_MIN_AGE_SECONDS, reconcilePendingPayments } from './reconcile.js';
+import { RECONCILE_MAX_AGE_MINUTES, RECONCILE_MIN_AGE_SECONDS, SANDBOX_RECONCILE_MIN_AGE_SECONDS, reconcilePendingPayments } from './reconcile.js';
 import { receiveWebhook } from './webhooks.js';
 
 /**
@@ -103,6 +103,19 @@ describe('which payments are looked up', () => {
     expect(provider.lookedUp).toEqual([nearlyAnHour.payment.ourRef, halfHour.payment.ourRef, justOldEnough.payment.ourRef]);
     expect(provider.lookedUp).not.toContain(tooNew.payment.ourRef);
     expect(provider.lookedUp).not.toContain(tooOld.payment.ourRef);
+  });
+
+  it('with the sandbox minimum age, a payment a few seconds old', async () => {
+    const tooNew = await waiting(1);
+    const oldEnough = await waiting(10);
+    const provider = answering('SUCCESSFUL');
+
+    const settled = await reconcilePendingPayments({ prisma, provider, log: sink.log, minAgeSeconds: SANDBOX_RECONCILE_MIN_AGE_SECONDS });
+
+    expect(settled).toBe(1);
+    expect(provider.lookedUp).toEqual([oldEnough.payment.ourRef]);
+    expect(await statusOf('booking', tooNew.booking.id)).not.toBe('confirmed');
+    expect(await statusOf('booking', oldEnough.booking.id)).toBe('confirmed');
   });
 
   it.each(['initiated', 'succeeded', 'failed', 'refund_due', 'refunded'])('never a %s payment', async (status) => {
