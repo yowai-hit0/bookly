@@ -82,7 +82,12 @@ export async function saveDelivery(deps: DeliveryDeps, bookingId: string, edit: 
 }
 
 /** Sends the branded delivery email, and records that it went (spec §3.5 step 6). */
-export async function sendDelivery(deps: DeliveryDeps, bookingId: string): Promise<DeliveryResult> {
+export async function sendDelivery(
+  deps: DeliveryDeps,
+  bookingId: string,
+  /** Another address for this one email only; the booking's contact email stays (decided 2026-09-25). */
+  options: { recipient?: string | undefined } = {},
+): Promise<DeliveryResult> {
   const booking = await findAdminBooking(deps.prisma, bookingId);
   if (booking === null) return { status: 'not_found' };
   if (booking.status !== 'completed') return { status: 'not_allowed' };
@@ -104,7 +109,7 @@ export async function sendDelivery(deps: DeliveryDeps, bookingId: string): Promi
     await enqueue(tx, {
       kind: 'email',
       template: 'photo_delivery',
-      recipient: booking.contactEmail,
+      recipient: options.recipient ?? booking.contactEmail,
       bookingId: booking.id,
       // Each send is its own message and stays in the history (spec §6.20). Two
       // sends inside one millisecond are the same click twice, and collapse.

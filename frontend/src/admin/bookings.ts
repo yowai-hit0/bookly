@@ -194,8 +194,12 @@ export const bookingsApi = {
   },
 
   /** Emails that link to the client, and records that it went (spec §3.5 step 6). */
-  sendDelivery(bookingId: string): Promise<{ booking: AdminBooking }> {
-    return post(`/admin/bookings/${bookingId}/delivery/send`, {})
+  /**
+   * Emails the photo link. `recipient` sends this one email elsewhere; the
+   * booking keeps its own contact email (decided 2026-09-25).
+   */
+  sendDelivery(bookingId: string, recipient?: string): Promise<{ booking: AdminBooking }> {
+    return post(`/admin/bookings/${bookingId}/delivery/send`, recipient === undefined ? {} : { recipient })
   },
 
   /** Records a refund the photographer has already sent (spec §6.16). */

@@ -461,6 +461,9 @@ test('saves the delivery link on a completed booking and sends the photos', asyn
   expect(writes.at(-1)?.body).not.toHaveProperty('expiresOn')
 
   await page.getByRole('button', { name: 'Send the photos' }).click()
+  // The confirm step (2026-09-25): the address is the booking's, and unchanged it sends no recipient.
+  await expect(page.getByLabel('Email address')).toHaveValue('aline@example.com')
+  await page.getByRole('button', { name: 'Send now' }).click()
 
   // NOW is 08:00Z, which is 10:00 in Kigali, though the browser is in New York.
   await expect(photos).toContainText('Last sent')

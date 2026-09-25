@@ -1410,6 +1410,12 @@ describe('saving the link', () => {
   })
 })
 
+/** "Send" opens the confirm step; its "Send now" is what sends (2026-09-25). */
+async function sendThroughConfirm(label: 'Send the photos' | 'Send again' = 'Send the photos') {
+  await user().click(screen.getByRole('button', { name: label }))
+  await user().click(screen.getByRole('button', { name: 'Send now' }))
+}
+
 describe('sending the photos', () => {
   it('offers no send button until the API says there is a link to send', async () => {
     stubApi({ booking: DELIVERABLE })
@@ -1423,7 +1429,7 @@ describe('sending the photos', () => {
     const { sent } = stubApi({ booking: WITH_LINK })
     await renderLoaded()
 
-    await user().click(screen.getByRole('button', { name: 'Send the photos' }))
+    await sendThroughConfirm()
 
     await waitFor(() => expect(writes(sent)).toHaveLength(1))
     expect(writes(sent)[0]).toEqual({ method: 'POST', url: `/api/admin/bookings/${BOOKING_ID}/delivery/send`, body: {} })
@@ -1447,7 +1453,7 @@ describe('sending the photos', () => {
     })
     await renderLoaded()
 
-    await user().click(screen.getByRole('button', { name: 'Send the photos' }))
+    await sendThroughConfirm()
 
     expect(await screen.findByRole('button', { name: 'Send again' })).toBeInTheDocument()
     expect(deliverySection()).toHaveTextContent('7 Jan 2027, 11:15')
@@ -1457,7 +1463,7 @@ describe('sending the photos', () => {
     stubApi({ booking: WITH_LINK, onPost: () => json({ error: 'no_link', booking: DELIVERABLE }, 409) })
     await renderLoaded()
 
-    await user().click(screen.getByRole('button', { name: 'Send the photos' }))
+    await sendThroughConfirm()
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Save a link to the photos first.')
     expect(screen.getByRole('alert')).not.toHaveTextContent('That did not work.')
@@ -1467,7 +1473,7 @@ describe('sending the photos', () => {
     stubApi({ booking: WITH_LINK, onPost: () => json({ error: 'not_allowed', booking: CANCELLED }, 409) })
     await renderLoaded()
 
-    await user().click(screen.getByRole('button', { name: 'Send the photos' }))
+    await sendThroughConfirm()
 
     expect(await screen.findByRole('alert')).toHaveTextContent('That is not possible for this booking any more.')
     expect(document.body).toHaveTextContent('Cancelled by you')
@@ -1475,11 +1481,105 @@ describe('sending the photos', () => {
     expect(screen.queryByRole('heading', { level: 2, name: 'The photos' })).toBeNull()
   })
 
+  it('asks who to send it to first, prefilled with the booking’s email, and sends nothing yet (2026-09-25)', async () => {
+    const { sent } = stubApi({ booking: WITH_LINK })
+    await renderLoaded()
+
+    await user().click(screen.getByRole('button', { name: 'Send the photos' }))
+
+    expect(within(deliverySection()).getByText('Send the photo link to:')).toBeInTheDocument()
+    expect(screen.getByLabelText('Email address')).toHaveValue('aline@example.com')
+    expect(screen.queryByRole('button', { name: 'Send the photos' })).toBeNull()
+    expect(writes(sent)).toHaveLength(0)
+  })
+
+  it('goes back without sending', async () => {
+    const { sent } = stubApi({ booking: WITH_LINK })
+    await renderLoaded()
+
+    await user().click(screen.getByRole('button', { name: 'Send the photos' }))
+    await user().click(screen.getByRole('button', { name: 'Back' }))
+
+    expect(screen.queryByLabelText('Email address')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Send the photos' })).toBeInTheDocument()
+    expect(writes(sent)).toHaveLength(0)
+  })
+
+  it('sends a changed address as this email’s recipient, trimmed', async () => {
+    const { sent } = stubApi({ booking: WITH_LINK })
+    await renderLoaded()
+
+    await user().click(screen.getByRole('button', { name: 'Send the photos' }))
+    const field = screen.getByLabelText('Email address')
+    await user().clear(field)
+    await user().type(field, '  aline.new@example.com ')
+    await user().click(screen.getByRole('button', { name: 'Send now' }))
+
+    await waitFor(() => expect(writes(sent)).toHaveLength(1))
+    expect(writes(sent)[0]?.body).toEqual({ recipient: 'aline.new@example.com' })
+  })
+
+  it('refuses an address that is not one, sending nothing', async () => {
+    const { sent } = stubApi({ booking: WITH_LINK })
+    await renderLoaded()
+
+    await user().click(screen.getByRole('button', { name: 'Send the photos' }))
+    const field = screen.getByLabelText('Email address')
+    await user().clear(field)
+    await user().type(field, 'not an email')
+    await user().click(screen.getByRole('button', { name: 'Send now' }))
+
+    expect(screen.getByText('Enter a valid email address.')).toBeInTheDocument()
+    expect(field).toHaveAttribute('aria-invalid', 'true')
+    expect(writes(sent)).toHaveLength(0)
+  })
+
+  it('names the recipient in the history only when it was not the booking’s own address', async () => {
+    const sentElsewhere: AdminBooking = {
+      ...DELIVERY_SENT,
+      messages: [
+        ...BOOKING.messages,
+        { ...BOOKING.messages[0], id: 'm9', template: 'photo_delivery', recipient: 'aline.new@example.com' } as AdminBooking['messages'][number],
+      ],
+    }
+    stubApi({ booking: sentElsewhere })
+    await renderLoaded()
+
+    const history = section('Messages sent')
+    expect(history).toHaveTextContent('to aline.new@example.com')
+    expect(history.textContent ?? '').not.toContain('to aline@example.com')
+  })
+
   it('reports no download count: the section is the link, the date, the note and when it went', async () => {
     stubApi({ booking: DELIVERY_SENT })
     await renderLoaded()
 
     expect(deliverySection().textContent ?? '').not.toMatch(/download|opened|viewed/i)
+  })
+})
+
+describe('before the booking is marked completed', () => {
+  // "The shoot has begun" is the API's `canComplete`, measured on its clock.
+  it('says where photo delivery will be once the shoot has begun (2026-09-25)', async () => {
+    stubApi({ booking: STARTED })
+    await renderLoaded()
+
+    expect(deliverySection()).toHaveTextContent('Photo delivery opens once you mark this booking completed.')
+    expect(screen.queryByLabelText('Link to the photos')).toBeNull()
+  })
+
+  it('says nothing before the shoot', async () => {
+    stubApi({ booking: BOOKING })
+    await renderLoaded()
+
+    expect(screen.queryByRole('heading', { level: 2, name: 'The photos' })).toBeNull()
+  })
+
+  it('says nothing for a cancelled booking', async () => {
+    stubApi({ booking: CANCELLED })
+    await renderLoaded()
+
+    expect(screen.queryByRole('heading', { level: 2, name: 'The photos' })).toBeNull()
   })
 })
 

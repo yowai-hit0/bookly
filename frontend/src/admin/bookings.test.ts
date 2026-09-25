@@ -251,6 +251,13 @@ describe('every call’s method, path and body', () => {
       `/api/admin/bookings/${BOOKING_ID}/delivery/send`,
       {},
     ],
+    [
+      'sendDelivery to another address',
+      () => bookingsApi.sendDelivery(BOOKING_ID, 'other@example.com'),
+      'POST',
+      `/api/admin/bookings/${BOOKING_ID}/delivery/send`,
+      { recipient: 'other@example.com' },
+    ],
   ])('%s', async (_label, run, method, url, body) => {
     const mock = stubFetch()
 

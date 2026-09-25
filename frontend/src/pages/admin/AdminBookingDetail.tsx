@@ -221,13 +221,22 @@ export function AdminBookingDetail() {
 
       <Payments booking={booking} busy={busy} onRefund={(paymentId, reference) => act(() => bookingsApi.recordRefund(paymentId, reference))} />
 
-      {(actions.canEditDelivery || booking.delivery.url !== null) && (
+      {actions.canEditDelivery || booking.delivery.url !== null ? (
         <DeliveryForm
           booking={booking}
           busy={busy}
           onSave={(body) => act(() => bookingsApi.saveDelivery(booking.id, body))}
-          onSend={() => act(() => bookingsApi.sendDelivery(booking.id))}
+          onSend={(recipient) => act(() => bookingsApi.sendDelivery(booking.id, recipient))}
         />
+      ) : (
+        // Where the form will be, once the shoot has begun: the photographer
+        // otherwise has no way to know it exists (2026-09-25). `canComplete` is
+        // the API's "confirmed and the shoot has begun", on its clock.
+        actions.canComplete && (
+          <Section title={t('admin:booking.sections.delivery')}>
+            <p className="text-muted-foreground text-sm">{t('admin:booking.delivery.opensWhenCompleted')}</p>
+          </Section>
+        )
       )}
 
       <Section title={t('admin:booking.sections.actions')}>
@@ -279,6 +288,10 @@ export function AdminBookingDetail() {
                     defaultValue: message.template ?? message.kind,
                   })}
                   <span className="text-muted-foreground"> · {formatDateTime(message.createdAt)}</span>
+                  {/* Named only when it went elsewhere than the booking's own address (a one-off delivery recipient). */}
+                  {message.recipient !== null && message.recipient !== booking.contact.email && (
+                    <span className="text-muted-foreground"> · {t('admin:booking.messageTo', { recipient: message.recipient })}</span>
+                  )}
                 </span>
                 <span className={message.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'}>
                   {t(`admin:booking.messageStatus.${message.status}`, { defaultValue: message.status })}
@@ -420,11 +433,13 @@ function DeliveryForm({
   booking: AdminBooking
   busy: boolean
   onSave: (body: { url: string; expiresOn?: string; note?: string | null }) => Promise<void>
-  onSend: () => Promise<void>
+  /** `recipient` only when the photographer changed the address. */
+  onSend: (recipient?: string) => Promise<void>
 }) {
   const { t } = useTranslation()
   const fieldId = useId()
   const { delivery, actions } = booking
+  const [confirming, setConfirming] = useState(false)
   const [url, setUrl] = useState(delivery.url ?? '')
   const [expiresOn, setExpiresOn] = useState(delivery.expiresOn ?? '')
   const [note, setNote] = useState(delivery.note ?? '')
@@ -481,15 +496,29 @@ function DeliveryForm({
             <Button type="submit" variant="outline" size="sm" aria-disabled={busy}>
               {t('admin:booking.delivery.save')}
             </Button>
-            {actions.canSendDelivery && (
-              <Button type="button" size="sm" aria-disabled={busy} onClick={() => void onSend()}>
+            {actions.canSendDelivery && !confirming && (
+              <Button type="button" size="sm" aria-disabled={busy} onClick={() => setConfirming(true)}>
                 {t(delivery.sentAt === null ? 'admin:booking.delivery.send' : 'admin:booking.delivery.sendAgain')}
               </Button>
             )}
           </div>
           <p className="text-muted-foreground text-xs">{t('admin:booking.delivery.note_hint')}</p>
         </form>
-      ) : (
+      ) : null}
+
+      {actions.canEditDelivery && actions.canSendDelivery && confirming && (
+        <ConfirmRecipient
+          contactEmail={booking.contact.email}
+          busy={busy}
+          onBack={() => setConfirming(false)}
+          onConfirm={async (recipient) => {
+            await onSend(recipient === booking.contact.email ? undefined : recipient)
+            setConfirming(false)
+          }}
+        />
+      )}
+
+      {actions.canEditDelivery ? null : (
         <>
           <Line term={t('admin:booking.delivery.url')}>{delivery.url}</Line>
           {delivery.expiresOn !== null && (
@@ -498,6 +527,76 @@ function DeliveryForm({
         </>
       )}
     </Section>
+  )
+}
+
+/**
+ * The step between "Send" and the email: who it goes to, prefilled with the
+ * booking's address and editable for when the client asked for another. A
+ * changed address is for this email only (decided 2026-09-25). Its own form,
+ * so Enter in the field confirms rather than saving the link above.
+ */
+function ConfirmRecipient({
+  contactEmail,
+  busy,
+  onBack,
+  onConfirm,
+}: {
+  contactEmail: string
+  busy: boolean
+  onBack: () => void
+  onConfirm: (recipient: string) => Promise<void>
+}) {
+  const { t } = useTranslation()
+  const fieldId = useId()
+  const [recipient, setRecipient] = useState(contactEmail)
+  const [invalid, setInvalid] = useState(false)
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const trimmed = recipient.trim()
+    // The browser's own email rule, the same one the input shows; the API checks again.
+    if (!event.currentTarget.checkValidity() || trimmed === '') {
+      setInvalid(true)
+      return
+    }
+    setInvalid(false)
+    void onConfirm(trimmed)
+  }
+
+  return (
+    <form onSubmit={submit} noValidate className="flex flex-col gap-2 border-t pt-4">
+      <p className="text-sm font-medium">{t('admin:booking.delivery.confirmTitle')}</p>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={fieldId}>{t('admin:booking.delivery.recipient')}</Label>
+        <Input
+          id={fieldId}
+          type="email"
+          autoComplete="off"
+          required
+          value={recipient}
+          aria-invalid={invalid || undefined}
+          aria-describedby={`${fieldId}-hint${invalid ? ` ${fieldId}-error` : ''}`}
+          onChange={(event) => setRecipient(event.target.value)}
+        />
+        <p id={`${fieldId}-hint`} className="text-muted-foreground text-xs">
+          {t('admin:booking.delivery.recipientHint', { email: contactEmail })}
+        </p>
+        {invalid && (
+          <p id={`${fieldId}-error`} className="text-destructive text-sm">
+            {t('admin:booking.delivery.recipientInvalid')}
+          </p>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" size="sm" aria-disabled={busy}>
+          {t('admin:booking.delivery.confirmSend')}
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={onBack}>
+          {t('admin:booking.delivery.back')}
+        </Button>
+      </div>
+    </form>
   )
 }
 

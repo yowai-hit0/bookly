@@ -469,6 +469,7 @@
       "linkNone": "Not issued yet",
       "noPayments": "No payments yet.",
       "noMessages": "Nothing sent yet.",
+      "messageTo": "to {{recipient}}",
       "paymentKinds": {
         "booking_fee": "Booking fee",
         "session_fee": "Session fee"
@@ -566,7 +567,14 @@
         "send": "Send the photos",
         "sendAgain": "Send again",
         "sent": "Last sent",
-        "unsent": "Nothing has been sent to the client yet."
+        "unsent": "Nothing has been sent to the client yet.",
+        "opensWhenCompleted": "Photo delivery opens once you mark this booking completed.",
+        "confirmTitle": "Send the photo link to:",
+        "recipient": "Email address",
+        "recipientHint": "Change it only if the client asked. A different address is used for this email only; the booking keeps {{email}}.",
+        "recipientInvalid": "Enter a valid email address.",
+        "confirmSend": "Send now",
+        "back": "Back"
       }
     }
   },

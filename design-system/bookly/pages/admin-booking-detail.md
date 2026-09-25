@@ -32,6 +32,10 @@ One `li` per payment: kind · amount (`tabular-nums`) on the left, status · set
 
 Sent / unsent line; URL input (`type="url"`), expiry date input (`w-44`) with its hint, note textarea; **Save** (outline `sm`) and **Send / Send again** (default `sm`, `aria-disabled` while busy) side by side; hint text below. Read-only mode shows URL and expiry as `Line`s.
 
+**Confirm step (2026-09-25, user request).** Send / Send again no longer sends: it opens an inline step below the form (`ConfirmRecipient`, the cancel form's pattern, no modal) with "Send the photo link to:" and an email input prefilled with the booking's contact email, then **Send now** (default `sm`) and **Back** (outline `sm`). A changed address goes to the API as `recipient` and is used **for that one email only**; the booking keeps its contact email. The Messages list names a recipient (" · to …") only when it differs from the booking's address.
+
+**Before completion (2026-09-25).** On a `confirmed` booking whose shoot has begun, the Delivery section appears with one muted line, "Photo delivery opens once you mark this booking completed.", so the photographer can find where the link will go.
+
 ## Actions section (destructive care)
 
 Today's order: reschedule, cancel, request session fee, [complete, no-show, resend link], notes.

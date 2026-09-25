@@ -1369,6 +1369,51 @@ describe('POST /bookings/:id/delivery/send', () => {
     expect(queued.payload).toMatchObject({ deliveryUrl: DELIVERY_LINK, expiresOn: '2027-01-01' });
   });
 
+  it('sends to another address for this one email when given, leaving the booking’s own email alone (2026-09-25)', async () => {
+    const booking = await withLink();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/delivery/send`, { recipient: '  Other.Address@Example.com ' });
+
+    expect(res.status, res.text).toBe(200);
+    const queued = await prisma.outbox.findFirstOrThrow({ where: { bookingId: booking.id, template: 'photo_delivery' } });
+    expect(queued.recipient).toBe('Other.Address@Example.com');
+    expect((await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } })).contactEmail).toBe(CLIENT.email);
+    expect(res.body.booking.contact.email).toBe(CLIENT.email);
+    expect(res.body.booking.messages).toContainEqual(expect.objectContaining({ template: 'photo_delivery', recipient: 'Other.Address@Example.com' }));
+  });
+
+  it('sends to the client with no body at all, as before', async () => {
+    const booking = await withLink();
+
+    const res = await request(app).post(`${BOOKINGS}/${booking.id}/delivery/send`).set('Authorization', `Bearer ${token}`);
+
+    expect(res.status, res.text).toBe(200);
+    const queued = await prisma.outbox.findFirstOrThrow({ where: { bookingId: booking.id, template: 'photo_delivery' } });
+    expect(queued.recipient).toBe(CLIENT.email);
+  });
+
+  it.each([['not an email', 'not-an-email'], ['empty', '   '], ['too long', `${'a'.repeat(250)}@example.com`]])(
+    'answers 422 for a recipient that is %s, and sends nothing',
+    async (_label, recipient) => {
+      const booking = await withLink();
+
+      const res = await post(`${BOOKINGS}/${booking.id}/delivery/send`, { recipient });
+
+      expect([res.status, res.body]).toEqual([422, { error: 'validation_failed', fields: ['recipient'] }]);
+      expect(await prisma.outbox.count({ where: { template: 'photo_delivery' } })).toBe(0);
+      expect((await prisma.booking.findUniqueOrThrow({ where: { id: booking.id } })).deliverySentAt).toBeNull();
+    },
+  );
+
+  it('refuses fields it does not know, sending nothing', async () => {
+    const booking = await withLink();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/delivery/send`, { recipient: 'a@example.com', contactEmail: 'b@example.com' });
+
+    expect(res.status).toBe(400);
+    expect(await prisma.outbox.count({ where: { template: 'photo_delivery' } })).toBe(0);
+  });
+
   it('answers 409 no_link carrying the booking when nothing has been saved', async () => {
     const booking = await completedBooking();
 

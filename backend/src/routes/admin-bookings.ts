@@ -52,7 +52,7 @@ import { kigaliDate, parseOrReject } from './validation.js';
  *
  *   PUT  /bookings/:id/delivery       { url, expiresOn?, note? }
  *        200 { booking } | 404 | 409 not_allowed | 422
- *   POST /bookings/:id/delivery/send  200 | 404 | 409 not_allowed | 409 no_link
+ *   POST /bookings/:id/delivery/send  { recipient? }  200 | 404 | 409 not_allowed | 409 no_link | 422
  *
  * A 409 carries the booking as it now stands, so a screen acting on a stale
  * view -- a booking cancelled in another tab, a slot taken while he chose --
@@ -130,6 +130,22 @@ const deliveryBody = z.strictObject({
   /** Omitted, the API dates it: today plus `delivery_expiry_days` (spec A-8). */
   expiresOn: kigaliDate.optional(),
   note: storableText(1, DELIVERY_NOTE_MAX_LENGTH).nullable().optional(),
+});
+
+/**
+ * Sending the photos: optionally to another address, for this one email only
+ * (decided 2026-09-25). The booking's own contact email is never changed here.
+ */
+const emailFormat = z.email();
+const deliverySendBody = z.strictObject({
+  // A refinement, not z.email(): a mistyped address is a 422 the form can mark,
+  // not a 400 (routes/validation.ts; as public-bookings.ts does).
+  recipient: z
+    .string()
+    .trim()
+    .max(254)
+    .refine((value) => emailFormat.safeParse(value).success, 'Invalid email')
+    .optional(),
 });
 
 const refundBody = z.strictObject({
@@ -263,7 +279,11 @@ export function adminBookingsRouter(deps: AdminBookingsDeps): Router {
     const id = parseOrReject(rowId, req.params.id, res);
     if (id === undefined) return;
 
-    await answer(prisma, now, res, await sendDelivery({ prisma, now }, id), id);
+    // No body at all is the ordinary send, as it always was.
+    const body = parseOrReject(deliverySendBody, req.body ?? {}, res);
+    if (body === undefined) return;
+
+    await answer(prisma, now, res, await sendDelivery({ prisma, now }, id, { recipient: body.recipient }), id);
   });
 
   router.post('/payments/:id/refund', async (req, res) => {
