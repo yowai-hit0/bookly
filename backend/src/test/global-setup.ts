@@ -29,6 +29,8 @@ export default async function setup(): Promise<void> {
   execFileSync('npx', ['prisma', 'migrate', 'deploy'], {
     stdio: 'inherit',
     shell: process.platform === 'win32',
-    env: { ...process.env, DATABASE_URL: url },
+    // DIRECT_URL too: prisma.config.ts migrates through it when set, and left
+    // alone it would point this migration at the development database.
+    env: { ...process.env, DATABASE_URL: url, DIRECT_URL: url },
   });
 }

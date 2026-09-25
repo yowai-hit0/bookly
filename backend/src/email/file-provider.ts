@@ -7,7 +7,7 @@ import type { MailMessage, MailProvider, MailSendResult } from './provider.js';
  * Development delivery: each email is written to a folder as an `.html` file
  * and a `.txt` file instead of being sent, so its links can be clicked without
  * an email account (`MAIL_OUTPUT_DIR`, default `.mail/`, git-ignored because the
- * files hold live access links). Never used when `RESEND_API_KEY` is set, and
+ * files hold live access links). Never used when `RESEND_API_KEY` or `BREVO_API_KEY` is set, and
  * refused in production by `env.ts`.
  */
 export class FileMailProvider implements MailProvider {

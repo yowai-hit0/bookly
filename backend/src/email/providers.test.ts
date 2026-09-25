@@ -3,6 +3,7 @@ import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { BrevoMailProvider, parseSender } from './brevo.js';
 import { FileMailProvider } from './file-provider.js';
 import { createMailProvider } from './mailer.js';
 import { type MailMessage, MailRejectedError } from './provider.js';
@@ -187,6 +188,128 @@ describe('ResendMailProvider', () => {
   });
 });
 
+// --- Brevo ------------------------------------------------------------------------
+
+describe('BrevoMailProvider', () => {
+  it('POSTs the message to the Brevo transactional endpoint with the key and JSON', async () => {
+    const { impl, calls } = fakeFetch(() => json(201, { messageId: '<202609251200.123@smtp-relay.mailin.fr>' }));
+    const provider = new BrevoMailProvider({ apiKey: 'xkeysib-test', from: 'Bookly <bookings@bookly.example>', fetch: impl });
+
+    await expect(provider.send(MESSAGE)).resolves.toEqual({ providerMessageId: '<202609251200.123@smtp-relay.mailin.fr>' });
+
+    expect(calls).toHaveLength(1);
+    const [call] = calls;
+    expect(call?.url).toBe('https://api.brevo.com/v3/smtp/email');
+    expect(call?.init.method).toBe('POST');
+    expect(headersOf(call)).toEqual({
+      'api-key': 'xkeysib-test',
+      'content-type': 'application/json',
+      accept: 'application/json',
+    });
+    expect(bodyOf(call)).toEqual({
+      sender: { name: 'Bookly', email: 'bookings@bookly.example' },
+      to: [{ email: 'aline@example.com' }],
+      subject: MESSAGE.subject,
+      htmlContent: MESSAGE.html,
+      textContent: MESSAGE.text,
+    });
+  });
+
+  it('adds replyTo only when one is configured', async () => {
+    const { impl, calls } = fakeFetch(() => json(201, { messageId: 'x' }));
+    const provider = new BrevoMailProvider({
+      apiKey: 'k',
+      from: 'bookings@bookly.example',
+      replyTo: 'photographer@bookly.example',
+      fetch: impl,
+    });
+
+    await provider.send(MESSAGE);
+
+    expect(bodyOf(calls[0])).toMatchObject({ replyTo: { email: 'photographer@bookly.example' } });
+  });
+
+  it('passes the abort signal through to fetch', async () => {
+    const { impl, calls } = fakeFetch(() => json(201, { messageId: 'x' }));
+    const provider = new BrevoMailProvider({ apiKey: 'k', from: 'f@bookly.example', fetch: impl });
+    const controller = new AbortController();
+
+    await provider.send(MESSAGE, controller.signal);
+
+    expect(calls[0]?.init.signal).toBe(controller.signal);
+  });
+
+  it.each([
+    ['a body without a messageId', () => json(201, { ok: true })],
+    ['a non-string messageId', () => json(201, { messageId: 42 })],
+    ['a body that is not JSON', () => new Response('accepted', { status: 201 })],
+  ])('returns a null provider id for %s', async (_case, respond) => {
+    const { impl } = fakeFetch(respond);
+    const provider = new BrevoMailProvider({ apiKey: 'k', from: 'f@bookly.example', fetch: impl });
+
+    await expect(provider.send(MESSAGE)).resolves.toEqual({ providerMessageId: null });
+  });
+
+  it('throws MailRejectedError on 400, quoting the code and nothing of the message', async () => {
+    const { impl } = fakeFetch(() => json(400, { code: 'invalid_parameter', message: `email is not valid: ${MESSAGE.to}` }));
+    const provider = new BrevoMailProvider({ apiKey: 'xkeysib-secret', from: 'f@bookly.example', fetch: impl });
+
+    const error = await provider.send(MESSAGE).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(MailRejectedError);
+    expect((error as Error).message).toBe('Brevo answered 400 (invalid_parameter)');
+    expect((error as Error).message).not.toContain('xkeysib-secret');
+    expect((error as Error).message).not.toContain(MESSAGE.to);
+  });
+
+  it.each([401, 402, 403, 429, 500, 502, 503])('throws a retryable Error, not MailRejectedError, on %i', async (status) => {
+    const { impl } = fakeFetch(() => json(status, { code: 'unauthorized', message: 'try later' }));
+    const provider = new BrevoMailProvider({ apiKey: 'k', from: 'f@bookly.example', fetch: impl });
+
+    const error = await provider.send(MESSAGE).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(MailRejectedError);
+    expect((error as Error).message).toContain(`Brevo answered ${status}`);
+  });
+
+  it('does not quote a code that is not an error code', async () => {
+    const { impl } = fakeFetch(() => json(500, { code: `oops ${MESSAGE.to}` }));
+    const provider = new BrevoMailProvider({ apiKey: 'k', from: 'f@bookly.example', fetch: impl });
+
+    expect(((await provider.send(MESSAGE).catch((e: unknown) => e)) as Error).message).toBe('Brevo answered 500');
+  });
+
+  it('lets a network failure propagate as retryable', async () => {
+    const failing = vi.fn(async () => {
+      throw new TypeError('fetch failed');
+    }) as unknown as typeof fetch;
+    const provider = new BrevoMailProvider({ apiKey: 'k', from: 'f@bookly.example', fetch: failing });
+
+    const error = await provider.send(MESSAGE).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+  });
+});
+
+describe('parseSender', () => {
+  it.each([
+    ['Bookly <bookings@bookly.example>', { name: 'Bookly', email: 'bookings@bookly.example' }],
+    ['"Bookly Studio" <hello@bookly.example>', { name: 'Bookly Studio', email: 'hello@bookly.example' }],
+    ['  bookings@bookly.example ', { email: 'bookings@bookly.example' }],
+    ['<bookings@bookly.example>', { email: 'bookings@bookly.example' }],
+  ])('reads %s', (from, expected) => {
+    expect(parseSender(from)).toEqual(expected);
+  });
+
+  it.each(['Bookly', 'Bookly <not an address>', 'Bookly <a@b> trailing'])('refuses %s, naming MAIL_FROM', (from) => {
+    expect(() => parseSender(from)).toThrow(/MAIL_FROM/);
+  });
+
+  it('refuses a bad sender when the provider is built, not on first send', () => {
+    expect(() => new BrevoMailProvider({ apiKey: 'k', from: 'Bookly' })).toThrow(/MAIL_FROM/);
+  });
+});
+
 // --- File sink -------------------------------------------------------------------
 
 describe('FileMailProvider', () => {
@@ -274,6 +397,27 @@ describe('createMailProvider', () => {
     expect(calls).toHaveLength(1);
     expect(headersOf(calls[0]).authorization).toBe('Bearer re_env_key');
     expect(bodyOf(calls[0])).toMatchObject({ from: 'Bookly <bookings@bookly.example>', reply_to: 'photographer@bookly.example' });
+  });
+
+  it('uses Brevo when BREVO_API_KEY is set, with the configured sender and reply-to', async () => {
+    const { impl, calls } = fakeFetch(() => json(201, { messageId: 'brevo_from_env' }));
+    vi.stubGlobal('fetch', impl);
+
+    const provider = createMailProvider({
+      BREVO_API_KEY: 'xkeysib-env',
+      RESEND_API_KEY: undefined,
+      MAIL_FROM: 'Bookly <bookings@bookly.example>',
+      MAIL_REPLY_TO: 'photographer@bookly.example',
+      MAIL_OUTPUT_DIR: '.mail',
+    });
+
+    expect(provider).toBeInstanceOf(BrevoMailProvider);
+    await expect(provider.send(MESSAGE)).resolves.toEqual({ providerMessageId: 'brevo_from_env' });
+    expect(headersOf(calls[0])['api-key']).toBe('xkeysib-env');
+    expect(bodyOf(calls[0])).toMatchObject({
+      sender: { name: 'Bookly', email: 'bookings@bookly.example' },
+      replyTo: { email: 'photographer@bookly.example' },
+    });
   });
 
   it('omits reply_to when MAIL_REPLY_TO is unset', async () => {

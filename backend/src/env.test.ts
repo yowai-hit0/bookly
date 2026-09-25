@@ -59,6 +59,21 @@ describe('parseEnv: email (plan.md Task 15)', () => {
     expect(parseEnv({ ...valid, ...payments, NODE_ENV: 'production', RESEND_API_KEY: 're_live_key' }).RESEND_API_KEY).toBe('re_live_key');
   });
 
+  it('accepts BREVO_API_KEY in place of RESEND_API_KEY in production', () => {
+    const payments = { API_ORIGIN: 'https://api.bookly.example', MTN_MOMO_SUBSCRIPTION_KEY: 'k', MTN_MOMO_API_USER: 'u', MTN_MOMO_API_KEY: 'a' };
+    const env = parseEnv({ ...valid, ...payments, NODE_ENV: 'production', BREVO_API_KEY: 'xkeysib-live' });
+    expect(env.BREVO_API_KEY).toBe('xkeysib-live');
+    expect(env.RESEND_API_KEY).toBeUndefined();
+  });
+
+  it('names both keys when production has neither', () => {
+    expect(() => parseEnv({ ...valid, NODE_ENV: 'production' })).toThrow(/BREVO_API_KEY/);
+  });
+
+  it.each(['development', 'production'])('refuses both keys at once in %s, naming BREVO_API_KEY', (NODE_ENV) => {
+    expect(() => parseEnv({ ...valid, NODE_ENV, RESEND_API_KEY: 're_k', BREVO_API_KEY: 'xkeysib-k' })).toThrow(/BREVO_API_KEY.*not both/);
+  });
+
   it('reads the configured sender, reply-to and folder', () => {
     const env = parseEnv({
       ...valid,
