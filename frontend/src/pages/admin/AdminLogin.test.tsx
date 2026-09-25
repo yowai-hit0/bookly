@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -82,6 +82,43 @@ describe('AdminLogin', () => {
   // The reset page is reachable only from here. The page itself is tested in
   // AdminResetPassword.test.tsx; without this, nothing proved the way in exists
   // (the gap list's row 2, closed 2026-09-21 and checked here since).
+  it('wears the client top bar, without a link to itself, beside its own main', () => {
+    stubLogin(() => json(LOGIN_OK))
+    const { container } = render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/admin/login'] })} />)
+
+    const banner = screen.getByRole('banner')
+    expect(within(banner).getByRole('link', { name: 'Bookly' })).toHaveAttribute('href', '/')
+    expect(within(banner).getByRole('link', { name: 'Book now' })).toHaveAttribute('href', '/services')
+    expect(within(banner).queryByRole('link', { name: 'Admin login' })).not.toBeInTheDocument()
+    expect(banner.contains(screen.getByRole('main'))).toBe(false)
+    expect(container.querySelectorAll('main')).toHaveLength(1)
+    // No client footer: its links are for clients.
+    expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument()
+  })
+
+  it('opens with a skip link to the form, ahead of the top bar', () => {
+    stubLogin(() => json(LOGIN_OK))
+    renderLogin()
+
+    const skip = screen.getByRole('link', { name: 'Skip to content' })
+    expect(skip).toHaveAttribute('href', '#main-content')
+    expect(document.querySelector('a[href], button, input')).toBe(skip)
+    expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content')
+    expect(screen.getByRole('main')).toHaveAttribute('tabindex', '-1')
+  })
+
+  it('is reached from the client top bar', async () => {
+    stubLogin(() => json(LOGIN_OK))
+    const router = createMemoryRouter(routes, { initialEntries: ['/'] })
+    render(<RouterProvider router={router} />)
+
+    const user = userEvent.setup({ delay: null })
+    await user.click(within(screen.getByRole('banner')).getByRole('link', { name: 'Admin login' }))
+
+    expect(router.state.location.pathname).toBe('/admin/login')
+    expect(await screen.findByRole('heading', { name: 'Admin sign in' })).toBeInTheDocument()
+  })
+
   it('offers the way to the reset page, carrying nothing with it', async () => {
     stubLogin(() => json(LOGIN_OK))
     renderLogin()

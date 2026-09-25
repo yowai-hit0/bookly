@@ -33,9 +33,11 @@ This is not decoration. It is what keeps the keyboard journeys honest once a hea
 - `header` > one `nav[aria-label]`. `bg-card`, `border-b`, **not sticky** (a sticky bar over the slot picker and the payment form risks obscuring focus; static is the safe default, same reasoning as the admin top bar).
 - Inner row: `mx-auto max-w-6xl px-4`, `flex items-center justify-between gap-4`, `h-16`.
 - **Left: the wordmark**, `common:appName` (existing key), heading font, semibold, `text-lg`, wrapped in a `Link` to `/`. It is a link, not an `h1` — **the page's `h1` belongs to the page.** An `h1` here would make two on the landing page and would break `admin-bookings.spec.ts`-style unqualified level-1 lookups on the client side too.
-- **Right: one link**, "Book now" -> `/services`, styled as a `Button` (`asChild` on a `Link`), default variant, the one primary action in the bar.
-- **One link, not two.** "My booking" was designed to point at a tokenless lookup page where a client re-sends their own magic link. **No such endpoint exists** (checked 2026-09-21: the only resend is `POST /api/admin/bookings/:id/resend-link`, behind the admin session guard). **User decision, 2026-09-21: ship the shell without it** rather than invent an endpoint or fake the page. When a public resend endpoint exists, this bar grows a second link and the lookup page gets its own file. Tracked in `docs/redesign-pending.md`.
-- At 375px the wordmark and one button fit on one row with room to spare. No menu, no drawer, no hamburger: one link does not need disclosure, and a drawer is state, a focus trap and scroll lock — logic this branch does not add.
+- **Right: "Book now"** -> `/services`, styled as a `Button` (`asChild` on a `Link`), default variant, the one primary action in the bar.
+- **Before it: "Admin login"** -> `/admin/login` (`shell:nav.adminLogin`), `ghost` variant so it never competes with "Book now". Still a link, not a button. **User decision, 2026-09-25.** Labelled "Admin", not a bare "Log in": clients have no accounts, and a bare "Log in" would send them to a form that is not theirs.
+- The header is the exported `ClientHeader` (in `ClientShell.tsx`), so `/admin/login` wears the same bar (see below).
+- **No "My booking" link.** "My booking" was designed to point at a tokenless lookup page where a client re-sends their own magic link. **No such endpoint exists** (checked 2026-09-21: the only resend is `POST /api/admin/bookings/:id/resend-link`, behind the admin session guard). **User decision, 2026-09-21: ship the shell without it** rather than invent an endpoint or fake the page. When a public resend endpoint exists, this bar grows a second link and the lookup page gets its own file. Tracked in `docs/redesign-pending.md`.
+- At 375px the wordmark and both links fit on one row (checked 2026-09-25, no horizontal scroll). No menu, no drawer, no hamburger: one link does not need disclosure, and a drawer is state, a focus trap and scroll lock — logic this branch does not add.
 - **No radio inputs anywhere in the header.** `services.spec.ts` and `checkout.spec.ts` count radios page-wide.
 
 ## Footer
@@ -51,7 +53,7 @@ This is not decoration. It is what keeps the keyboard journeys honest once a hea
 
 ## Which routes it wraps
 
-All of them on the client side, including `*` (NotFound) — a visitor who mistypes a URL is exactly the visitor who most needs a way out. **`/admin/*` is untouched**: it has its own shell, and `/admin/login` and `/admin/reset-password` are deliberately bare.
+All of them on the client side, including `*` (NotFound) — a visitor who mistypes a URL is exactly the visitor who most needs a way out. **`/admin/*` is untouched**: it has its own shell, and `/admin/reset-password` is deliberately bare. **`/admin/login` wears the client header only (user decision, 2026-09-25)**, with the admin link hidden because it would point at itself. It gets no footer and stays outside the layout route.
 
 The checkout and booking pages get the shell too. They are reached from an email, and the header is the only thing on them that leads anywhere. It must not compete with the page's own action: static bar, one button, no second colour.
 

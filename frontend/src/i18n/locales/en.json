@@ -715,7 +715,8 @@
     "skipToContent": "Skip to content",
     "nav": {
       "label": "Main",
-      "bookNow": "Book now"
+      "bookNow": "Book now",
+      "adminLogin": "Admin login"
     },
     "footer": {
       "label": "Footer",

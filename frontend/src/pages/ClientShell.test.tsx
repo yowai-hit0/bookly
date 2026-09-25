@@ -52,16 +52,25 @@ describe('the client shell', () => {
     expect(target).toHaveAttribute('tabindex', '-1')
   })
 
-  it('carries one nav link, to the service list', () => {
+  it('carries the service list and the admin login, and nothing else', () => {
     renderShell()
 
     const banner = screen.getByRole('banner')
     expect(within(banner).getByRole('link', { name: 'Bookly' })).toHaveAttribute('href', '/')
     expect(within(banner).getByRole('link', { name: 'Book now' })).toHaveAttribute('href', '/services')
+    // Added 2026-09-25: the photographer's way into admin from the site.
+    expect(within(banner).getByRole('link', { name: 'Admin login' })).toHaveAttribute('href', '/admin/login')
     // "My booking" needs a public resend endpoint, which does not exist
     // (decided 2026-09-21). Until it does, the header must not offer it.
     expect(within(banner).queryByRole('link', { name: /my booking/i })).not.toBeInTheDocument()
-    expect(within(banner).getAllByRole('link')).toHaveLength(2)
+    expect(within(banner).getAllByRole('link')).toHaveLength(3)
+  })
+
+  it('puts the admin login before "Book now", so the primary action stays last in the bar', () => {
+    renderShell()
+
+    const links = within(screen.getByRole('banner')).getAllByRole('link').map((link) => link.textContent)
+    expect(links).toEqual(['Bookly', 'Admin login', 'Book now'])
   })
 
   it('adds no button and no form control anywhere: the e2e suite counts these page-wide', () => {

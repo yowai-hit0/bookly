@@ -13,11 +13,10 @@ import { SkipLink } from '@/components/ui/skip-link'
  * the e2e suite, and each page's landmark is its own. The container around the
  * outlet is a plain `div`, and it is the skip link's target.
  *
- * One nav link, not two. "My booking" was meant to lead to a page where a
- * client re-sends their own magic link, but no public endpoint exists to do it
- * (the only resend is admin-only, behind the session guard). Decided
- * 2026-09-21: ship the header without it rather than invent the endpoint or
- * fake the page.
+ * No "My booking" link. It was meant to lead to a page where a client re-sends
+ * their own magic link, but no public endpoint exists to do it (the only resend
+ * is admin-only, behind the session guard). Decided 2026-09-21: ship the header
+ * without it rather than invent the endpoint or fake the page.
  */
 
 export function ClientShell() {
@@ -27,24 +26,7 @@ export function ClientShell() {
     <div className="flex min-h-svh flex-col">
       <SkipLink targetId="main-content">{t('shell:skipToContent')}</SkipLink>
 
-      {/* Static, not sticky: a bar that follows the page can obscure focus over
-          the slot picker and the payment form. */}
-      <header className="bg-card border-b">
-        <nav
-          aria-label={t('shell:nav.label')}
-          className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4"
-        >
-          <Link
-            to="/"
-            className="font-heading rounded-sm text-lg font-semibold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-          >
-            {t('common:appName')}
-          </Link>
-          <Button asChild>
-            <Link to="/services">{t('shell:nav.bookNow')}</Link>
-          </Button>
-        </nav>
-      </header>
+      <ClientHeader />
 
       <div id="main-content" tabIndex={-1} className="flex-1 outline-none">
         <Outlet />
@@ -76,5 +58,46 @@ export function ClientShell() {
         </div>
       </footer>
     </div>
+  )
+}
+
+/**
+ * The client top bar: the wordmark home, the photographer's way into admin,
+ * and the one primary action. Also worn by `/admin/login` (decided 2026-09-25),
+ * which hides the admin link -- it would point at the page itself.
+ *
+ * The admin link is a quiet ghost, never a second primary: "Book now" is the
+ * action this bar exists for. It is a link, not a button: the e2e suite counts
+ * buttons page-wide.
+ */
+export function ClientHeader({ showAdminLogin = true }: { showAdminLogin?: boolean }) {
+  const { t } = useTranslation()
+
+  return (
+    // Static, not sticky: a bar that follows the page can obscure focus over
+    // the slot picker and the payment form.
+    <header className="bg-card border-b">
+      <nav
+        aria-label={t('shell:nav.label')}
+        className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4"
+      >
+        <Link
+          to="/"
+          className="font-heading rounded-sm text-lg font-semibold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          {t('common:appName')}
+        </Link>
+        <div className="flex items-center gap-2">
+          {showAdminLogin && (
+            <Button asChild variant="ghost">
+              <Link to="/admin/login">{t('shell:nav.adminLogin')}</Link>
+            </Button>
+          )}
+          <Button asChild>
+            <Link to="/services">{t('shell:nav.bookNow')}</Link>
+          </Button>
+        </div>
+      </nav>
+    </header>
   )
 }

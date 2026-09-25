@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { SkipLink } from '@/components/ui/skip-link'
+import { ClientHeader } from '@/pages/ClientShell'
 
 type Status = 'idle' | 'submitting' | 'invalid' | 'failed'
 
@@ -16,6 +18,10 @@ type LoginResponse = { token: string; expiresAt: string }
  * Email and password (spec A-11). The API answers an unknown email, a wrong
  * password and a locked account identically, so this page cannot and does not
  * tell them apart.
+ *
+ * It wears the client top bar (decided 2026-09-25), so a visitor who followed
+ * the header's admin link has the same way back out. Only the header: the
+ * footer's links are for clients.
  */
 export function AdminLogin() {
   const { t } = useTranslation()
@@ -53,51 +59,56 @@ export function AdminLogin() {
     status === 'invalid' ? t('admin:signIn.invalid') : status === 'failed' ? t('admin:signIn.failed') : null
 
   return (
-    <main className="mx-auto flex min-h-svh max-w-sm flex-col justify-center gap-4 p-6">
-      {/* The only place in admin where brand presence is appropriate. */}
-      <span className="font-heading text-foreground/80 self-center text-lg font-semibold">
-        {t('common:appName')}
-      </span>
-      <Card className="shadow-md">
-        <CardHeader>
-          <CardTitle>
-            <h1 className="text-xl">{t('admin:signIn.title')}</h1>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="admin-email">{t('admin:signIn.email')}</Label>
-              <Input id="admin-email" name="email" type="email" autoComplete="username" required />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="admin-password">{t('admin:signIn.password')}</Label>
-              <Input
-                id="admin-password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-              />
-            </div>
-            {message !== null && (
-              <p className="text-destructive text-sm" role="alert">
-                {message}
-              </p>
-            )}
-            <Button type="submit" className="w-full" disabled={status === 'submitting'}>
-              {status === 'submitting' ? t('admin:signIn.submitting') : t('admin:signIn.submit')}
-            </Button>
-            {/* The reset page asks for the address itself; this link carries nothing. */}
-            <Link
-              to="/admin/reset-password"
-              className="text-muted-foreground self-start text-sm underline-offset-4 hover:underline"
-            >
-              {t('admin:signIn.forgot')}
-            </Link>
-          </form>
-        </CardContent>
-      </Card>
-    </main>
+    <div className="flex min-h-svh flex-col">
+      <SkipLink targetId="main-content">{t('shell:skipToContent')}</SkipLink>
+      {/* The wordmark is the header's now, so none sits above the card. */}
+      <ClientHeader showAdminLogin={false} />
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-4 p-6 outline-none"
+      >
+        <Card className="shadow-md">
+          <CardHeader>
+            <CardTitle>
+              <h1 className="text-xl">{t('admin:signIn.title')}</h1>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="admin-email">{t('admin:signIn.email')}</Label>
+                <Input id="admin-email" name="email" type="email" autoComplete="username" required />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="admin-password">{t('admin:signIn.password')}</Label>
+                <Input
+                  id="admin-password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
+              {message !== null && (
+                <p className="text-destructive text-sm" role="alert">
+                  {message}
+                </p>
+              )}
+              <Button type="submit" className="w-full" disabled={status === 'submitting'}>
+                {status === 'submitting' ? t('admin:signIn.submitting') : t('admin:signIn.submit')}
+              </Button>
+              {/* The reset page asks for the address itself; this link carries nothing. */}
+              <Link
+                to="/admin/reset-password"
+                className="text-muted-foreground self-start text-sm underline-offset-4 hover:underline"
+              >
+                {t('admin:signIn.forgot')}
+              </Link>
+            </form>
+          </CardContent>
+        </Card>
+      </main>
+    </div>
   )
 }
