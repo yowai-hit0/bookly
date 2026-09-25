@@ -9,6 +9,7 @@ import { bookingLinks } from './templates/booking-links.js';
 import { emailChangeConfirm } from './templates/email-change-confirm.js';
 import { emailChangedNotice } from './templates/email-changed-notice.js';
 import { cancellation } from './templates/cancellation.js';
+import { clientNote } from './templates/client-note.js';
 import { paymentReceipt } from './templates/payment-receipt.js';
 import { photoDelivery } from './templates/photo-delivery.js';
 import { reschedule } from './templates/reschedule.js';
@@ -38,6 +39,7 @@ export const TEMPLATES: Record<EmailTemplate, AnyEmailTemplate> = {
   booking_links: bookingLinks,
   email_change_confirm: emailChangeConfirm,
   email_changed_notice: emailChangedNotice,
+  client_note: clientNote,
 };
 
 export type RenderOptions = {

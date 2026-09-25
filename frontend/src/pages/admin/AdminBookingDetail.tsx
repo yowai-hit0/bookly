@@ -6,6 +6,7 @@ import { type AdminBooking, type AdminPayment, bookingFromRefusal, bookingsApi }
 import { type AdminAddon, catalogueApi } from '@/admin/catalogue'
 import { kigaliDateOf } from '@/admin/calendar-dates'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -63,15 +64,21 @@ export function AdminBookingDetail() {
 
   /** Runs an action, then shows whatever the API says the booking now is. */
   async function act(action: () => Promise<{ booking: AdminBooking }>): Promise<void> {
-    if (busy) return
+    await attempt(action)
+  }
+
+  /** `act`, answering whether it worked, for a form that clears only on success. */
+  async function attempt(action: () => Promise<{ booking: AdminBooking }>): Promise<boolean> {
+    if (busy) return false
     setBusy(true)
     setFailure(null)
     try {
       setBooking((await action()).booking)
+      return true
     } catch (error) {
       if (error instanceof UnauthenticatedError) {
         void navigate('/admin/login', { replace: true })
-        return
+        return false
       }
       setFailure({ code: error instanceof ApiError ? error.message : 'failed' })
       // A refusal carries the booking it refused: that is how the screen
@@ -84,6 +91,7 @@ export function AdminBookingDetail() {
           if (fresh !== null) setBooking(fresh.booking)
         }
       }
+      return false
     } finally {
       setBusy(false)
     }
@@ -281,6 +289,16 @@ export function AdminBookingDetail() {
         </div>
       </Section>
 
+      {/* Once a client has a page to read them on (2026-09-25). */}
+      {booking.lifecycle.confirmedAt !== null && (
+        <Notes
+          booking={booking}
+          busy={busy}
+          onAdd={(note) => attempt(() => bookingsApi.addNote(booking.id, note))}
+          onDelete={(noteId) => act(() => bookingsApi.deleteNote(booking.id, noteId))}
+        />
+      )}
+
       <Section title={t('admin:booking.sections.messages')}>
         {booking.messages.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t('admin:booking.noMessages')}</p>
@@ -320,6 +338,110 @@ function Shell({ children }: { children: ReactNode }) {
       </Link>
       {children}
     </main>
+  )
+}
+
+/**
+ * Notes to the client (docs/prompts/client-access-and-admin-polish.md, item 8):
+ * shown on their booking page as "From your photographer", and emailed unless
+ * the box is unticked (it starts ticked: user decision, 2026-09-25). Plain
+ * text, up to 1000 characters. Deleting takes one from the client's page; an
+ * email already sent stays sent, and the confirm step says so.
+ */
+function Notes({
+  booking,
+  busy,
+  onAdd,
+  onDelete,
+}: {
+  booking: AdminBooking
+  busy: boolean
+  /** True when the note was saved: only then is the form cleared, so a failure keeps what was typed. */
+  onAdd: (note: { body: string; email: boolean }) => Promise<boolean>
+  onDelete: (noteId: string) => Promise<unknown>
+}) {
+  const { t } = useTranslation()
+  const fieldId = useId()
+  const [body, setBody] = useState('')
+  const [email, setEmail] = useState(true)
+  const [deleting, setDeleting] = useState<string | null>(null)
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const text = body.trim()
+    if (text === '' || busy) return
+    if (!(await onAdd({ body: text, email }))) return
+    setBody('')
+    setEmail(true)
+  }
+
+  return (
+    <Section title={t('admin:booking.notes.title')}>
+      <p className="text-muted-foreground text-sm">{t('admin:booking.notes.intro')}</p>
+      {booking.notes.length === 0 ? (
+        <p className="text-muted-foreground text-sm">{t('admin:booking.notes.none')}</p>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {booking.notes.map((note) => (
+            <li key={note.id} className="flex flex-col gap-1 border-b pb-3 text-sm last:border-b-0">
+              <p className="whitespace-pre-line wrap-anywhere">{note.body}</p>
+              <p className="text-muted-foreground text-xs">
+                {formatDateTime(note.createdAt)} · {t(note.emailed ? 'admin:booking.notes.emailed' : 'admin:booking.notes.pageOnly')}
+              </p>
+              {deleting === note.id ? (
+                <div className="flex flex-col gap-2 pt-1">
+                  <p className="text-sm font-medium">{t('admin:booking.notes.deleteConfirm')}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      aria-disabled={busy}
+                      onClick={() => {
+                        setDeleting(null)
+                        void onDelete(note.id)
+                      }}
+                    >
+                      {t('admin:booking.notes.deleteYes')}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setDeleting(null)}>
+                      {t('admin:booking.notes.keep')}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button variant="ghost" size="sm" className="text-destructive self-start" onClick={() => setDeleting(note.id)}>
+                  {t('admin:booking.notes.delete')}
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <form onSubmit={submit} className="flex flex-col gap-2 border-t pt-3">
+        <Label htmlFor={`${fieldId}body`}>{t('admin:booking.notes.label')}</Label>
+        <Textarea
+          id={`${fieldId}body`}
+          rows={3}
+          maxLength={1000}
+          value={body}
+          aria-describedby={`${fieldId}count`}
+          onChange={(event) => setBody(event.target.value)}
+        />
+        <p id={`${fieldId}count`} className="text-muted-foreground self-end text-xs tabular-nums">
+          {t('admin:booking.notes.count', { count: body.length })}
+        </p>
+        <div className="flex items-center gap-2">
+          <Checkbox id={`${fieldId}email`} checked={email} onCheckedChange={(value) => setEmail(value === true)} />
+          <Label htmlFor={`${fieldId}email`} className="font-normal">
+            {t('admin:booking.notes.email')}
+          </Label>
+        </div>
+        <Button type="submit" size="sm" className="self-start" aria-disabled={busy || body.trim() === ''}>
+          {t('admin:booking.notes.add')}
+        </Button>
+      </form>
+    </Section>
   )
 }
 

@@ -84,6 +84,7 @@ const BOOKING: AdminBooking = {
   lifecycle: { confirmedAt: '2026-10-01T06:05:00.000Z', completedAt: null, cancelledAt: null, cancellationReason: null },
   access: { hasLink: true, expiresAt: '2027-10-01T06:05:00.000Z', lastUsedAt: null },
   delivery: { url: null, expiresOn: null, sentAt: null, note: null },
+  notes: [],
   messages: [
     {
       id: 'm1',
@@ -1583,6 +1584,94 @@ describe('before the booking is marked completed', () => {
     await renderLoaded()
 
     expect(screen.queryByRole('heading', { level: 2, name: 'The photos' })).toBeNull()
+  })
+})
+
+describe('notes to the client (2026-09-25)', () => {
+  const NOTE = { id: 'n1', body: 'Bring a jacket.\nIt gets cold.', emailed: true, createdAt: '2026-10-02T08:00:00.000Z' }
+  const WITH_NOTE: AdminBooking = { ...BOOKING, notes: [NOTE] }
+
+  function notes() {
+    return section('Notes to the client')
+  }
+
+  it('lists the notes with when they were written and whether they were emailed', async () => {
+    stubApi({ booking: { ...BOOKING, notes: [NOTE, { ...NOTE, id: 'n2', body: 'Quiet one.', emailed: false }] } })
+    await renderLoaded()
+
+    expect(notes()).toHaveTextContent('Bring a jacket.')
+    expect(notes()).toHaveTextContent('Emailed')
+    expect(notes()).toHaveTextContent('On the page only')
+  })
+
+  it('adds a note, emailed by default, and clears the form', async () => {
+    const { sent } = stubApi({ onPost: (_call, current) => ((current.value = WITH_NOTE), json({ booking: WITH_NOTE })) })
+    await renderLoaded()
+
+    expect(within(notes()).getByRole('checkbox', { name: 'Also email it to the client' })).toBeChecked()
+    await user().type(within(notes()).getByLabelText('New note'), '  Bring a jacket.  ')
+    expect(notes()).toHaveTextContent('19 of 1000')
+    await user().click(within(notes()).getByRole('button', { name: 'Add the note' }))
+
+    await waitFor(() => expect(writes(sent)).toHaveLength(1))
+    expect(writes(sent)[0]).toEqual({ method: 'POST', url: `/api/admin/bookings/${BOOKING_ID}/notes`, body: { body: 'Bring a jacket.', email: true } })
+    await waitFor(() => expect(within(notes()).getByLabelText('New note')).toHaveValue(''))
+  })
+
+  it('keeps it to the page when unticked', async () => {
+    const { sent } = stubApi()
+    await renderLoaded()
+
+    await user().click(within(notes()).getByRole('checkbox', { name: 'Also email it to the client' }))
+    await user().type(within(notes()).getByLabelText('New note'), 'Quiet one.')
+    await user().click(within(notes()).getByRole('button', { name: 'Add the note' }))
+
+    await waitFor(() => expect(writes(sent)).toHaveLength(1))
+    expect(writes(sent)[0]?.body).toEqual({ body: 'Quiet one.', email: false })
+  })
+
+  it('keeps what was typed when the note could not be saved', async () => {
+    stubApi({ onPost: () => json({ error: 'failed' }, 500) })
+    await renderLoaded()
+
+    await user().type(within(notes()).getByLabelText('New note'), 'Do not lose me.')
+    await user().click(within(notes()).getByRole('button', { name: 'Add the note' }))
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(within(notes()).getByLabelText('New note')).toHaveValue('Do not lose me.')
+  })
+
+  it('sends nothing for an empty note', async () => {
+    const { sent } = stubApi()
+    await renderLoaded()
+
+    await user().click(within(notes()).getByRole('button', { name: 'Add the note' }))
+
+    expect(writes(sent)).toHaveLength(0)
+  })
+
+  it('deletes a note only after confirming, and keeps it on Keep it', async () => {
+    const { sent } = stubApi({ booking: WITH_NOTE, onPost: (_call, current) => ((current.value = BOOKING), json({ booking: BOOKING })) })
+    await renderLoaded()
+
+    await user().click(within(notes()).getByRole('button', { name: 'Delete' }))
+    expect(notes()).toHaveTextContent('An email already sent stays sent.')
+    await user().click(within(notes()).getByRole('button', { name: 'Keep it' }))
+    expect(writes(sent)).toHaveLength(0)
+
+    await user().click(within(notes()).getByRole('button', { name: 'Delete' }))
+    await user().click(within(notes()).getByRole('button', { name: 'Delete the note' }))
+
+    await waitFor(() => expect(writes(sent)).toHaveLength(1))
+    expect(writes(sent)[0]).toMatchObject({ method: 'DELETE', url: `/api/admin/bookings/${BOOKING_ID}/notes/n1` })
+    await waitFor(() => expect(notes()).toHaveTextContent('No notes yet.'))
+  })
+
+  it('is not offered before a client has a page to read it on', async () => {
+    stubApi({ booking: { ...BOOKING, lifecycle: { ...BOOKING.lifecycle, confirmedAt: null } } })
+    await renderLoaded()
+
+    expect(screen.queryByRole('heading', { level: 2, name: 'Notes to the client' })).not.toBeInTheDocument()
   })
 })
 

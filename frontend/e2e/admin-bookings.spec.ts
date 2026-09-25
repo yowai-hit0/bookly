@@ -79,6 +79,7 @@ function booking(id: string, reference: string, status: string, startsAt: string
     lifecycle: { confirmedAt: '2026-10-01T06:05:00.000Z', completedAt: null, cancelledAt: null, cancellationReason: null },
     access: { hasLink: true, expiresAt: '2027-10-01T06:05:00.000Z', lastUsedAt: null },
     delivery: { url: null, expiresOn: null, sentAt: null, note: null },
+    notes: [],
     messages: [],
     actions: { canReschedule: true, canCancel: true, canComplete: false, canMarkNoShow: false, canResendLink: true, canEditAddons: false, canRequestSessionFee: false, canEditDelivery: false, canSendDelivery: false },
   }

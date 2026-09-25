@@ -12,6 +12,7 @@ import {
 } from '../booking/admin-actions.js';
 import { ADDON_MAX_QUANTITY, type AddonEditResult, addPostShootAddon, removePostShootAddon } from '../booking/addons.js';
 import { type DeliveryResult, saveDelivery, sendDelivery } from '../booking/delivery.js';
+import { NOTE_MAX_LENGTH, addNote, deleteNote } from '../booking/notes.js';
 import { BOOKINGS_MAX_PAGE_SIZE, findBookings } from '../booking/admin-list.js';
 import { type AdminBooking, adminBookingView, findAdminBooking } from '../booking/admin-view.js';
 import { BOOKING_STAGES } from '../booking/stage.js';
@@ -54,6 +55,8 @@ import { kigaliDate, parseOrReject } from './validation.js';
  *   PUT  /bookings/:id/delivery       { url, expiresOn?, note? }
  *        200 { booking } | 404 | 409 not_allowed | 422
  *   POST /bookings/:id/delivery/send  { recipient? }  200 | 404 | 409 not_allowed | 409 no_link | 422
+ *   POST /bookings/:id/notes  { body, email? }  200 | 404 | 409 not_allowed | 422   (2026-09-25)
+ *   DELETE /bookings/:id/notes/:noteId          200 | 404
  *
  * A 409 carries the booking as it now stands, so a screen acting on a stale
  * view -- a booking cancelled in another tab, a slot taken while he chose --
@@ -152,6 +155,12 @@ const deliverySendBody = z.strictObject({
     .max(254)
     .refine((value) => emailFormat.safeParse(value).success, 'Invalid email')
     .optional(),
+});
+
+/** A note to the client: plain text; emailed unless the photographer unticks it (2026-09-25). */
+const noteBody = z.strictObject({
+  body: storableText(1, NOTE_MAX_LENGTH),
+  email: z.boolean().default(true),
 });
 
 const refundBody = z.strictObject({
@@ -292,6 +301,24 @@ export function adminBookingsRouter(deps: AdminBookingsDeps): Router {
     if (body === undefined) return;
 
     await answer(prisma, now, res, await sendDelivery({ prisma, now }, id, { recipient: body.recipient }), id);
+  });
+
+  router.post('/bookings/:id/notes', async (req, res) => {
+    const id = parseOrReject(rowId, req.params.id, res);
+    if (id === undefined) return;
+    const body = parseOrReject(noteBody, req.body ?? {}, res);
+    if (body === undefined) return;
+
+    await answer(prisma, now, res, await addNote({ prisma, now }, id, body), id);
+  });
+
+  router.delete('/bookings/:id/notes/:noteId', async (req, res) => {
+    const id = parseOrReject(rowId, req.params.id, res);
+    if (id === undefined) return;
+    const noteId = parseOrReject(rowId, req.params.noteId, res);
+    if (noteId === undefined) return;
+
+    await answer(prisma, now, res, await deleteNote({ prisma, now }, id, noteId), id);
   });
 
   router.post('/payments/:id/refund', async (req, res) => {

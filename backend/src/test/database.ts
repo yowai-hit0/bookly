@@ -38,6 +38,8 @@ export function databaseName(databaseUrl: string): string {
 
 /** Every application table, children first, for TRUNCATE ... CASCADE. */
 export const APPLICATION_TABLES = [
+  // A booking's notes to its client (2026-09-25).
+  'booking_note',
   'booking_addon',
   'payment',
   'webhook_event',

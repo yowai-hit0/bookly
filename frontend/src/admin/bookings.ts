@@ -113,6 +113,8 @@ export type AdminBooking = {
   lifecycle: { confirmedAt: string | null; completedAt: string | null; cancelledAt: string | null; cancellationReason: string | null }
   access: { hasLink: boolean; expiresAt: string | null; lastUsedAt: string | null }
   delivery: { url: string | null; expiresOn: string | null; sentAt: string | null; note: string | null }
+  /** The photographer's notes to the client, newest first (2026-09-25). */
+  notes: { id: string; body: string; emailed: boolean; createdAt: string }[]
   messages: {
     id: string
     kind: string
@@ -202,6 +204,16 @@ export const bookingsApi = {
 
   removeAddon(bookingId: string, addonId: string): Promise<{ booking: AdminBooking }> {
     return adminFetch<{ booking: AdminBooking }>(`/admin/bookings/${bookingId}/addons/${addonId}`, { method: 'DELETE' })
+  },
+
+  /** A note to the client: on their booking page, and emailed unless `email` is false (2026-09-25). */
+  addNote(bookingId: string, note: { body: string; email: boolean }): Promise<{ booking: AdminBooking }> {
+    return post(`/admin/bookings/${bookingId}/notes`, note)
+  },
+
+  /** Hides a note from the client's page. An email already sent stays sent. */
+  deleteNote(bookingId: string, noteId: string): Promise<{ booking: AdminBooking }> {
+    return adminFetch<{ booking: AdminBooking }>(`/admin/bookings/${bookingId}/notes/${noteId}`, { method: 'DELETE' })
   },
 
   /** Asks the client for what is outstanding, and emails them a link (spec §3.5 step 3). */

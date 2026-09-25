@@ -11,7 +11,7 @@ import {
   insertPayment,
   seedWorld,
 } from '../test/payment-fixtures.js';
-import type { AccessedBooking } from './access.js';
+import { type AccessedBooking, FULL_BOOKING } from './access.js';
 import { canCancel, clientBookingView } from './client-view.js';
 import { saveDelivery, sendDelivery } from './delivery.js';
 
@@ -58,12 +58,9 @@ beforeEach(async () => {
 
 // --- Helpers ----------------------------------------------------------------------------
 
-/** The booking as `findBookingByToken` hands it over: add-ons and payments included. */
+/** The booking as `findBookingByToken` hands it over, with its own include. */
 async function accessed(bookingId: string): Promise<AccessedBooking> {
-  return prisma.booking.findUniqueOrThrow({
-    where: { id: bookingId },
-    include: { addons: true, payments: { orderBy: { initiatedAt: 'asc' } } },
-  });
+  return prisma.booking.findUniqueOrThrow({ where: { id: bookingId }, include: FULL_BOOKING });
 }
 
 async function viewOf(bookingId: string, now: Date = NOW) {
@@ -141,6 +138,8 @@ describe('the whole view', () => {
       cancelledAt: null,
       sessionFee: { outstandingRwf: 48_000, waitingPayment: null },
       delivery: null,
+      // Nothing sent, no notes, the shoot still ahead (2026-09-25).
+      notices: [],
     });
   });
 

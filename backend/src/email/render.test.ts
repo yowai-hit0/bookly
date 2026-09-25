@@ -347,6 +347,8 @@ describe('links point at WEB_ORIGIN, never at the API host', () => {
         'cancellation (by client)',
         // To the old address after an email change: it must not get a way into the booking.
         'email_changed_notice',
+        // A photographer's note: no token plaintext exists to link with.
+        'client_note',
       ].sort(),
     );
   });
@@ -408,6 +410,7 @@ describe('escaping', () => {
     ['booking_links', 'clientName', HOSTILE],
     ['email_change_confirm', 'newEmail', HOSTILE],
     ['email_changed_notice', 'newEmail', HOSTILE],
+    ['client_note', 'body', HOSTILE],
     ['admin_alert payment_received', 'clientName', HOSTILE],
     ['admin_alert retries_exhausted', 'lastError', HOSTILE],
     ['admin_alert refund_due', 'paymentReference', HOSTILE],

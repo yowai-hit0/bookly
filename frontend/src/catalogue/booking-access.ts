@@ -32,6 +32,21 @@ export const CLIENT_STAGES = [
 
 export type ClientStage = (typeof CLIENT_STAGES)[number]
 
+/**
+ * One thing that happened to the booking, as its page lists them (2026-09-25):
+ * built by the API from what it sent the client, with only the fields each
+ * kind needs, and the photographer's notes. Newest first.
+ */
+export type ClientNotice = { id: string; at: string } & (
+  | { kind: 'reschedule'; data: { startsAt: string; endsAt: string; previousStartsAt: string; previousEndsAt: string } }
+  | { kind: 'session_fee_request'; data: { amountRwf: number } }
+  | { kind: 'payment_receipt'; data: { amountRwf: number } }
+  | { kind: 'photo_delivery'; data: Record<string, never> }
+  | { kind: 'cancelled_by_photographer'; data: Record<string, never> }
+  | { kind: 'balance_due'; data: { amountRwf: number } }
+  | { kind: 'note'; data: { body: string } }
+)
+
 export type ClientBooking = {
   reference: string
   status: string
@@ -67,6 +82,7 @@ export type ClientBooking = {
   cancelledAt: string | null
   sessionFee: { outstandingRwf: number; waitingPayment: { ourRef: string } | null } | null
   delivery: { url: string | null; expiresOn: string | null; expired: boolean; note: string | null } | null
+  notices: ClientNotice[]
 }
 
 /** Where a client's booking lives. The emails link here (`BOOKING_PAGE_PATH` on the API). */

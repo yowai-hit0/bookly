@@ -137,6 +137,11 @@ export const EMAIL_FIXTURES: readonly EmailFixture[] = [
     payload: { ...basics, accessToken: FIXTURE_ACCESS_TOKEN },
   },
   {
+    name: 'client_note',
+    template: 'client_note',
+    payload: { ...basics, body: 'Please bring a jacket: it gets cold up there.\nSee you at 09:30.' },
+  },
+  {
     name: 'email_change_confirm',
     template: 'email_change_confirm',
     payload: { ...basics, newEmail: 'aline.new@example.com', confirmToken: FIXTURE_CONFIRM_TOKEN },

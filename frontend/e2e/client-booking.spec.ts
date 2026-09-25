@@ -41,6 +41,7 @@ function bookingBody(mock: Mock) {
       clientName: 'Aline Uwase',
       maskedEmail: 'a•••••@example.com',
       pendingMaskedEmail: null,
+      notices: [],
       ...WHEN,
       serviceName: 'Portraits',
       packageName: 'Standard',

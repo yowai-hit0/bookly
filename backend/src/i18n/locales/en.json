@@ -111,6 +111,12 @@
       "intro": "Here is a new link to your booking for {{service}} on {{date}}.",
       "oldLinks": "Any link we sent you before no longer works. Keep this email, and please do not share the link."
     },
+    "clientNote": {
+      "subject": "A message about your booking ({{reference}})",
+      "preheader": "Your photographer wrote to you.",
+      "heading": "A message from your photographer",
+      "alsoOnPage": "You will also find this message on your booking page."
+    },
     "emailChangeConfirm": {
       "subject": "Confirm your new email ({{reference}})",
       "preheader": "One click to use this address for your booking.",
@@ -167,6 +173,7 @@
         "booking_links": "Booking links the client asked for",
         "email_change_confirm": "Confirmation link to a new client email",
         "email_changed_notice": "Notice to an old client email",
+        "client_note": "Your message to the client",
           "admin_alert": "Alert to you",
           "gcal_create": "Adding the booking to your Google Calendar",
           "gcal_update": "Updating the booking in your Google Calendar",

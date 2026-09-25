@@ -56,6 +56,7 @@ const BOOKING: ClientBooking = {
   cancelledAt: null,
   sessionFee: { outstandingRwf: 30_000, waitingPayment: null },
   delivery: null,
+  notices: [],
 }
 
 /** The same booking, paid in full: nothing outstanding, so no payment control. */
@@ -300,6 +301,92 @@ describe('remembering the link on this device', () => {
     renderAt()
 
     expect(await screen.findByText(REFERENCE)).toBeInTheDocument()
+  })
+})
+
+// --- Notices (2026-09-25) ------------------------------------------------------------------
+
+describe('the notices', () => {
+  const NOTICES: ClientBooking['notices'] = [
+    { id: 'note:n1', kind: 'note', at: '2026-10-06T10:00:00.000Z', data: { body: 'Bring a jacket.\nIt gets cold <b>up there</b>.' } },
+    { id: 'balance:30000', kind: 'balance_due', at: '2026-10-05T10:00:00.000Z', data: { amountRwf: 30_000 } },
+    {
+      id: 'outbox:o1',
+      kind: 'reschedule',
+      at: '2026-10-04T10:00:00.000Z',
+      data: {
+        startsAt: '2026-10-09T07:00:00.000Z',
+        endsAt: '2026-10-09T08:30:00.000Z',
+        previousStartsAt: '2026-10-07T07:30:00.000Z',
+        previousEndsAt: '2026-10-07T09:00:00.000Z',
+      },
+    },
+  ]
+
+  function withNotices(notices = NOTICES) {
+    return stubApi({ booking: () => json({ booking: { ...BOOKING, notices } }) })
+  }
+
+  function region() {
+    return within(screen.getByRole('region', { name: 'Updates about your booking' }))
+  }
+
+  it('lists them newest first, in words, with the photographer\u2019s note as plain text', async () => {
+    withNotices()
+    await renderLoaded()
+
+    const items = region().getAllByRole('listitem')
+    expect(items.map((item) => item.textContent)).toEqual([
+      expect.stringContaining('From your photographer: Bring a jacket.'),
+      expect.stringContaining('30,000 RWF is still to pay.'),
+      expect.stringContaining('Your session was moved to Friday, 9 October 2026, 09:00 to 10:30 (Kigali time).'),
+    ])
+    // Typed markup stays text.
+    expect(items[0]?.querySelector('b')).toBeNull()
+    expect(items[0]).toHaveTextContent('It gets cold <b>up there</b>.')
+    expect(region().getByRole('link', { name: 'Pay now' })).toHaveAttribute('href', '#pay')
+  })
+
+  it('hides one when closed, and remembers it on this device', async () => {
+    withNotices()
+    await renderLoaded()
+
+    await user().click(within(region().getAllByRole('listitem')[2] as HTMLElement).getByRole('button', { name: 'Dismiss' }))
+
+    expect(region().getAllByRole('listitem')).toHaveLength(2)
+    expect(JSON.parse(localStorage.getItem(`bookly.notices.${REFERENCE}`) ?? '{}')['outbox:o1']).toMatchObject({ dismissed: true })
+  })
+
+  it('stops showing a notice a day after it was first seen here, but never the money still owed', async () => {
+    const aDayAgo = Date.now() - 24 * 60 * 60_000 - 1000
+    localStorage.setItem(
+      `bookly.notices.${REFERENCE}`,
+      JSON.stringify({ 'note:n1': { firstSeenAt: aDayAgo }, 'balance:30000': { firstSeenAt: aDayAgo }, 'outbox:o1': { firstSeenAt: aDayAgo } }),
+    )
+    withNotices()
+    await renderLoaded()
+
+    expect(region().getAllByRole('listitem').map((item) => item.textContent)).toEqual([expect.stringContaining('30,000 RWF is still to pay.')])
+  })
+
+  it('renders nothing when there is nothing to show', async () => {
+    withNotices([])
+    await renderLoaded()
+
+    expect(screen.queryByRole('region', { name: 'Updates about your booking' })).not.toBeInTheDocument()
+  })
+
+  it('still shows them when storage cannot be used', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked')
+    })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked')
+    })
+    withNotices()
+    await renderLoaded()
+
+    expect(region().getAllByRole('listitem')).toHaveLength(3)
   })
 })
 

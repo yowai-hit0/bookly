@@ -19,6 +19,7 @@ export const ADMIN_BOOKING_INCLUDE = {
   addons: { orderBy: [{ stage: 'asc' }, { createdAt: 'asc' }] },
   payments: { orderBy: { initiatedAt: 'asc' } },
   outbox: { orderBy: { createdAt: 'asc' } },
+  notes: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
 } satisfies Prisma.BookingInclude;
 
 export type AdminBooking = Prisma.BookingGetPayload<{ include: typeof ADMIN_BOOKING_INCLUDE }>;
@@ -51,6 +52,8 @@ export type AdminBookingView = {
   delivery: { url: string | null; expiresOn: string | null; sentAt: string | null; note: string | null };
   /** The per-booking message history (data-model_v2.md §5.13, spec P-28). */
   messages: { id: string; kind: string; template: string | null; recipient: string | null; status: string; attempts: number; lastError: string | null; createdAt: string; completedAt: string | null }[];
+  /** The photographer's notes to the client, newest first; deleted ones are gone from here (2026-09-25). */
+  notes: { id: string; body: string; emailed: boolean; createdAt: string }[];
   /** What the photographer may do to it now. The API enforces these again. */
   actions: {
     canReschedule: boolean;
@@ -165,6 +168,7 @@ export function adminBookingView(booking: AdminBooking, now: Date): AdminBooking
       sentAt: booking.deliverySentAt?.toISOString() ?? null,
       note: booking.deliveryNote,
     },
+    notes: booking.notes.map((note) => ({ id: note.id, body: note.body, emailed: note.emailed, createdAt: note.createdAt.toISOString() })),
     messages: booking.outbox.map((message) => ({
       id: message.id,
       kind: message.kind,

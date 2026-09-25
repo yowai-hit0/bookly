@@ -585,6 +585,21 @@
         "request": "Request {{amount}} session fee",
         "note": "Emails the client the amount and a fresh link to pay it. The amount is fixed when you ask, so add every add-on first."
       },
+      "notes": {
+        "title": "Notes to the client",
+        "intro": "The client sees these on their booking page, from \"your photographer\".",
+        "none": "No notes yet.",
+        "label": "New note",
+        "count": "{{count}} of 1000",
+        "email": "Also email it to the client",
+        "add": "Add the note",
+        "emailed": "Emailed",
+        "pageOnly": "On the page only",
+        "delete": "Delete",
+        "deleteConfirm": "Delete this note? It disappears from the client's page. An email already sent stays sent.",
+        "deleteYes": "Delete the note",
+        "keep": "Keep it"
+      },
       "delivery": {
         "url": "Link to the photos",
         "expires": "Link expires",
@@ -694,6 +709,18 @@
       "title": "This link is not valid",
       "body": "Check that you opened the whole link from your email. If it has been replaced, use the most recent email we sent you.",
       "getNewLink": "Get a new link by email"
+    },
+    "notices": {
+      "label": "Updates about your booking",
+      "dismiss": "Dismiss",
+      "reschedule": "Your session was moved to {{date}}, {{start}} to {{end}} (Kigali time).",
+      "sessionFeeRequest": "The photographer asked you to pay {{amount}}.",
+      "paymentReceipt": "We received your payment of {{amount}}. Thank you.",
+      "photoDelivery": "Your photos are ready. We emailed you the link, and it is on this page too.",
+      "cancelledByPhotographer": "The photographer cancelled this booking.",
+      "balanceDue": "{{amount}} is still to pay.",
+      "payNow": "Pay now",
+      "fromPhotographer": "From your photographer:"
     },
     "contact": {
       "title": "Your email",

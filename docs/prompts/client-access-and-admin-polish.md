@@ -281,3 +281,16 @@ All eight items are merged on the branch with tests. The four suites pass (backe
 typecheck and lint). The design files record the reversed decisions and the new stages. Screenshots at 375 px and
 1280 px show the header, `/my-booking`, the skeletons, the delivery confirm step, both status legends open, the
 client notices and the admin notes section.
+
+## As built (2026-09-25)
+
+All eight items are on `feat/client-access`, one commit each. Where the build differs from the text above:
+
+- **Item 1:** the placeholder cards have no image block: no service has a cover image, and `services.md` forbids an empty top band.
+- **Item 4:** the per-IP limit is 20 requests an hour (not 10), so visitors behind one shared address are not cut off. The `booking_links` email is stored with no `booking_id`, because it is about an address and may cover several bookings.
+- **Item 5:** below `sm` the header's "Admin login" moves to the footer (user decision): four items do not fit at 375 px.
+- **Item 6:** the booking page never carries a full email (user decision): the API sends `maskedEmail` and `pendingMaskedEmail` (`a•••••@example.com`), and the 202 no longer echoes the typed address. The `/email-confirm/:token` page confirms on a **button**, never on load, because mail scanners open links.
+- **Item 7:** old `?status=` links open on the stages their status now spans.
+- **Item 8:** the admin section is titled "Notes to the client", to keep it apart from the existing "Messages sent". A note is refused (409) on a booking that was never confirmed. The client-note email carries no link, because no token plaintext exists to link with.
+- **Deploy:** three new migrations (`booking_links_email`, `contact_email_change`, `booking_notes`, all `20260925…`) need `prisma migrate deploy` against the production database before the new API starts.
+

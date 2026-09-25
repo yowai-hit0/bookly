@@ -24,6 +24,7 @@ import { reportError } from '@/lib/report-error'
 import { forgetBookingToken, rememberBookingToken } from '@/lib/stored-booking'
 import { cn } from '@/lib/utils'
 import { StageLegend } from '@/pages/StageLegend'
+import { Notices } from './Notices'
 import { PaymentFields } from '@/pages/checkout/PaymentFields'
 
 /**
@@ -169,6 +170,9 @@ function BookingView({ token, booking: loadedBooking, methods, onMissing, onRelo
             <StageLegend audience="client" />
           </span>
         </div>
+
+        {/* What has happened since, newest first (2026-09-25). */}
+        <Notices reference={booking.reference} notices={booking.notices} />
 
         <dl className="bg-card flex flex-col gap-2 rounded-xl border p-4 text-sm shadow-sm">
           <Line term={t('booking:labels.reference')} className="items-baseline">
@@ -534,7 +538,8 @@ function SessionFee({ token, booking, methods, onMissing, onReload }: SessionFee
   }
 
   return (
-    <section className="bg-card flex flex-col gap-4 rounded-xl border p-4 shadow-sm">
+    // `#pay`: where a "still to pay" notice leads (2026-09-25).
+    <section id="pay" className="bg-card flex scroll-mt-4 flex-col gap-4 rounded-xl border p-4 shadow-sm">
       <div className="flex flex-col gap-1">
         <h2 className="text-lg font-semibold">{t('booking:sessionFee.title')}</h2>
         <p className="text-sm">{t('booking:sessionFee.intro', { amount })}</p>

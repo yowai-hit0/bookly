@@ -6,6 +6,7 @@ import { createPrismaClient } from '../db/client.js';
 import { renderEmail } from '../email/render.js';
 import { connect, firstRow, sqlstateOf, testDatabaseUrl, truncateAll } from '../test/database.js';
 import { CLIENT, type PaymentWorld, insertBooking, insertPayment, seedWorld } from '../test/payment-fixtures.js';
+import { FULL_BOOKING } from './access.js';
 import { adminBookingView, findAdminBooking } from './admin-view.js';
 import { clientBookingView } from './client-view.js';
 import { saveDelivery, sendDelivery } from './delivery.js';
@@ -748,10 +749,7 @@ describe('nothing counts downloads', () => {
     const booking = await completedBooking();
     await saveDelivery(deps(), booking.id, { url: LINK, note: NOTE });
     await sendDelivery(deps(), booking.id);
-    const accessed = await prisma.booking.findUniqueOrThrow({
-      where: { id: booking.id },
-      include: { addons: true, payments: { orderBy: { initiatedAt: 'asc' } } },
-    });
+    const accessed = await prisma.booking.findUniqueOrThrow({ where: { id: booking.id }, include: FULL_BOOKING });
 
     const view = clientBookingView(accessed, NOW);
 

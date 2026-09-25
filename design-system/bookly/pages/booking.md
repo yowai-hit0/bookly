@@ -25,6 +25,15 @@ The client opens this from an email, usually on a phone. The token in the URL is
 
 Cards: one visual definition shared with the rest of the app (see MASTER "Card surface").
 
+## Notices (2026-09-25, user decisions; prompt item 8)
+
+Under the title and pill, above the booking facts (`Notices.tsx`): a list, newest first, of what has happened, as the API builds it from what it sent the client (`backend/src/booking/notices.ts`: moved, a fee asked for, a payment received, photos sent, cancelled by the photographer), money still owed once the shoot is done ("33,000 RWF is still to pay. Pay now", linking to `#pay`), and the photographer's notes ("From your photographer:", plain text, line breaks kept).
+
+- Each is a small card: an icon, one sentence, when, and a ghost "Dismiss" (X) button.
+- Shown until dismissed, or until a day after this device first showed it, remembered in `localStorage` per booking reference. **Money still owed is never hidden by time**, only by dismissing it, and a new amount shows again.
+- Nothing to show: nothing renders, no empty box.
+- The API copies only each kind's own fields; no email payload reaches the page (several hold a link token).
+
 ## Your email (2026-09-25, user decisions; prompt item 6)
 
 A card after the booking facts and amounts (`ContactEmail` in `BookingPage.tsx`), only while the booking is `confirmed` or `completed`: an `h2` "Your email", one line "We write to a•••••@example.com about this booking.", and an outline `sm` "Change email" that opens an inline form (New email, a hint that nothing changes until the new address uses our link, **Send the link** default `sm`, **Keep this email** outline `sm`).

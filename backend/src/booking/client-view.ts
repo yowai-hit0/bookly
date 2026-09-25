@@ -1,6 +1,7 @@
 import { kigaliDateOf } from '../availability/engine.js';
 import type { AccessedBooking } from './access.js';
 import { maskEmail, pendingMaskedEmailOf } from './email-change.js';
+import { type ClientNotice, clientNotices } from './notices.js';
 import { type ClientStage, bookingStage } from './stage.js';
 import { bookingTotals } from './totals.js';
 
@@ -61,6 +62,8 @@ export type ClientBookingView = {
   sessionFee: { outstandingRwf: number; waitingPayment: { ourRef: string } | null } | null;
   /** Present once the photographer has sent the photos (spec §3.9, §6.20). */
   delivery: { url: string | null; expiresOn: string | null; expired: boolean; note: string | null } | null;
+  /** What has happened since, newest first (2026-09-25; `notices.ts`). */
+  notices: ClientNotice[];
 };
 
 export function clientBookingView(booking: AccessedBooking, now: Date): ClientBookingView {
@@ -106,6 +109,16 @@ export function clientBookingView(booking: AccessedBooking, now: Date): ClientBo
         ? { outstandingRwf: totals.outstandingRwf, waitingPayment: waiting === undefined ? null : { ourRef: waiting.ourRef } }
         : null,
     delivery: deliveryOf(booking, now),
+    notices: clientNotices({
+      outbox: booking.outbox,
+      notes: booking.notes,
+      // Money still owed once the shoot is done: before then it is the session fee the page already asks for.
+      balance: {
+        outstandingRwf: totals.outstandingRwf,
+        showing: ['completed', 'closed'].includes(bookingStage(booking, now, 'client')),
+        since: booking.completedAt ?? booking.endsAt,
+      },
+    }),
   };
 }
 

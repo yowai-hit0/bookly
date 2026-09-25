@@ -56,6 +56,7 @@ const BOOKING: ClientBooking = {
   cancelledAt: null,
   sessionFee: { outstandingRwf: 30_000, waitingPayment: null },
   delivery: null,
+  notices: [],
 }
 
 type FetchArgs = [input: string | URL | Request, init?: RequestInit]

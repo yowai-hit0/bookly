@@ -26,7 +26,7 @@ beforeEach(async () => {
 
 // --- Fixtures ---------------------------------------------------------------
 
-const APPLICATION_TABLE_COUNT = 13;
+const APPLICATION_TABLE_COUNT = 14;
 
 async function insertCatalogue() {
   const service = await db.query<{ id: string }>(
@@ -88,7 +88,7 @@ const NOON = '2026-10-07T10:00:00Z';
 // --- Shape ------------------------------------------------------------------
 
 describe('the schema', () => {
-  it('has 13 application tables plus Prisma migration history, and no view', async () => {
+  it('has 14 application tables (booking_note since 2026-09-25) plus Prisma migration history, and no view', async () => {
     const tables = await db.query<{ tablename: string }>(
       `SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`,
     );

@@ -78,9 +78,9 @@ describe('outbox_template_allowed and the templates', () => {
     }
   });
 
-  it('there are twelve: the nine of spec §4.1 and the three client-access emails (2026-09-25)', () => {
-    expect(templateFiles()).toHaveLength(12);
-    expect(EMAIL_TEMPLATES).toHaveLength(12);
+  it('there are thirteen: the nine of spec §4.1 and the four client-access emails (2026-09-25)', () => {
+    expect(templateFiles()).toHaveLength(13);
+    expect(EMAIL_TEMPLATES).toHaveLength(13);
   });
 });
 

@@ -34,6 +34,8 @@ Sent / unsent line; URL input (`type="url"`), expiry date input (`w-44`) with it
 
 **Confirm step (2026-09-25, user request).** Send / Send again no longer sends: it opens an inline step below the form (`ConfirmRecipient`, the cancel form's pattern, no modal) with "Send the photo link to:" and an email input prefilled with the booking's contact email, then **Send now** (default `sm`) and **Back** (outline `sm`). A changed address goes to the API as `recipient` and is used **for that one email only**; the booking keeps its contact email. The Messages list names a recipient (" · to …") only when it differs from the booking's address.
 
+**Notes to the client (2026-09-25, prompt item 8).** A section before Messages sent, once the booking has been confirmed: the notes newest first (text with its line breaks, when, "Emailed" or "On the page only", and a ghost red Delete with an inline confirm that says an email already sent stays sent), then a form: New note (textarea, `maxLength` 1000, a live "n of 1000"), **Also email it to the client** (a checkbox, ticked by default: user decision), and **Add the note** (default `sm`). The form clears only when the note is saved. The client sees each note on their booking page as "From your photographer" until a photographer profile exists.
+
 **Before completion (2026-09-25).** On a `confirmed` booking whose shoot has begun, the Delivery section appears with one muted line, "Photo delivery opens once you mark this booking completed.", so the photographer can find where the link will go.
 
 ## Actions section (destructive care)

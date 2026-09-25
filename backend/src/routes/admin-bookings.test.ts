@@ -5,7 +5,9 @@ import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
 import { issueAdminToken } from '../auth/token.js';
+import { findBookingByToken } from '../booking/access.js';
 import { encodeCursor } from '../booking/admin-list.js';
+import { clientBookingView } from '../booking/client-view.js';
 import { type AdminBooking, adminBookingView, findAdminBooking } from '../booking/admin-view.js';
 import { createPrismaClient } from '../db/client.js';
 import { connect, testDatabaseUrl, truncateAll } from '../test/database.js';
@@ -172,6 +174,8 @@ describe('every route is behind requireAdmin (spec §2.2)', () => {
         call: (bearer) => post(`${BOOKINGS}/${booking.id}/addons`, { addonId: world.sharedAddonId }, bearer),
       },
       { label: 'DELETE /bookings/:id/addons/:addonId', call: (bearer) => del(`${BOOKINGS}/${booking.id}/addons/${UNKNOWN_ID}`, bearer) },
+      { label: 'POST /bookings/:id/notes', call: (bearer) => post(`${BOOKINGS}/${booking.id}/notes`, { body: 'Hello' }, bearer) },
+      { label: 'DELETE /bookings/:id/notes/:noteId', call: (bearer) => del(`${BOOKINGS}/${booking.id}/notes/${UNKNOWN_ID}`, bearer) },
       { label: 'POST /bookings/:id/session-fee', call: (bearer) => postPaid(`${BOOKINGS}/${booking.id}/session-fee`, {}, bearer) },
       // Task 21.
       {
@@ -1525,5 +1529,100 @@ describe('the whole delivery sequence (spec §3.5 steps 5-7)', () => {
       const res = await get(path);
       expect([path, res.status]).toEqual([path, 404]);
     }
+  });
+});
+
+// --- Notes to the client (2026-09-25) -----------------------------------------------------
+
+describe('notes to the client', () => {
+  it('adds a note, emails it by default, and answers the booking with it', async () => {
+    const { booking } = await confirmedBooking();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/notes`, { body: 'Bring a jacket.\nIt gets cold.' });
+
+    expect(res.status, res.text).toBe(200);
+    expect(res.body.booking.notes).toEqual([{ id: expect.any(String), body: 'Bring a jacket.\nIt gets cold.', emailed: true, createdAt: START.toISOString() }]);
+    const sent = await prisma.outbox.findMany({ where: { template: 'client_note' } });
+    expect(sent.map((row) => [row.recipient, (row.payload as { body: string }).body])).toEqual([[CLIENT.email, 'Bring a jacket.\nIt gets cold.']]);
+  });
+
+  it('keeps it to the page when the photographer unticks the email', async () => {
+    const { booking } = await confirmedBooking();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/notes`, { body: 'Just so you know.', email: false });
+
+    expect(res.body.booking.notes[0]).toMatchObject({ emailed: false });
+    expect(await prisma.outbox.count({ where: { template: 'client_note' } })).toBe(0);
+  });
+
+  it.each([
+    ['empty', { body: '' }, 422],
+    ['over 1000 characters', { body: 'x'.repeat(1001) }, 422],
+    ['missing', {}, 400],
+    ['carrying another field', { body: 'Hi', bookingId: 'x' }, 400],
+  ])('refuses a note that is %s, adding nothing', async (_label, body, status) => {
+    const { booking } = await confirmedBooking();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/notes`, body);
+
+    expect(res.status).toBe(status);
+    expect(await prisma.bookingNote.count()).toBe(0);
+  });
+
+  it('takes exactly 1000 characters', async () => {
+    const { booking } = await confirmedBooking();
+
+    expect((await post(`${BOOKINGS}/${booking.id}/notes`, { body: 'x'.repeat(1000), email: false })).status).toBe(200);
+  });
+
+  it('refuses a booking no client was ever confirmed on, and one that does not exist', async () => {
+    const waiting = await insertBooking(prisma, world, { status: 'pending_payment', startsAt: WEDNESDAY_0900 });
+
+    expect([(await post(`${BOOKINGS}/${waiting.id}/notes`, { body: 'Hi' })).status, (await post(`${BOOKINGS}/${UNKNOWN_ID}/notes`, { body: 'Hi' })).status]).toEqual([409, 404]);
+    expect(await prisma.bookingNote.count()).toBe(0);
+  });
+
+  it('deletes a note: gone from both pages, kept in the table, and a second delete is a 404', async () => {
+    const { booking, token: clientToken } = await insertBookingWithToken(prisma, world, { startsAt: WEDNESDAY_0900 });
+    const added = await post(`${BOOKINGS}/${booking.id}/notes`, { body: 'Withdrawn soon.', email: false });
+    const noteId = added.body.booking.notes[0].id as string;
+
+    const res = await del(`${BOOKINGS}/${booking.id}/notes/${noteId}`);
+
+    expect(res.status, res.text).toBe(200);
+    expect(res.body.booking.notes).toEqual([]);
+    expect((await prisma.bookingNote.findUniqueOrThrow({ where: { id: noteId } })).deletedAt).toEqual(START);
+    const accessed = await findBookingByToken(prisma, clientToken);
+    expect(clientBookingView(accessed as NonNullable<typeof accessed>, START).notices).toEqual([]);
+    expect((await del(`${BOOKINGS}/${booking.id}/notes/${noteId}`)).status).toBe(404);
+  });
+
+  it('will not delete a note through another booking', async () => {
+    const { booking } = await confirmedBooking();
+    const other = await confirmedBooking(THURSDAY_0900);
+    const added = await post(`${BOOKINGS}/${booking.id}/notes`, { body: 'Mine.', email: false });
+
+    const res = await del(`${BOOKINGS}/${other.booking.id}/notes/${added.body.booking.notes[0].id as string}`);
+
+    expect(res.status).toBe(404);
+    expect(await prisma.bookingNote.count({ where: { deletedAt: null } })).toBe(1);
+  });
+
+  it('shows the note on the client\u2019s page, among notices that carry no token', async () => {
+    const { booking, token: clientToken } = await insertBookingWithToken(prisma, world, { startsAt: WEDNESDAY_0900 });
+    await post(`${BOOKINGS}/${booking.id}/notes`, { body: 'See you soon.' });
+    await post(`${BOOKINGS}/${booking.id}/resend-link`, {});
+
+    const accessed = await findBookingByToken(prisma, clientToken);
+    const fresh = await prisma.outbox.findFirstOrThrow({ where: { template: 'access_link_resend' } });
+    const view = clientBookingView(
+      (await findBookingByToken(prisma, (fresh.payload as { accessToken: string }).accessToken)) ?? (accessed as NonNullable<typeof accessed>),
+      START,
+    );
+
+    expect(view.notices.map((notice) => notice.kind)).toEqual(['note']);
+    const serialised = JSON.stringify(view);
+    expect(serialised).not.toContain((fresh.payload as { accessToken: string }).accessToken);
+    expect(serialised).not.toContain(clientToken);
   });
 });

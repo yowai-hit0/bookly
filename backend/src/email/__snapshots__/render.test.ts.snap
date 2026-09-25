@@ -674,6 +674,59 @@ You are welcome to book again at any time.
 Bookly, Kigali. All times are Kigali time (UTC+2)."
 `;
 
+exports[`client_note > matches its snapshot > html 1`] = `
+"<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A message about your booking (BKY-2610-7K3MQ)</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;">
+<span style="display:none;max-height:0;overflow:hidden;opacity:0;">Your photographer wrote to you.</span>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;color:#18181b;">
+<tr><td style="padding:24px 28px 0;font-size:14px;font-weight:600;letter-spacing:0.04em;color:#71717a;">Bookly</td></tr>
+<tr><td style="padding:8px 28px 28px;font-size:15px;line-height:1.55;">
+<h1 style="margin:12px 0 16px;font-size:22px;line-height:1.3;">A message from your photographer</h1>
+<p style="margin:0 0 14px;">Hello Aline Uwase,</p>
+<p style="margin:0 0 14px;">Please bring a jacket: it gets cold up there.<br>See you at 09:30.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 18px;border-top:1px solid #e4e4e7;">
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Service</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">Portrait, Standard</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">When</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">Wednesday, 7 October 2026, 09:30 to 10:30 (Kigali time)</td></tr>
+<tr><td style="padding:8px 12px 8px 0;border-bottom:1px solid #e4e4e7;color:#71717a;vertical-align:top;white-space:nowrap;">Booking reference</td><td style="padding:8px 0;border-bottom:1px solid #e4e4e7;text-align:right;vertical-align:top;">BKY-2610-7K3MQ</td></tr>
+</table>
+<p style="margin:0 0 14px;padding:10px 12px;border-left:3px solid #18181b;background:#fafafa;font-weight:600;">You will also find this message on your booking page.</p>
+</td></tr>
+</table>
+<p style="max-width:560px;margin:16px auto 0;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;font-size:12px;line-height:1.5;color:#71717a;">Bookly, Kigali. All times are Kigali time (UTC+2).</p>
+</td></tr>
+</table>
+</body>
+</html>"
+`;
+
+exports[`client_note > matches its snapshot > subject 1`] = `"A message about your booking (BKY-2610-7K3MQ)"`;
+
+exports[`client_note > matches its snapshot > text 1`] = `
+"A message from your photographer
+
+Hello Aline Uwase,
+
+Please bring a jacket: it gets cold up there.
+See you at 09:30.
+
+Service: Portrait, Standard
+When: Wednesday, 7 October 2026, 09:30 to 10:30 (Kigali time)
+Booking reference: BKY-2610-7K3MQ
+
+** You will also find this message on your booking page. **
+
+--
+Bookly, Kigali. All times are Kigali time (UTC+2)."
+`;
+
 exports[`content rules > a client cancellation with a session fee to refund (plan.md Task 18) matches its snapshot > html 1`] = `
 "<!doctype html>
 <html lang="en">

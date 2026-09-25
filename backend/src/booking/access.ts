@@ -19,7 +19,14 @@ import { hashAccessToken } from './access-token.js';
 const TOKEN_FORMAT = /^[A-Za-z0-9_-]{16,256}$/;
 
 /** The booking, its add-ons and its payments: everything the client page and a cancellation need. */
-const FULL_BOOKING = { addons: true, payments: { orderBy: { initiatedAt: 'asc' } } } satisfies Prisma.BookingInclude;
+export const FULL_BOOKING = {
+  addons: true,
+  payments: { orderBy: { initiatedAt: 'asc' } },
+  // What the notices are built from (2026-09-25). The payloads are read on the
+  // server only, field by field (booking/notices.ts); none reaches the page.
+  outbox: { select: { id: true, template: true, status: true, payload: true, createdAt: true } },
+  notes: { where: { deletedAt: null }, select: { id: true, body: true, createdAt: true, deletedAt: true } },
+} satisfies Prisma.BookingInclude;
 
 export type AccessedBooking = Prisma.BookingGetPayload<{ include: typeof FULL_BOOKING }>;
 

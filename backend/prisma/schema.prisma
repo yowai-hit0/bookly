@@ -295,6 +295,7 @@ model Booking {
   addons   BookingAddon[]
   payments Payment[]
   outbox   Outbox[]
+  notes    BookingNote[]
 
   @@index([status, startsAt])
   @@index([clientId, startsAt(sort: Desc)])
@@ -400,6 +401,23 @@ model WebhookEvent {
 }
 
 // --- Work queue & audit ------------------------------------------------------
+
+/// A note the photographer writes to a client (2026-09-25): shown on the
+/// client's booking page, and emailed when asked. Deleting sets `deleted_at`,
+/// which hides it from the client and keeps the row. CHECK: 1-1000 characters.
+model BookingNote {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId String    @map("booking_id") @db.Uuid
+  body      String
+  emailed   Boolean   @default(false)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, createdAt])
+  @@map("booking_note")
+}
 
 /// One queue and one audit trail for everything the system sends. Replaces v1's
 /// notification_log and the three gcal_* columns — a queued message and a sent
