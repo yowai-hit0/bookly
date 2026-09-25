@@ -94,9 +94,9 @@ which was that there is no public resend endpoint. Record that in the file.
   `backend/src/app.ts`.
   - Always answer **202 `{ sent: true }`**, with the same body and status whether there are matches, no matches, or
     the rate limit was hit. 422 only for a malformed email.
-  - Match with `lower(trim(contact_email)) = lower(trim(:email))`, `status = 'confirmed'`, `starts_at > now()`.
-  - **Ask the user:** should `completed` bookings that still owe a session fee, or whose photo link is still live,
-    be included? Clients reach both through the same page.
+  - Match with `lower(trim(contact_email)) = lower(trim(:email))` and either `status = 'confirmed'` with
+    `starts_at > now()`, or (**user decision, 2026-09-25**) `status = 'completed'` with an outstanding balance or a
+    photo link not yet expired (`delivery_url` set and `delivery_expires_on` today or later in Kigali).
   - In one transaction: rotate each matched booking's token, then enqueue **one** email (new template
     `booking_links`) to the address **on the booking** (never the typed string, though they match
     case-insensitively). Its payload lists each booking's reference, service, date and link. The plaintext tokens
@@ -244,7 +244,8 @@ they first saw it**. Both are remembered per device.
     /api/admin/bookings/:id/notes/:noteId` soft-deletes it, which hides it from the client. The admin booking detail
     view lists the notes.
   - Admin UI (`AdminBookingDetail.tsx`): a "Messages to the client" section with the list (time, text, "emailed"),
-    a textarea with a character count, an "Also email it to the client" checkbox, Send, and a delete action per
+    a textarea with a character count, an "Also email it to the client" checkbox (**ticked by default**, user
+    decision 2026-09-25), Send, and a delete action per
     note using the file's inline-confirm pattern.
   - The body is plain text everywhere: render it as text, never HTML, in the page and in the email template (escape
     it).
@@ -253,7 +254,8 @@ they first saw it**. Both are remembered per device.
   "Dismiss"). A `balance_due` notice links to the payment section. Per device, in `localStorage` under
   `bookly.notices.<booking reference>`, keep `{ [noticeId]: { firstSeenAt, dismissed } }`, and wrap every read and
   write in try/catch. Show a notice unless it has been dismissed or it was first seen more than 24 hours ago. Stamp
-  `firstSeenAt` the first time it renders. When nothing is left to show, render nothing (no empty box).
+  `firstSeenAt` the first time it renders. **Exception (user decision): `balance_due` is never hidden by time**;
+  only closing it hides it. Notes are labelled "From your photographer". When nothing is left to show, render nothing (no empty box).
 - Tests (backend): each outbox kind maps to its notice with only allowlisted fields, and no token ever appears in
   the response (assert against the raw JSON); cancelled outbox rows and admin-only templates are excluded; the
   balance notice appears and disappears with the balance; notes can be created, emailed or not, soft-deleted and
@@ -264,13 +266,15 @@ they first saw it**. Both are remembered per device.
 ---
 
 ## Open questions to ask the user before starting
-1. Item 4: should the "My booking" lookup include `completed` bookings that still owe money or have live photos?
+1. ~~Lookup scope~~ **Answered 2026-09-25:** yes. Include completed bookings that still owe money or whose photo
+   link is live (item 4).
 2. Items 4, 6 and 8: draft the wording of the new emails (`booking_links`, `email_change_confirm`,
    `email_changed_notice`, `client_note`) and ask the user to review it before merging.
-3. Item 8: should a photographer note show the photographer's name, or just "From your photographer"? Should
-   "Also email it" default to on or off?
-4. Item 8: is 24 hours right for everything? A `balance_due` notice hiding after a day while money is still owed
-   may be unwanted. Ask whether it should stay until the balance is paid, closable but not hidden by time.
+3. ~~Note author~~ **Answered 2026-09-25:** notes say "From your photographer". A photographer profile and a
+   contact for issues or questions will come later; leave room for them, but build nothing for them now.
+   "Also email it" starts ticked.
+4. ~~24 hours for the balance notice~~ **Answered 2026-09-25:** `balance_due` stays until the balance is paid. It
+   can be closed, but is never hidden by time; if the amount changes, it is a new notice and shows again.
 
 ## Done when
 All eight items are merged on the branch with tests. The four suites pass (backend and frontend vitest, e2e,
