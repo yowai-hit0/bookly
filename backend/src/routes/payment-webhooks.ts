@@ -9,6 +9,7 @@ import { type WebhookDeps, receiveWebhook } from '../payments/webhooks.js';
  * each route reads its own raw body, whatever the content type claims.
  *
  *   POST|PUT /api/webhooks/mtn-momo/:ourRef/:signature
+ *   POST     /api/webhooks/flutterwave         signed in `flutterwave-signature`
  *
  * Every provider whose payments may still be settling keeps its route mounted,
  * the active one or not (spec §6.18). The answer is 200 whenever the delivery is
@@ -33,6 +34,11 @@ export function paymentWebhooksRouter(deps: PaymentWebhooksDeps): Router {
     const handle = deliver(deps, mtn);
     router.post('/mtn-momo/:ourRef/:signature', raw, handle);
     router.put('/mtn-momo/:ourRef/:signature', raw, handle);
+  }
+
+  const flutterwave = deps.providers.flutterwave;
+  if (flutterwave !== undefined) {
+    router.post('/flutterwave', raw, deliver(deps, flutterwave));
   }
 
   return router;

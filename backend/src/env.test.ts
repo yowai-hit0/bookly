@@ -172,10 +172,44 @@ describe('parseEnv: payments (plan.md Tasks 16 and 17)', () => {
     },
   );
 
+  const flutterwave = { FLUTTERWAVE_CLIENT_ID: 'id', FLUTTERWAVE_CLIENT_SECRET: 'secret', FLUTTERWAVE_WEBHOOK_HASH: 'hash' };
+
   it('does not require MTN credentials in production once Flutterwave takes payments', () => {
     const { MTN_MOMO_SUBSCRIPTION_KEY: _s, MTN_MOMO_API_USER: _u, MTN_MOMO_API_KEY: _k, ...withoutMtn } = production;
-    expect(parseEnv({ ...withoutMtn, PAYMENT_PROVIDER: 'flutterwave' }).PAYMENT_PROVIDER).toBe('flutterwave');
+    expect(parseEnv({ ...withoutMtn, ...flutterwave, PAYMENT_PROVIDER: 'flutterwave' }).PAYMENT_PROVIDER).toBe('flutterwave');
   });
+
+  it.each(['FLUTTERWAVE_CLIENT_ID', 'FLUTTERWAVE_CLIENT_SECRET', 'FLUTTERWAVE_WEBHOOK_HASH'] as const)(
+    'requires %s in production while Flutterwave takes payments, naming the credentials',
+    (key) => {
+      const without: Record<string, string> = { ...production, ...flutterwave, PAYMENT_PROVIDER: 'flutterwave' };
+      delete without[key];
+      expect(() => parseEnv(without)).toThrow(/FLUTTERWAVE_CLIENT_ID, FLUTTERWAVE_CLIENT_SECRET and FLUTTERWAVE_WEBHOOK_HASH are required/);
+    },
+  );
+
+  it('does not require Flutterwave credentials in production while MTN direct takes payments', () => {
+    expect(() => parseEnv(production)).not.toThrow();
+  });
+
+  it('defaults Flutterwave to its sandbox, its token endpoint and RWF', () => {
+    const env = parseEnv(valid);
+    expect(env).toMatchObject({
+      FLUTTERWAVE_BASE_URL: 'https://developersandbox-api.flutterwave.com',
+      FLUTTERWAVE_IDP_URL: 'https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token',
+      FLUTTERWAVE_CURRENCY: 'RWF',
+    });
+    for (const key of ['FLUTTERWAVE_CLIENT_ID', 'FLUTTERWAVE_CLIENT_SECRET', 'FLUTTERWAVE_WEBHOOK_HASH'] as const) {
+      expect(env[key]).toBeUndefined();
+    }
+  });
+
+  it.each(['FLUTTERWAVE_CLIENT_ID', 'FLUTTERWAVE_CLIENT_SECRET', 'FLUTTERWAVE_WEBHOOK_HASH', 'FLUTTERWAVE_BASE_URL', 'FLUTTERWAVE_CURRENCY'])(
+    'rejects an empty %s, naming it',
+    (key) => {
+      expect(() => parseEnv({ ...valid, [key]: '' })).toThrow(new RegExp(key));
+    },
+  );
 
   it('names every missing production setting at once', () => {
     const { API_ORIGIN: _o, MTN_MOMO_API_KEY: _k, RESEND_API_KEY: _r, ...bare } = production;

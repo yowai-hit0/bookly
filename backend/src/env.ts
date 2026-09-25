@@ -48,6 +48,18 @@ const schema = z.object({
   MTN_MOMO_API_KEY: z.string().min(1).optional(),
   /** The sandbox accepts only EUR; defaults to EUR there and RWF elsewhere. */
   MTN_MOMO_CURRENCY: z.string().regex(/^[A-Z]{3}$/).optional(),
+  /** Flutterwave v4 (plan.md Task 25), mobile money only. Sandbox by default;
+   *  live is https://f4bexperience.flutterwave.com. Without the client
+   *  credentials, payment attempts are recorded and fail at once. */
+  FLUTTERWAVE_BASE_URL: z.url().default('https://developersandbox-api.flutterwave.com'),
+  FLUTTERWAVE_IDP_URL: z.url().default('https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token'),
+  FLUTTERWAVE_CLIENT_ID: z.string().min(1).optional(),
+  FLUTTERWAVE_CLIENT_SECRET: z.string().min(1).optional(),
+  /** The dashboard's "Secret hash": the HMAC key of `flutterwave-signature`.
+   *  Without it every webhook is stored unverified and applies nothing; payments
+   *  then settle only through the status lookup. */
+  FLUTTERWAVE_WEBHOOK_HASH: z.string().min(1).optional(),
+  FLUTTERWAVE_CURRENCY: z.string().regex(/^[A-Z]{3}$/).default('RWF'),
   /** HS256 key that signs admin bearer tokens (plan.md Task 7). jose enforces no
    *  minimum key length, so this floor is the only one. Rotating it invalidates
    *  every issued token -- the only "revoke everything" there is. */
@@ -81,6 +93,15 @@ const schema = z.object({
   {
     message: 'MTN_MOMO_SUBSCRIPTION_KEY, MTN_MOMO_API_USER and MTN_MOMO_API_KEY are required in production with PAYMENT_PROVIDER=mtn_momo_direct',
     path: ['MTN_MOMO_API_KEY'],
+  },
+).refine(
+  (env) =>
+    env.NODE_ENV !== 'production' ||
+    env.PAYMENT_PROVIDER !== 'flutterwave' ||
+    (env.FLUTTERWAVE_CLIENT_ID !== undefined && env.FLUTTERWAVE_CLIENT_SECRET !== undefined && env.FLUTTERWAVE_WEBHOOK_HASH !== undefined),
+  {
+    message: 'FLUTTERWAVE_CLIENT_ID, FLUTTERWAVE_CLIENT_SECRET and FLUTTERWAVE_WEBHOOK_HASH are required in production with PAYMENT_PROVIDER=flutterwave',
+    path: ['FLUTTERWAVE_CLIENT_SECRET'],
   },
 );
 

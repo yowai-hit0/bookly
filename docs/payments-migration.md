@@ -64,10 +64,24 @@ still serves v3 with `verif-hash`, so do not use it).
   sandbox. The success path is therefore proven by unit tests and signed fake webhooks, and only a live-mode
   charge exercises it for real. The decline path *is* sandbox-testable with `issuer:insufficient_funds`.
 
+## Stage 1: the adapter (2026-09-25)
+
+- `backend/src/payments/flutterwave.ts`: token (cached, shared, dropped on 401) → `POST /customers` →
+  `POST /payment-methods` → `POST /charges` (`reference` = idempotency key = `our_ref`). `methods: ['momo_mtn',
+  'momo_airtel']`. Numbers outside `+2507xxxxxxxx` are refused `phone_not_rwandan_mobile` before any call.
+- Decisions taken as proposed: a `redirect_url` next action → rejected `redirect_required`; Flutterwave is in
+  `providers.all` whenever it is active or configured; the "flutterwave throws" test is replaced.
+- Refusals: `data.status` failed/voided → `charge_failed_<processor code>` / `charge_voided`; 400/409/422 →
+  `error.type`. 401, 429, 5xx, network and timeout → `PaymentProviderError` (recorded as unavailable).
+- Webhook: `POST /api/webhooks/flutterwave`, verified by `flutterwave-signature` (timing-safe, raw bytes). MTN's
+  route stays mounted. The lookup-based reconciler runs for every configured provider, Flutterwave included.
+- Env: `FLUTTERWAVE_BASE_URL`, `FLUTTERWAVE_IDP_URL`, `FLUTTERWAVE_CLIENT_ID`, `FLUTTERWAVE_CLIENT_SECRET`,
+  `FLUTTERWAVE_WEBHOOK_HASH`, `FLUTTERWAVE_CURRENCY` (default RWF). The first three credentials are required in
+  production with `PAYMENT_PROVIDER=flutterwave`.
+- Frontend: unchanged. It already renders any method `/api/payment-methods` lists, Airtel Money included.
+
 ## Run state
-- Stage: 0 complete (39feb63, plus this poll result). Branch `feat/flutterwave-v4` off c07aece.
-- In flight: nothing.
-- Awaiting from the user: whether a dashboard Secret hash is set (does not block Stage 1), and any objection to
-  the proposed decisions (redirect → rejected `redirect_required`; Flutterwave stays in `providers.all` whenever
-  configured; the one "flutterwave throws" test in providers.test.ts is replaced).
-- Next action: Stage 1, backend/src/payments/flutterwave.ts.
+- Stage: 1 complete (uncommitted). Full backend suite green against local PostgreSQL.
+- Awaiting from the user: real sandbox client credentials (the local `.env` ones answer `401 invalid_client`);
+  the webhook URL and secret hash entered in the dashboard; the same variables set on the deployed API.
+- Next action: a live-mode charge to exercise the success path for real (the sandbox never settles momo).

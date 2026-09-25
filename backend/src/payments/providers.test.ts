@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseEnv } from '../env.js';
+import { FlutterwaveProvider } from './flutterwave.js';
 import { MtnMomoProvider } from './mtn-momo.js';
 import { createPaymentProviders } from './providers.js';
 
@@ -12,8 +13,10 @@ import { createPaymentProviders } from './providers.js';
  * active provider and the only one whose callbacks are accepted, and it offers
  * MTN MoMo alone; it is configured only with all three credentials; callbacks
  * point at `API_ORIGIN`, or localhost on `PORT` without one; the sandbox is
- * charged in EUR and production in RWF unless a currency is set; and
- * Flutterwave is refused loudly rather than silently falling back to MTN.
+ * charged in EUR and production in RWF unless a currency is set. With
+ * `PAYMENT_PROVIDER=flutterwave`, Flutterwave takes new payments -- MTN MoMo and
+ * Airtel Money -- while MTN stays mounted for its in-flight payments; after a
+ * rollback to MTN, a configured Flutterwave still accepts its callbacks.
  */
 
 const BASE = {
@@ -120,8 +123,68 @@ describe('createPaymentProviders with PAYMENT_PROVIDER=mtn_momo_direct', () => {
   });
 });
 
+const FLUTTERWAVE = {
+  FLUTTERWAVE_CLIENT_ID: 'fw-client',
+  FLUTTERWAVE_CLIENT_SECRET: 'fw-secret',
+  FLUTTERWAVE_WEBHOOK_HASH: 'fw-hash',
+  FLUTTERWAVE_BASE_URL: 'https://flutterwave.test',
+  FLUTTERWAVE_IDP_URL: 'https://idp.flutterwave.test/token',
+};
+
 describe('createPaymentProviders with PAYMENT_PROVIDER=flutterwave', () => {
-  it('refuses to start, naming the task that brings it, rather than taking payments through MTN', () => {
-    expect(() => createPaymentProviders(parseEnv({ ...BASE, PAYMENT_PROVIDER: 'flutterwave' }))).toThrow(/flutterwave is not implemented yet/);
+  it('makes Flutterwave the active provider, keeping MTN for its in-flight callbacks', () => {
+    const providers = createPaymentProviders(parseEnv({ ...BASE, ...FLUTTERWAVE, PAYMENT_PROVIDER: 'flutterwave' }));
+
+    expect(providers.active).toBeInstanceOf(FlutterwaveProvider);
+    expect(providers.active.id).toBe('flutterwave');
+    expect(providers.all.flutterwave).toBe(providers.active);
+    expect(providers.all.mtn_momo_direct).toBeInstanceOf(MtnMomoProvider);
+  });
+
+  it('offers MTN MoMo and Airtel Money, and no card', () => {
+    const { active } = createPaymentProviders(parseEnv({ ...BASE, ...FLUTTERWAVE, PAYMENT_PROVIDER: 'flutterwave' }));
+    expect([...active.methods]).toEqual(['momo_mtn', 'momo_airtel']);
+  });
+
+  it('is configured only with both client credentials', () => {
+    expect(createPaymentProviders(parseEnv({ ...BASE, PAYMENT_PROVIDER: 'flutterwave' })).active.configured).toBe(false);
+    expect(createPaymentProviders(parseEnv({ ...BASE, PAYMENT_PROVIDER: 'flutterwave', FLUTTERWAVE_CLIENT_ID: 'id' })).active.configured).toBe(false);
+    expect(createPaymentProviders(parseEnv({ ...BASE, ...FLUTTERWAVE, PAYMENT_PROVIDER: 'flutterwave' })).active.configured).toBe(true);
+  });
+
+  it('calls the configured token endpoint and base URL, in the configured currency', async () => {
+    const sent: { url: string; body: unknown }[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string, init?: RequestInit) => {
+        sent.push({ url: input, body: init?.body });
+        if (input === FLUTTERWAVE.FLUTTERWAVE_IDP_URL) return new Response(JSON.stringify({ access_token: 't', expires_in: 600 }));
+        if (input.endsWith('/charges')) return new Response(JSON.stringify({ data: { id: 'chg_1', status: 'pending' } }), { status: 201 });
+        return new Response(JSON.stringify({ data: { id: 'x_1' } }), { status: 201 });
+      }),
+    );
+    const { active } = createPaymentProviders(parseEnv({ ...BASE, ...FLUTTERWAVE, PAYMENT_PROVIDER: 'flutterwave', FLUTTERWAVE_CURRENCY: 'RWF' }));
+    const result = await active.initiate(
+      { ourRef: OUR_REF, amountRwf: 16_000, method: 'momo_airtel', payerPhone: '+250731234567', kind: 'booking_fee', bookingReference: 'BKY-2610-7K3QX' },
+      new AbortController().signal,
+    );
+
+    expect(result).toStrictEqual({ outcome: 'accepted', providerRef: 'chg_1' });
+    expect(sent.map((request) => request.url)).toEqual([
+      'https://idp.flutterwave.test/token',
+      'https://flutterwave.test/customers',
+      'https://flutterwave.test/payment-methods',
+      'https://flutterwave.test/charges',
+    ]);
+    expect(String(sent[0]?.body)).toContain('client_id=fw-client');
+    expect(JSON.parse(String(sent[3]?.body))).toMatchObject({ currency: 'RWF', amount: 16_000, reference: OUR_REF });
+  });
+});
+
+describe('createPaymentProviders after a rollback to PAYMENT_PROVIDER=mtn_momo_direct', () => {
+  it('keeps a configured Flutterwave accepting callbacks for the payments it still has in flight', () => {
+    const providers = createPaymentProviders(parseEnv({ ...BASE, ...FLUTTERWAVE }));
+    expect(providers.active).toBeInstanceOf(MtnMomoProvider);
+    expect(providers.all.flutterwave).toBeInstanceOf(FlutterwaveProvider);
   });
 });
