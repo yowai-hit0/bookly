@@ -36,6 +36,8 @@ function booking(id: string, reference: string, status: string, startsAt: string
     id,
     reference,
     status,
+    // Every fixture shoot is ahead of NOW, so the stage is the status's own (booking/stage.ts).
+    stage: status === 'pending_payment' ? 'awaiting_payment' : status,
     locale: 'en',
     client: { id: 'cl1', fullName: contactName, email: 'aline@example.com', phone: '+250788000000', anonymized: false },
     contact: { name: contactName, email: 'aline@example.com', phone: '+250788000000' },
@@ -90,6 +92,7 @@ function row(entry: Booking) {
     id: entry.id,
     reference: entry.reference,
     status: entry.status,
+    stage: entry.stage,
     startsAt: schedule.startsAt,
     endsAt: schedule.endsAt,
     contactName: (entry.contact as { name: string }).name,
@@ -142,6 +145,7 @@ async function mockApi(page: Page, options: { completed?: boolean } = {}) {
   if (options.completed === true) {
     const first = bookings[0] as Booking
     first.status = 'completed'
+    first.stage = 'completed'
     first.lifecycle = { confirmedAt: '2026-10-01T06:05:00.000Z', completedAt: NOW.toISOString(), cancelledAt: null, cancellationReason: null }
     first.actions = {
       canReschedule: false,
@@ -181,10 +185,11 @@ async function mockApi(page: Page, options: { completed?: boolean } = {}) {
         return
       }
       if (method === 'GET' && path === '/api/admin/bookings') {
-        const statuses = url.searchParams.getAll('status')
+        // The list filters by display stage since 2026-09-25.
+        const stages = url.searchParams.getAll('stage')
         const search = url.searchParams.get('search') ?? ''
         const matching = bookings
-          .filter((entry) => statuses.length === 0 || statuses.includes(entry.status))
+          .filter((entry) => stages.length === 0 || stages.includes(String(entry.stage)))
           .filter((entry) => search === '' || entry.reference.toLowerCase().includes(search.toLowerCase()))
         await route.fulfill({ json: { bookings: matching.map(row), nextCursor: null } })
         return
@@ -218,6 +223,7 @@ async function mockApi(page: Page, options: { completed?: boolean } = {}) {
       }
       if (entry !== undefined && action?.[2] === 'cancel') {
         entry.status = 'cancelled_by_admin'
+        entry.stage = 'cancelled_by_admin'
         entry.lifecycle = { confirmedAt: '2026-10-01T06:05:00.000Z', completedAt: null, cancelledAt: NOW.toISOString(), cancellationReason: String(body?.reason ?? '') }
         entry.payments = [{ ...(entry.payments as Record<string, unknown>[])[0], status: 'refund_due', canRecordRefund: true }]
         entry.money = {
@@ -347,7 +353,7 @@ test('signs in, filters the list, moves a booking and then cancels it', async ({
 
   await page.getByRole('button', { name: 'Confirmed' }).click()
 
-  await expect(page).toHaveURL(/\?status=confirmed$/)
+  await expect(page).toHaveURL(/\?stage=confirmed$/)
   await expect(rows).toHaveCount(2)
   await expect(page.getByRole('link', { name: 'BKY-2701-00042' })).toBeVisible()
 

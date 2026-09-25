@@ -23,6 +23,7 @@ import { formatDate, formatMoney, formatTime } from '@/lib/format'
 import { reportError } from '@/lib/report-error'
 import { forgetBookingToken, rememberBookingToken } from '@/lib/stored-booking'
 import { cn } from '@/lib/utils'
+import { StageLegend } from '@/pages/StageLegend'
 import { PaymentFields } from '@/pages/checkout/PaymentFields'
 
 /**
@@ -160,9 +161,13 @@ function BookingView({ token, booking: loadedBooking, methods, onMissing, onRelo
       <section className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h1 className="text-3xl font-semibold">{t('booking:title')}</h1>
-          <StatusBadge status={booking.status} size="md">
-            {t(`booking:status.${booking.status}`)}
-          </StatusBadge>
+          {/* The display stage (2026-09-25), and what each one means. */}
+          <span className="inline-flex items-center gap-1">
+            <StatusBadge status={booking.stage} size="md">
+              {t(`booking:stage.${booking.stage}`)}
+            </StatusBadge>
+            <StageLegend audience="client" />
+          </span>
         </div>
 
         <dl className="bg-card flex flex-col gap-2 rounded-xl border p-4 text-sm shadow-sm">

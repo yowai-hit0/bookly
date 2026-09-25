@@ -14,6 +14,7 @@ import { ADDON_MAX_QUANTITY, type AddonEditResult, addPostShootAddon, removePost
 import { type DeliveryResult, saveDelivery, sendDelivery } from '../booking/delivery.js';
 import { BOOKINGS_MAX_PAGE_SIZE, findBookings } from '../booking/admin-list.js';
 import { type AdminBooking, adminBookingView, findAdminBooking } from '../booking/admin-view.js';
+import { BOOKING_STAGES } from '../booking/stage.js';
 import { BOOKING_STATUSES } from '../db/statuses.js';
 import type { PaymentProviderId } from '../payments/provider.js';
 import { recordRefund } from '../payments/refund.js';
@@ -25,7 +26,7 @@ import { kigaliDate, parseOrReject } from './validation.js';
  * (plan.md Task 19; spec §3.6, §6.11, §6.12, §6.16, §6.21). Mounted behind
  * `requireAdmin`, so every route here is his alone (spec §2.2).
  *
- *   GET  /bookings?status=&from=&to=&search=&cursor=&limit=
+ *   GET  /bookings?stage=&status=&from=&to=&search=&cursor=&limit=   (`stage` since 2026-09-25; `status` still read)
  *        200 { bookings, nextCursor }
  *   GET  /bookings/:id                      200 { booking } | 404
  *   POST /bookings/:id/reschedule  { startsAt }
@@ -87,6 +88,11 @@ const listQuery = z.strictObject({
   /** Repeatable: `?status=confirmed&status=completed`. */
   status: z
     .union([z.enum(BOOKING_STATUSES), z.array(z.enum(BOOKING_STATUSES))])
+    .optional()
+    .transform((value) => (value === undefined ? undefined : [value].flat())),
+  /** Repeatable: `?stage=in_progress&stage=needs_review` (booking/stage.ts). */
+  stage: z
+    .union([z.enum(BOOKING_STAGES), z.array(z.enum(BOOKING_STAGES))])
     .optional()
     .transform((value) => (value === undefined ? undefined : [value].flat())),
   from: kigaliDate.optional(),
@@ -168,6 +174,8 @@ export function adminBookingsRouter(deps: AdminBookingsDeps): Router {
     res.json(
       await findBookings(prisma, {
         ...(query.status === undefined ? {} : { statuses: query.status }),
+        ...(query.stage === undefined ? {} : { stages: query.stage }),
+        now: now(),
         ...(query.from === undefined ? {} : { from: query.from }),
         ...(query.to === undefined ? {} : { to: query.to }),
         ...(query.search === undefined ? {} : { search: query.search }),

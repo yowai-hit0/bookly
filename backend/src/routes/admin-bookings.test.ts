@@ -286,6 +286,30 @@ describe('GET /bookings', () => {
     );
   });
 
+  it('filters by display stage, on the API clock, and stages every row (2026-09-25)', async () => {
+    const ahead = await insertBooking(prisma, world, { status: 'confirmed', holdMinutes: null, startsAt: WEDNESDAY_0900 });
+    // Before START: over, and never marked completed or no-show.
+    const unreviewed = await insertBooking(prisma, world, { status: 'confirmed', holdMinutes: null, startsAt: new Date('2026-09-01T07:00:00Z') });
+
+    const review = await get(`${BOOKINGS}?stage=needs_review`);
+    const both = await get(`${BOOKINGS}?stage=needs_review&stage=confirmed`);
+
+    expect(review.body.bookings.map((row: { reference: string }) => row.reference)).toEqual([unreviewed.reference]);
+    expect(review.body.bookings[0].stage).toBe('needs_review');
+    expect(both.body.bookings.map((row: { reference: string; stage: string }) => [row.reference, row.stage]).sort()).toEqual(
+      [
+        [ahead.reference, 'confirmed'],
+        [unreviewed.reference, 'needs_review'],
+      ].sort(),
+    );
+  });
+
+  it('refuses a stage it does not know', async () => {
+    const res = await get(`${BOOKINGS}?stage=almost_done`);
+
+    expect(res.status).toBe(400);
+  });
+
   it('filters by a Kigali date range, inclusive at both ends', async () => {
     const inside = await insertBooking(prisma, world, { status: 'confirmed', startsAt: WEDNESDAY_0900 });
     await insertBooking(prisma, world, { status: 'confirmed', startsAt: new Date('2027-01-20T07:00:00Z') });

@@ -12,6 +12,7 @@ import {
   seedWorld,
 } from '../test/payment-fixtures.js';
 import { BOOKINGS_MAX_PAGE_SIZE, BOOKINGS_PAGE_SIZE, decodeCursor, encodeCursor, findBookings } from './admin-list.js';
+import { BOOKING_STAGES, bookingStage } from './stage.js';
 import { bookingTotals } from './totals.js';
 
 /**
@@ -604,5 +605,80 @@ describe('each row’s money', () => {
       packageName: 'Standard',
     });
     expect(JSON.stringify(row)).not.toMatch(/accessToken|access_token/i);
+  });
+});
+
+// --- Stages (2026-09-25) --------------------------------------------------------------
+
+describe('filtering by display stage', () => {
+  /** Mid-shoot for the "happening" booking: every stage has at least one booking at this instant. */
+  const NOW = new Date('2027-03-11T08:00:00Z');
+
+  async function everyStage(): Promise<Booking[]> {
+    const at = (iso: string) => new Date(iso);
+    const seeds: { seed: BookingSeed; delivered?: boolean }[] = [
+      // Explicit days, far from the shared fixture's counter, so no two ever overlap.
+      { seed: { status: 'pending_payment', startsAt: at('2027-03-13T07:00:00Z') } },
+      { seed: { status: 'confirmed', holdMinutes: null, startsAt: at('2027-03-12T07:00:00Z') } },
+      // Starting at 08:00 exactly: under way, the boundary included.
+      { seed: { status: 'confirmed', holdMinutes: null, startsAt: at('2027-03-11T08:00:00Z') } },
+      // 06:30 to 07:30, its buffer to 08:00: over, and clear of the one above.
+      { seed: { status: 'confirmed', holdMinutes: null, startsAt: at('2027-03-11T06:30:00Z'), durationMinutes: 60 } },
+      { seed: { status: 'confirmed', holdMinutes: null, startsAt: at('2027-03-08T07:00:00Z') } },
+      { seed: { status: 'completed', holdMinutes: null, startsAt: at('2027-03-05T07:00:00Z') } },
+      { seed: { status: 'completed', holdMinutes: null, startsAt: at('2027-03-04T07:00:00Z') }, delivered: true },
+      { seed: { status: 'no_show', holdMinutes: null, startsAt: at('2027-03-03T07:00:00Z') } },
+      { seed: { status: 'expired', startsAt: at('2027-03-02T07:00:00Z') } },
+      { seed: { status: 'cancelled_by_client', holdMinutes: null, startsAt: at('2027-03-01T07:00:00Z') } },
+      { seed: { status: 'cancelled_by_admin', holdMinutes: null, startsAt: at('2027-02-28T07:00:00Z') } },
+    ];
+    const made: Booking[] = [];
+    for (const { seed, delivered } of seeds) {
+      const booking = await insertBooking(prisma, world, seed);
+      made.push(
+        delivered === true
+          ? await prisma.booking.update({
+              where: { id: booking.id },
+              data: { deliveryUrl: 'https://photos.example/x', deliverySentAt: at('2027-03-06T10:00:00Z') },
+            })
+          : booking,
+      );
+    }
+    return made;
+  }
+
+  it('returns, for every stage, exactly the bookings bookingStage() puts in it', async () => {
+    const bookings = await everyStage();
+
+    for (const stage of BOOKING_STAGES) {
+      const expected = bookings.filter((booking) => bookingStage(booking, NOW, 'admin') === stage).map((b) => b.id).sort();
+      const page = await findBookings(prisma, { stages: [stage], now: NOW, limit: 100 });
+      expect([stage, page.bookings.map((row) => row.id).sort()]).toEqual([stage, expected]);
+      for (const row of page.bookings) expect(row.stage).toBe(stage);
+    }
+    // And the fixtures cover every stage, so the loop above is not vacuous.
+    expect(new Set(bookings.map((booking) => bookingStage(booking, NOW, 'admin')))).toEqual(new Set(BOOKING_STAGES));
+  });
+
+  it('matches any of several stages, and still reads the old status filter', async () => {
+    const bookings = await everyStage();
+    const ids = (stage: string) => bookings.filter((b) => bookingStage(b, NOW, 'admin') === stage).map((b) => b.id);
+
+    const several = await findBookings(prisma, { stages: ['in_progress', 'needs_review'], now: NOW, limit: 100 });
+    expect(several.bookings.map((row) => row.id).sort()).toEqual([...ids('in_progress'), ...ids('needs_review')].sort());
+
+    const byStatus = await findBookings(prisma, { statuses: ['completed'], now: NOW, limit: 100 });
+    expect(byStatus.bookings.map((row) => row.id).sort()).toEqual([...ids('completed'), ...ids('closed')].sort());
+  });
+
+  it('stages every row it returns, filtered or not', async () => {
+    const bookings = await everyStage();
+
+    const page = await findBookings(prisma, { now: NOW, limit: 100 });
+
+    for (const row of page.bookings) {
+      const booking = bookings.find((b) => b.id === row.id);
+      expect(row.stage).toBe(booking === undefined ? undefined : bookingStage(booking, NOW, 'admin'));
+    }
   });
 });

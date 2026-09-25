@@ -36,7 +36,11 @@ function bookingBody(mock: Mock) {
     booking: {
       reference: REFERENCE,
       status: mock.cancelled ? 'cancelled_by_client' : 'confirmed',
+      // The pill shows the display stage (2026-09-25); the shoot is still ahead.
+      stage: mock.cancelled ? 'cancelled_by_client' : 'confirmed',
       clientName: 'Aline Uwase',
+      maskedEmail: 'a•••••@example.com',
+      pendingMaskedEmail: null,
       ...WHEN,
       serviceName: 'Portraits',
       packageName: 'Standard',

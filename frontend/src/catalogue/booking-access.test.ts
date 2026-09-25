@@ -33,6 +33,7 @@ const OUR_REF = '3f0c6a52-8d1e-4b7a-9c35-0e4d2a61b7f8'
 const BOOKING: ClientBooking = {
   reference: 'BKY-2610-7K3QX',
   status: 'confirmed',
+  stage: 'confirmed',
   clientName: 'Aline Uwase',
   maskedEmail: 'a•••••@example.com',
   pendingMaskedEmail: null,
@@ -186,7 +187,7 @@ describe('fetchClientBooking', () => {
 // --- Cancelling ---------------------------------------------------------------------------------
 
 describe('cancelBooking', () => {
-  const cancelled = { ...BOOKING, status: 'cancelled_by_client', canCancel: false, cancelledAt: '2026-10-01T06:00:00.000Z' }
+  const cancelled = { ...BOOKING, status: 'cancelled_by_client', stage: 'cancelled_by_client', canCancel: false, cancelledAt: '2026-10-01T06:00:00.000Z' }
 
   it('POSTs to the token’s cancel route with no body at all', async () => {
     const mock = stubFetch(() => json({ booking: cancelled }))

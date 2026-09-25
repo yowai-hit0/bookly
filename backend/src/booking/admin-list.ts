@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { type KigaliDate, kigaliMinuteToUtc } from '../availability/engine.js';
 import type { BookingStatus } from '../db/statuses.js';
+import { type BookingStage, bookingStage, stageWhere } from './stage.js';
 import { bookingTotals } from './totals.js';
 
 /**
@@ -23,8 +24,12 @@ export const BOOKINGS_MAX_PAGE_SIZE = 100;
 const MINUTES_PER_DAY = 1440;
 
 export type BookingsQuery = {
-  /** Empty means every status. */
+  /** Empty means every status. Kept for links made before stages (2026-09-25). */
   statuses?: readonly BookingStatus[];
+  /** Display stages (`stage.ts`), what the list filters by now. Empty means every stage. */
+  stages?: readonly BookingStage[];
+  /** The clock stages are read on; the same one the rows are staged with. */
+  now?: Date;
   /** Kigali dates, inclusive, matched against the shoot's start. */
   from?: KigaliDate;
   to?: KigaliDate;
@@ -38,6 +43,8 @@ export type BookingListRow = {
   id: string;
   reference: string;
   status: string;
+  /** The admin's display stage (`stage.ts`). */
+  stage: BookingStage;
   startsAt: string;
   endsAt: string;
   contactName: string;
@@ -61,7 +68,8 @@ export type BookingsPage = {
 
 export async function findBookings(prisma: PrismaClient, query: BookingsQuery = {}): Promise<BookingsPage> {
   const limit = Math.min(Math.max(query.limit ?? BOOKINGS_PAGE_SIZE, 1), BOOKINGS_MAX_PAGE_SIZE);
-  const where = bookingsWhere(query);
+  const now = query.now ?? new Date();
+  const where = bookingsWhere(query, now);
 
   // One row more than asked for: whether it comes back is whether there is a
   // next page, and no second count query is needed to know.
@@ -78,12 +86,12 @@ export async function findBookings(prisma: PrismaClient, query: BookingsQuery = 
   const page = rows.slice(0, limit);
   const last = page.at(-1);
   return {
-    bookings: page.map(toRow),
+    bookings: page.map((row) => toRow(row, now)),
     nextCursor: rows.length > limit && last !== undefined ? encodeCursor(last.startsAt, last.id) : null,
   };
 }
 
-function bookingsWhere(query: BookingsQuery): Prisma.BookingWhereInput {
+function bookingsWhere(query: BookingsQuery, now: Date): Prisma.BookingWhereInput {
   const startsAt: Prisma.DateTimeFilter = {};
   if (query.from !== undefined) startsAt.gte = kigaliMinuteToUtc(query.from, 0);
   if (query.to !== undefined) startsAt.lt = kigaliMinuteToUtc(query.to, MINUTES_PER_DAY);
@@ -101,20 +109,21 @@ function bookingsWhere(query: BookingsQuery): Prisma.BookingWhereInput {
       : {
           OR: [{ startsAt: { lt: after.startsAt } }, { startsAt: after.startsAt, id: { lt: after.id } }],
         }),
-    ...(search === ''
-      ? {}
-      : {
-          AND: [
+    AND: [
+      ...(query.stages !== undefined && query.stages.length > 0 ? [{ OR: query.stages.map((stage) => stageWhere(stage, now)) }] : []),
+      ...(search === ''
+        ? []
+        : [
             {
               OR: [
-                { reference: { contains: search, mode: 'insensitive' } },
-                { contactName: { contains: search, mode: 'insensitive' } },
-                { contactEmail: { contains: search, mode: 'insensitive' } },
-                { contactPhone: { contains: search, mode: 'insensitive' } },
+                { reference: { contains: search, mode: 'insensitive' as const } },
+                { contactName: { contains: search, mode: 'insensitive' as const } },
+                { contactEmail: { contains: search, mode: 'insensitive' as const } },
+                { contactPhone: { contains: search, mode: 'insensitive' as const } },
               ],
             },
-          ],
-        }),
+          ]),
+    ],
   };
 }
 
@@ -122,12 +131,13 @@ type ListedBooking = Prisma.BookingGetPayload<{
   include: { addons: { select: { stage: true; amountRwf: true } }; payments: { select: { status: true; amountRwf: true } } };
 }>;
 
-function toRow(booking: ListedBooking): BookingListRow {
+function toRow(booking: ListedBooking, now: Date): BookingListRow {
   const totals = bookingTotals(booking, booking.addons, booking.payments);
   return {
     id: booking.id,
     reference: booking.reference,
     status: booking.status,
+    stage: bookingStage(booking, now, 'admin'),
     startsAt: booking.startsAt.toISOString(),
     endsAt: booking.endsAt.toISOString(),
     contactName: booking.contactName,

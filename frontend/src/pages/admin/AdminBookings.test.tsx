@@ -27,6 +27,7 @@ const CONFIRMED: BookingListRow = {
   id: 'b1',
   reference: 'BKY-2701-00042',
   status: 'confirmed',
+  stage: 'confirmed',
   // 09:00 to 10:30 Kigali on Wednesday 6 January 2027.
   startsAt: '2027-01-06T07:00:00.000Z',
   endsAt: '2027-01-06T08:30:00.000Z',
@@ -47,6 +48,7 @@ const CANCELLED: BookingListRow = {
   id: 'b2',
   reference: 'BKY-2701-00043',
   status: 'cancelled_by_admin',
+  stage: 'cancelled_by_admin',
   startsAt: '2027-01-05T12:00:00.000Z',
   endsAt: '2027-01-05T13:30:00.000Z',
   contactName: 'Eric Habimana',
@@ -63,6 +65,7 @@ const NO_SHOW: BookingListRow = {
   id: 'b3',
   reference: 'BKY-2701-00044',
   status: 'no_show',
+  stage: 'no_show',
   startsAt: '2027-01-04T06:00:00.000Z',
   endsAt: '2027-01-04T07:30:00.000Z',
   contactName: 'Grace Mukamana',
@@ -161,6 +164,25 @@ describe('the list', () => {
     expect(third).toHaveTextContent('No-show')
   })
 
+  it('explains every stage beside the Status column, by click or keyboard (2026-09-25)', async () => {
+    stubFetch()
+    renderAt()
+    await rows()
+
+    const trigger = within(screen.getByRole('columnheader', { name: /Status/ })).getByRole('button', { name: 'What the statuses mean' })
+    await user().click(trigger)
+    const legend = await screen.findByRole('dialog')
+    expect(legend).toHaveTextContent('Needs review')
+    expect(legend).toHaveTextContent('The shoot has ended. Mark it completed or no-show.')
+    expect(legend).toHaveTextContent('The photos email has been sent.')
+
+    await user().keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    trigger.focus()
+    await user().keyboard('{Enter}')
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Needs review')
+  })
+
   it('shows the total, what is still owed, and what is owed back', async () => {
     stubFetch()
     renderAt()
@@ -226,23 +248,24 @@ describe('the list', () => {
 // --- The filter, which lives in the URL ------------------------------------------------
 
 describe('filtering', () => {
-  it('toggles a status into the URL, presses the button, and re-asks with it', async () => {
+  // The filter is by display stage since 2026-09-25.
+  it('toggles a stage into the URL, presses the button, and re-asks with it', async () => {
     const mock = stubFetch()
     const router = renderAt()
     await rows()
 
-    await user().click(statusButton('Confirmed'))
+    await user().click(statusButton('Needs review'))
 
     await waitFor(() => expect(listCalls(mock)).toHaveLength(2))
-    expect(router.state.location.search).toBe('?status=confirmed')
-    expect(listCalls(mock)[1]).toBe(`${BOOKINGS_API}?status=confirmed`)
-    expect(statusButton('Confirmed')).toHaveAttribute('aria-pressed', 'true')
+    expect(router.state.location.search).toBe('?stage=needs_review')
+    expect(listCalls(mock)[1]).toBe(`${BOOKINGS_API}?stage=needs_review`)
+    expect(statusButton('Needs review')).toHaveAttribute('aria-pressed', 'true')
     expect(statusButton('Completed')).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('toggles a status back off', async () => {
+  it('toggles a stage back off', async () => {
     const mock = stubFetch()
-    const router = renderAt('/admin/bookings?status=confirmed')
+    const router = renderAt('/admin/bookings?stage=confirmed')
     await rows()
     expect(statusButton('Confirmed')).toHaveAttribute('aria-pressed', 'true')
 
@@ -253,25 +276,37 @@ describe('filtering', () => {
     expect(statusButton('Confirmed')).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('keeps several statuses at once, repeated in the query', async () => {
+  it('keeps several stages at once, repeated in the query', async () => {
     const mock = stubFetch()
-    const router = renderAt('/admin/bookings?status=confirmed')
+    const router = renderAt('/admin/bookings?stage=confirmed')
     await rows()
 
     await user().click(statusButton('No-show'))
 
     await waitFor(() => expect(listCalls(mock)).toHaveLength(2))
-    expect(router.state.location.search).toBe('?status=confirmed&status=no_show')
-    expect(listCalls(mock)[1]).toBe(`${BOOKINGS_API}?status=confirmed&status=no_show`)
+    expect(router.state.location.search).toBe('?stage=confirmed&stage=no_show')
+    expect(listCalls(mock)[1]).toBe(`${BOOKINGS_API}?stage=confirmed&stage=no_show`)
+  })
+
+  it('opens a link made before stages on the stages its statuses now span', async () => {
+    const mock = stubFetch()
+    renderAt('/admin/bookings?status=confirmed&status=completed')
+    await rows()
+
+    expect(listCalls(mock)).toEqual([`${BOOKINGS_API}?stage=confirmed&stage=in_progress&stage=needs_review&stage=completed&stage=closed`])
+    for (const name of ['Confirmed', 'In progress', 'Needs review', 'Completed', 'Closed']) {
+      expect(statusButton(name)).toHaveAttribute('aria-pressed', 'true')
+    }
+    expect(statusButton('No-show')).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('reads the whole filter out of the URL on first render', async () => {
     const mock = stubFetch()
-    renderAt('/admin/bookings?status=confirmed&status=completed&from=2027-01-01&to=2027-01-31&search=Uwase')
+    renderAt('/admin/bookings?stage=confirmed&stage=completed&from=2027-01-01&to=2027-01-31&search=Uwase')
     await rows()
 
     expect(listCalls(mock)).toEqual([
-      `${BOOKINGS_API}?status=confirmed&status=completed&from=2027-01-01&to=2027-01-31&search=Uwase`,
+      `${BOOKINGS_API}?stage=confirmed&stage=completed&from=2027-01-01&to=2027-01-31&search=Uwase`,
     ])
     expect(statusButton('Confirmed')).toHaveAttribute('aria-pressed', 'true')
     expect(statusButton('Completed')).toHaveAttribute('aria-pressed', 'true')
@@ -311,22 +346,22 @@ describe('filtering', () => {
     expect(router.state.location.search).toBe('?from=2027-01-01&to=2027-01-31')
   })
 
-  it('searches on submit, trimming what was typed, and keeps the status filter', async () => {
+  it('searches on submit, trimming what was typed, and keeps the stage filter', async () => {
     const mock = stubFetch()
-    const router = renderAt('/admin/bookings?status=confirmed')
+    const router = renderAt('/admin/bookings?stage=confirmed')
     await rows()
 
     await user().type(screen.getByLabelText('Search'), '  Uwase  ')
     await user().click(screen.getByRole('button', { name: 'Search' }))
 
     await waitFor(() => expect(listCalls(mock)).toHaveLength(2))
-    expect(router.state.location.search).toBe('?status=confirmed&search=Uwase')
-    expect(listCalls(mock)[1]).toBe(`${BOOKINGS_API}?status=confirmed&search=Uwase`)
+    expect(router.state.location.search).toBe('?stage=confirmed&search=Uwase')
+    expect(listCalls(mock)[1]).toBe(`${BOOKINGS_API}?stage=confirmed&search=Uwase`)
   })
 
   it('clears every filter at once', async () => {
     const mock = stubFetch()
-    const router = renderAt('/admin/bookings?status=confirmed&from=2027-01-01&search=Uwase')
+    const router = renderAt('/admin/bookings?stage=confirmed&from=2027-01-01&search=Uwase')
     await rows()
 
     await user().click(screen.getByRole('button', { name: 'Clear filters' }))
@@ -375,13 +410,13 @@ describe('load more', () => {
 
   it('carries the filter into the next page', async () => {
     const mock = paged()
-    renderAt('/admin/bookings?status=confirmed&search=Uwase')
+    renderAt('/admin/bookings?stage=confirmed&search=Uwase')
     await rows()
 
     await user().click(screen.getByRole('button', { name: 'Load more' }))
 
     await waitFor(() => expect(listCalls(mock)).toHaveLength(2))
-    expect(listCalls(mock)[1]).toBe(`${BOOKINGS_API}?status=confirmed&search=Uwase&cursor=bmV4dA`)
+    expect(listCalls(mock)[1]).toBe(`${BOOKINGS_API}?stage=confirmed&search=Uwase&cursor=bmV4dA`)
   })
 
   it('stops offering more once the cursor comes back null', async () => {

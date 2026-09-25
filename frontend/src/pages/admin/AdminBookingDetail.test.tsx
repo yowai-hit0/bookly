@@ -53,6 +53,7 @@ const BOOKING: AdminBooking = {
   id: BOOKING_ID,
   reference: 'BKY-2701-00042',
   status: 'confirmed',
+  stage: 'confirmed',
   locale: 'en',
   client: { id: 'cl1', fullName: 'Aline Uwase', email: 'aline@example.com', phone: '+250788000000', anonymized: false },
   contact: { name: 'Aline Uwase', email: 'aline@example.com', phone: '+250788000000' },
@@ -108,6 +109,7 @@ const STARTED: AdminBooking = {
 const CANCELLED: AdminBooking = {
   ...BOOKING,
   status: 'cancelled_by_admin',
+  stage: 'cancelled_by_admin',
   lifecycle: { ...BOOKING.lifecycle, cancelledAt: '2026-10-02T09:00:00.000Z', cancellationReason: 'Studio flooded.' },
   money: { ...BOOKING.money, totals: { ...BOOKING.money.totals, collectedRwf: 0, refundDueRwf: 20_000, outstandingRwf: 0 } },
   payments: [{ ...BOOKING_FEE, status: 'refund_due', canRecordRefund: true }],
@@ -620,8 +622,8 @@ describe('cancelling', () => {
 
 describe('the one-click actions', () => {
   it.each([
-    ['Mark completed', 'complete', { ...STARTED, status: 'completed' }],
-    ['Mark no-show', 'no-show', { ...STARTED, status: 'no_show' }],
+    ['Mark completed', 'complete', { ...STARTED, status: 'completed', stage: 'completed' as const }],
+    ['Mark no-show', 'no-show', { ...STARTED, status: 'no_show', stage: 'no_show' as const }],
   ])('%s posts to /%s and re-renders from the answer', async (label, path, answer) => {
     const next = { ...answer, actions: { ...STARTED.actions, canComplete: false, canMarkNoShow: false, canReschedule: false, canCancel: false } }
     const { sent } = stubApi({ booking: STARTED, onPost: (_call, current) => ((current.value = next), json({ booking: next })) })
@@ -810,6 +812,7 @@ describe('when the API refuses an action', () => {
 const COMPLETED: AdminBooking = {
   ...BOOKING,
   status: 'completed',
+  stage: 'completed',
   lifecycle: { ...BOOKING.lifecycle, completedAt: '2027-01-06T09:00:00.000Z' },
   actions: {
     canReschedule: false,

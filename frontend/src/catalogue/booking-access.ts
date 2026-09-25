@@ -17,9 +17,26 @@ export type ClientBookingPayment = {
   settledAt: string | null
 }
 
+/** What a client may be shown (`backend/src/booking/stage.ts`), in the order the legend lists them. */
+export const CLIENT_STAGES = [
+  'awaiting_payment',
+  'confirmed',
+  'in_progress',
+  'completed',
+  'closed',
+  'no_show',
+  'expired',
+  'cancelled_by_client',
+  'cancelled_by_admin',
+] as const
+
+export type ClientStage = (typeof CLIENT_STAGES)[number]
+
 export type ClientBooking = {
   reference: string
   status: string
+  /** The client's display stage (2026-09-25): never `needs_review`. */
+  stage: ClientStage
   clientName: string
   /** Where the booking's emails go, masked by the API (`a•••••@example.com`): never the full address. */
   maskedEmail: string

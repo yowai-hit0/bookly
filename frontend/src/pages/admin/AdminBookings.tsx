@@ -2,7 +2,7 @@ import { type FormEvent, useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { UnauthenticatedError } from '@/admin/api'
-import { BOOKING_STATUSES, type BookingListRow, type BookingStatus, bookingsApi } from '@/admin/bookings'
+import { BOOKING_STAGES, BOOKING_STATUSES, type BookingListRow, type BookingStage, type BookingStatus, bookingsApi } from '@/admin/bookings'
 import { kigaliDateOf } from '@/admin/calendar-dates'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { formatDate, formatMoney, formatTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { StageLegend } from '@/pages/StageLegend'
 
 /**
  * The bookings list (plan.md Task 19): filtered by status and date, searched by
@@ -29,11 +30,16 @@ export function AdminBookings() {
   const [params, setParams] = useSearchParams()
   const searchId = useId()
 
-  const statuses = params.getAll('status').filter(isStatus)
+  // The list filters by display stage (2026-09-25). A link from before, with
+  // `?status=`, opens on the stages that status now spans, so it still shows
+  // the same bookings; the next change to the filter writes `?stage=`.
+  const stages = [
+    ...new Set([...params.getAll('stage').filter(isStage), ...params.getAll('status').filter(isStatus).flatMap(stagesOfStatus)]),
+  ]
   const from = params.get('from') ?? ''
   const to = params.get('to') ?? ''
   const search = params.get('search') ?? ''
-  const filterKey = `${statuses.join(',')}|${from}|${to}|${search}`
+  const filterKey = `${stages.join(',')}|${from}|${to}|${search}`
 
   const [page, setPage] = useState<{ key: string; rows: BookingListRow[]; nextCursor: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -45,7 +51,7 @@ export function AdminBookings() {
     setLoading(true)
     setFailed(false)
     bookingsApi
-      .list({ statuses, ...(from === '' ? {} : { from }), ...(to === '' ? {} : { to }), ...(search === '' ? {} : { search }) })
+      .list({ stages, ...(from === '' ? {} : { from }), ...(to === '' ? {} : { to }), ...(search === '' ? {} : { search }) })
       .then((answer) => {
         if (cancelled) return
         setPage({ key: filterKey, rows: answer.bookings, nextCursor: answer.nextCursor })
@@ -63,7 +69,7 @@ export function AdminBookings() {
     return () => {
       cancelled = true
     }
-    // `statuses` is rebuilt each render from the URL; `filterKey` is its value.
+    // `stages` is rebuilt each render from the URL; `filterKey` is its value.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterKey, navigate])
 
@@ -73,7 +79,7 @@ export function AdminBookings() {
     setLoading(true)
     try {
       const answer = await bookingsApi.list({
-        statuses,
+        stages,
         ...(from === '' ? {} : { from }),
         ...(to === '' ? {} : { to }),
         ...(search === '' ? {} : { search }),
@@ -91,9 +97,9 @@ export function AdminBookings() {
     }
   }
 
-  function applyFilter(next: { statuses?: BookingStatus[]; from?: string; to?: string; search?: string }) {
+  function applyFilter(next: { stages?: BookingStage[]; from?: string; to?: string; search?: string }) {
     const query = new URLSearchParams()
-    for (const status of next.statuses ?? statuses) query.append('status', status)
+    for (const stage of next.stages ?? stages) query.append('stage', stage)
     for (const [key, value] of [
       ['from', next.from ?? from],
       ['to', next.to ?? to],
@@ -104,8 +110,8 @@ export function AdminBookings() {
     setParams(query, { replace: true })
   }
 
-  function toggleStatus(status: BookingStatus) {
-    applyFilter({ statuses: statuses.includes(status) ? statuses.filter((s) => s !== status) : [...statuses, status] })
+  function toggleStage(stage: BookingStage) {
+    applyFilter({ stages: stages.includes(stage) ? stages.filter((s) => s !== stage) : [...stages, stage] })
   }
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
@@ -122,15 +128,15 @@ export function AdminBookings() {
 
       <section className="flex flex-col gap-3" aria-label={t('admin:bookings.filters.label')}>
         <div className="flex flex-wrap gap-2">
-          {BOOKING_STATUSES.map((status) => (
+          {BOOKING_STAGES.map((stage) => (
             <Button
-              key={status}
-              variant={statuses.includes(status) ? 'default' : 'outline'}
+              key={stage}
+              variant={stages.includes(stage) ? 'default' : 'outline'}
               size="sm"
-              aria-pressed={statuses.includes(status)}
-              onClick={() => toggleStatus(status)}
+              aria-pressed={stages.includes(stage)}
+              onClick={() => toggleStage(stage)}
             >
-              {t(`admin:bookings.status.${status}`)}
+              {t(`admin:bookings.stage.${stage}`)}
             </Button>
           ))}
         </div>
@@ -165,7 +171,7 @@ export function AdminBookings() {
               {t('admin:bookings.filters.apply')}
             </Button>
           </form>
-          {(statuses.length > 0 || from !== '' || to !== '' || search !== '') && (
+          {(stages.length > 0 || from !== '' || to !== '' || search !== '') && (
             <Button variant="ghost" size="sm" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
               {t('admin:bookings.filters.clear')}
             </Button>
@@ -199,7 +205,15 @@ export function AdminBookings() {
                     scope="col"
                     className={cn('text-muted-foreground px-2 py-2 font-medium', column === 'money' && 'text-right')}
                   >
-                    {t(`admin:bookings.columns.${column}`)}
+                    {column === 'status' ? (
+                      // What each stage means, beside the column that shows them (2026-09-25).
+                      <span className="inline-flex items-center gap-1">
+                        {t(`admin:bookings.columns.${column}`)}
+                        <StageLegend audience="admin" />
+                      </span>
+                    ) : (
+                      t(`admin:bookings.columns.${column}`)
+                    )}
                   </th>
                 ))}
               </tr>
@@ -227,7 +241,7 @@ export function AdminBookings() {
                     <span className="text-muted-foreground block">{booking.packageName}</span>
                   </td>
                   <td className="px-2 py-2 align-top">
-                    <StatusBadge status={booking.status}>{t(`admin:bookings.status.${booking.status}`)}</StatusBadge>
+                    <StatusBadge status={booking.stage}>{t(`admin:bookings.stage.${booking.stage}`)}</StatusBadge>
                   </td>
                   <td className="px-2 py-2 text-right align-top tabular-nums">
                     {formatMoney(booking.grandTotalRwf)}
@@ -260,4 +274,22 @@ export function AdminBookings() {
 
 function isStatus(value: string): value is BookingStatus {
   return (BOOKING_STATUSES as readonly string[]).includes(value)
+}
+
+function isStage(value: string): value is BookingStage {
+  return (BOOKING_STAGES as readonly string[]).includes(value)
+}
+
+/** The stages a stored status spans, for links made before stages. */
+function stagesOfStatus(status: BookingStatus): BookingStage[] {
+  switch (status) {
+    case 'pending_payment':
+      return ['awaiting_payment']
+    case 'confirmed':
+      return ['confirmed', 'in_progress', 'needs_review']
+    case 'completed':
+      return ['completed', 'closed']
+    default:
+      return [status]
+  }
 }

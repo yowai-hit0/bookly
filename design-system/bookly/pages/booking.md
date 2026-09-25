@@ -36,6 +36,8 @@ A card after the booking facts and amounts (`ContactEmail` in `BookingPage.tsx`)
 
 ## Status pill
 
+**Since 2026-09-25** the pill shows the display stage (MASTER section 7): in progress while the shoot runs, completed once it has ended (the client never sees `needs_review`), closed once the photos email has gone. An info button beside it opens "What the statuses mean".
+
 Today every status renders in one `bg-muted rounded-full` style, and `muted` is nearly invisible on the page background. Use the shared treatments in MASTER "Booking status treatments". The text label is always shown; tone and icon are secondary. This pill and the admin badges must look like the same system.
 
 ## States

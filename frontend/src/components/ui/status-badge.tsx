@@ -1,7 +1,10 @@
 import * as React from "react"
 import {
+  Archive,
   Ban,
+  Camera,
   CheckCheck,
+  ClipboardCheck,
   CircleCheck,
   CircleX,
   Clock,
@@ -34,6 +37,16 @@ const TREATMENTS = new Map<string, Treatment>([
   ["expired", { icon: Hourglass, className: "border-dotted border-muted-foreground bg-transparent text-muted-foreground" }],
   ["cancelled_by_client", { icon: CircleX, className: "border-destructive/40 bg-transparent text-destructive" }],
   ["cancelled_by_admin", { icon: Ban, className: "border-input bg-transparent text-muted-foreground" }],
+  // The display stages (2026-09-25, `backend/src/booking/stage.ts`): each keeps
+  // the rule above -- apart in greyscale by edge, fill and icon.
+  // `awaiting_payment` is `pending_payment` under its stage name.
+  ["awaiting_payment", { icon: Clock, className: "border-dashed border-muted-foreground bg-transparent text-foreground" }],
+  // Happening now: the only solid fill.
+  ["in_progress", { icon: Camera, className: "border-transparent bg-primary text-primary-foreground" }],
+  // Admin only: the shoot is over and waits on the photographer.
+  ["needs_review", { icon: ClipboardCheck, className: "border-ring/40 bg-[color-mix(in_oklab,var(--ring)_10%,var(--card))] text-foreground" }],
+  // Photos sent: done, and quieter than completed.
+  ["closed", { icon: Archive, className: "border-transparent bg-muted text-muted-foreground" }],
 ])
 
 /** A status the API adds later still renders, as a plain outline. */

@@ -33,6 +33,7 @@ const BOOKING_API = `/api/booking/${TOKEN}`
 const BOOKING: ClientBooking = {
   reference: REFERENCE,
   status: 'confirmed',
+  stage: 'confirmed',
   clientName: 'Aline Uwase',
   maskedEmail: 'a•••••@example.com',
   pendingMaskedEmail: null,
@@ -61,6 +62,7 @@ const BOOKING: ClientBooking = {
 const PAID: ClientBooking = {
   ...BOOKING,
   status: 'completed',
+  stage: 'completed',
   totals: { ...BOOKING.totals, collectedRwf: 50_000, outstandingRwf: 0 },
   payments: [
     ...BOOKING.payments,
@@ -73,6 +75,7 @@ const PAID: ClientBooking = {
 const CANCELLED: ClientBooking = {
   ...BOOKING,
   status: 'cancelled_by_client',
+  stage: 'cancelled_by_client',
   totals: { ...BOOKING.totals, outstandingRwf: 0, refundDueRwf: 30_000, collectedRwf: 20_000 },
   canCancel: false,
   cancelledAt: '2026-10-01T06:00:00.000Z',
@@ -228,17 +231,33 @@ describe('a valid link', () => {
     expect(screen.queryByText('Special requests')).not.toBeInTheDocument()
   })
 
+  // The pill shows the display stage (2026-09-25); `status` is kept beside it as the API sends both.
   it.each([
-    ['completed', 'Completed'],
-    ['no_show', 'Recorded as missed'],
-    ['cancelled_by_admin', 'Cancelled by the photographer'],
-    ['cancelled_by_client', 'Cancelled by you'],
-    ['expired', 'Expired'],
-  ])('names the %s status in words', async (status, words) => {
-    stubApi({ booking: () => json({ booking: { ...BOOKING, status, canCancel: false, sessionFee: null } }) })
+    ['confirmed', 'in_progress', 'In progress'],
+    ['completed', 'completed', 'Completed'],
+    ['completed', 'closed', 'Closed'],
+    ['no_show', 'no_show', 'Recorded as missed'],
+    ['cancelled_by_admin', 'cancelled_by_admin', 'Cancelled by the photographer'],
+    ['cancelled_by_client', 'cancelled_by_client', 'Cancelled by you'],
+    ['expired', 'expired', 'Expired'],
+  ])('names a %s booking at stage %s in words', async (status, stage, words) => {
+    stubApi({ booking: () => json({ booking: { ...BOOKING, status, stage, canCancel: false, sessionFee: null } }) })
     await renderLoaded()
 
     expect(screen.getByText(words)).toBeInTheDocument()
+  })
+
+  it('explains every stage a client can meet, and never needs_review (2026-09-25)', async () => {
+    stubApi()
+    await renderLoaded()
+
+    await user().click(screen.getByRole('button', { name: 'What the statuses mean' }))
+
+    const legend = await screen.findByRole('dialog')
+    for (const words of ['Waiting for payment', 'In progress', 'Closed', 'Your photos have been sent to your email.']) {
+      expect(legend).toHaveTextContent(words)
+    }
+    expect(legend).not.toHaveTextContent('Needs review')
   })
 })
 
@@ -455,7 +474,7 @@ describe('the amounts (data-model_v2.md §6.1)', () => {
   it('show nothing outstanding for a no-show, as the API computes it', async () => {
     stubApi({
       booking: () =>
-        json({ booking: { ...BOOKING, status: 'no_show', canCancel: false, sessionFee: null, totals: { ...BOOKING.totals, outstandingRwf: 0 } } }),
+        json({ booking: { ...BOOKING, status: 'no_show', stage: 'no_show', canCancel: false, sessionFee: null, totals: { ...BOOKING.totals, outstandingRwf: 0 } } }),
     })
     await renderLoaded()
 
@@ -735,7 +754,7 @@ describe('cancelling (spec §6.10)', () => {
   it('shows the photographer’s reason when they were the one who cancelled', async () => {
     stubApi({
       booking: () =>
-        json({ booking: { ...CANCELLED, status: 'cancelled_by_admin', cancellationReason: 'The photographer is unwell.' } }),
+        json({ booking: { ...CANCELLED, status: 'cancelled_by_admin', stage: 'cancelled_by_admin', cancellationReason: 'The photographer is unwell.' } }),
     })
     await renderLoaded()
 

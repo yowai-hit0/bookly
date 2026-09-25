@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { formatDate, formatDateTime, formatMoney, formatTime } from '@/lib/format'
 import { SELECT_CLASS } from './AdminField'
 import { cn } from '@/lib/utils'
+import { StageLegend } from '@/pages/StageLegend'
 
 /**
  * One booking, and everything the photographer does to it (plan.md Task 19;
@@ -122,9 +123,13 @@ export function AdminBookingDetail() {
     <Shell>
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="font-mono text-2xl font-semibold">{booking.reference}</h1>
-        <StatusBadge status={booking.status} size="md">
-          {t(`admin:bookings.status.${booking.status}`)}
-        </StatusBadge>
+        {/* The display stage (2026-09-25): the stored status read with the clock. */}
+        <span className="inline-flex items-center gap-1">
+          <StatusBadge status={booking.stage} size="md">
+            {t(`admin:bookings.stage.${booking.stage}`)}
+          </StatusBadge>
+          <StageLegend audience="admin" />
+        </span>
       </header>
 
       {failure !== null && (

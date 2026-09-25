@@ -352,6 +352,17 @@ Rules: the text label is **always** shown; the statuses must stay distinguishabl
 | `cancelled_by_client` | cancelled | outline, solid destructive 40% edge, destructive text | card fill + solid destructive 40% edge, muted text | `CircleX` |
 | `cancelled_by_admin` | cancelled | outline, solid neutral edge, muted-foreground text | card fill + solid neutral edge, muted text | `Ban` |
 
+**Display stages (2026-09-25, user decisions; `docs/prompts/client-access-and-admin-polish.md` item 7).** Badges and pills now show a *stage*, computed from the stored status and the clock by `backend/src/booking/stage.ts` and sent by the API as `stage`. The stored statuses and every rule on them are unchanged. The stages reuse the treatments above and add three:
+
+| Stage | Meaning | Badge / pill | Icon |
+|-------|---------|--------------|------|
+| `awaiting_payment` | `pending_payment` under its stage name | as `pending_payment` | `Clock` |
+| `in_progress` | confirmed, the shoot happening now | **solid** `primary` fill, `primary-foreground` text (the only solid fill) | `Camera` |
+| `needs_review` | confirmed, the shoot over, not yet marked completed or no-show. **Admin only**: the client sees `completed` | `ring` 10% tint, `ring` 40% edge, foreground text | `ClipboardCheck` |
+| `closed` | completed, and the photos email has gone | `muted` fill, no edge, **muted-foreground** text | `Archive` |
+
+`completed` now means "shoot done, photos not yet sent", whatever is still owed; money owed shows in the payment section, never hidden by the stage. A **legend** ("What the statuses mean", `pages/StageLegend.tsx`) sits beside the admin list's Status column header, the admin detail badge and the client pill: an info-icon button opening a popover (click, tap, Enter, Space; not a hover-only tooltip) that lists every stage its reader can meet, as the badge plus one sentence.
+
 Calendar blocks are not a status: muted fill with a diagonal hatch (pattern, not only colour). The dashed cue for `pending_payment` only works because its fill differs from its edge; see `pages/admin-calendar.md`.
 
 **Shipped (Section 4, 2026-09-20):** the client pill, as the shared `StatusBadge` (`components/ui/status-badge.tsx`; see section 11). The admin badges (Section 7) and the calendar events (Section 6) still have to adopt it.

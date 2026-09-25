@@ -14,7 +14,7 @@
 
 ### Filter section (`aria-label`)
 
-- Row 1: seven **status toggle buttons** (`aria-pressed`), `flex-wrap`, `size="sm"`. Pressed = default (filled) variant, unpressed = outline. Pressed vs unpressed must differ by more than hue: fill vs outline is enough; a small check icon on pressed is a good extra. Do not shorten labels.
+- Row 1: **stage toggle buttons** (ten since 2026-09-25, one per display stage, MASTER section 7; the URL carries `?stage=`, and an older `?status=` link opens on the stages that status now spans), `flex-wrap`, `size="sm"`. Pressed = default (filled) variant, unpressed = outline. Pressed vs unpressed must differ by more than hue: fill vs outline is enough; a small check icon on pressed is a good extra. Do not shorten labels.
 - Row 2: From date, To date (`w-44`), search (`w-64`) + outline "Apply", and a ghost "Clear" that appears only when a filter is active. Labels above inputs, `items-end` so buttons align with inputs.
 - Filters live in the URL; the layout must not depend on any local-only state.
 

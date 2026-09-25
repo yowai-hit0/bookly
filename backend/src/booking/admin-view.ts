@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
+import { type BookingStage, bookingStage } from './stage.js';
 import { type BookingTotals, bookingTotals } from './totals.js';
 
 /**
@@ -26,6 +27,8 @@ export type AdminBookingView = {
   id: string;
   reference: string;
   status: string;
+  /** The admin's display stage (`stage.ts`). */
+  stage: BookingStage;
   locale: string;
   client: { id: string; fullName: string; email: string; phone: string | null; anonymized: boolean };
   contact: { name: string; email: string; phone: string };
@@ -97,6 +100,7 @@ export function adminBookingView(booking: AdminBooking, now: Date): AdminBooking
     id: booking.id,
     reference: booking.reference,
     status: booking.status,
+    stage: bookingStage(booking, now, 'admin'),
     locale: booking.locale,
     client: {
       id: booking.client.id,

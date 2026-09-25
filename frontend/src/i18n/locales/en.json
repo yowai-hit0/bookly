@@ -430,6 +430,34 @@
         "expired": "Expired",
         "cancelled_by_client": "Cancelled by client",
         "cancelled_by_admin": "Cancelled by you"
+      },
+      "stage": {
+        "awaiting_payment": "Waiting for payment",
+        "confirmed": "Confirmed",
+        "in_progress": "In progress",
+        "needs_review": "Needs review",
+        "completed": "Completed",
+        "closed": "Closed",
+        "no_show": "No-show",
+        "expired": "Expired",
+        "cancelled_by_client": "Cancelled by client",
+        "cancelled_by_admin": "Cancelled by you"
+      },
+      "stageHelp": {
+        "awaiting_payment": "Held for the client while they pay the booking fee.",
+        "confirmed": "Booking fee paid, and the shoot is still ahead.",
+        "in_progress": "The shoot is happening now.",
+        "needs_review": "The shoot has ended. Mark it completed or no-show.",
+        "completed": "The shoot is done, and the photos have not been sent yet.",
+        "closed": "The photos email has been sent.",
+        "no_show": "You recorded that the client did not come.",
+        "expired": "The hold ran out before the booking fee was paid.",
+        "cancelled_by_client": "The client cancelled.",
+        "cancelled_by_admin": "You cancelled it."
+      },
+      "stageLegend": {
+        "label": "What the statuses mean",
+        "title": "What the statuses mean"
       }
     },
     "booking": {
@@ -734,7 +762,33 @@
       "title": "This booking is cancelled",
       "refund": "You are owed {{amount}} back. The photographer will contact you to arrange it."
     },
-    "photos_one": "{{count}} photo"
+    "photos_one": "{{count}} photo",
+    "stage": {
+      "awaiting_payment": "Waiting for payment",
+      "confirmed": "Confirmed",
+      "in_progress": "In progress",
+      "completed": "Completed",
+      "closed": "Closed",
+      "no_show": "Recorded as missed",
+      "expired": "Expired",
+      "cancelled_by_client": "Cancelled by you",
+      "cancelled_by_admin": "Cancelled by the photographer"
+    },
+    "stageHelp": {
+      "awaiting_payment": "Your time is held while you pay the booking fee.",
+      "confirmed": "Your booking fee is paid and your time is booked.",
+      "in_progress": "Your shoot is happening now.",
+      "completed": "The shoot is done, and the photographer is preparing your photos.",
+      "closed": "Your photos have been sent to your email.",
+      "no_show": "The photographer recorded that the shoot did not take place.",
+      "expired": "The hold ran out before the booking fee was paid.",
+      "cancelled_by_client": "You cancelled this booking.",
+      "cancelled_by_admin": "The photographer cancelled this booking."
+    },
+    "stageLegend": {
+      "label": "What the statuses mean",
+      "title": "What the statuses mean"
+    }
   },
   "emailConfirm": {
     "title": "Confirm your new email",

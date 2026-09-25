@@ -28,6 +28,7 @@ const BOOKING = {
   id: BOOKING_ID,
   reference: 'BKY-2701-00042',
   status: 'confirmed',
+  stage: 'confirmed',
   locale: 'en',
   client: { id: 'cl1', fullName: 'Aline Uwase', email: 'aline@example.com', phone: '+250788000000', anonymized: false },
   contact: { name: 'Aline Uwase', email: 'aline@example.com', phone: '+250788000000' },
@@ -359,6 +360,7 @@ describe('the post-shoot calls', () => {
   const POST_SHOOT: AdminBooking = {
     ...BOOKING,
     status: 'completed',
+    stage: 'completed',
     addons: [{ id: LINE_ID, name: 'Extra prints', unitPriceRwf: 15_000, quantity: 1, amountRwf: 15_000, stage: 'post_shoot', canRemove: true }],
     money: {
       ...BOOKING.money,
@@ -449,6 +451,7 @@ describe('the delivery calls', () => {
   const DELIVERED: AdminBooking = {
     ...BOOKING,
     status: 'completed',
+    stage: 'completed',
     delivery: { url: DELIVERY_LINK, expiresOn: '2027-03-15', sentAt: '2027-01-02T09:15:00.000Z', note: 'Thank you!' },
     actions: { ...BOOKING.actions, canEditAddons: true, canEditDelivery: true, canSendDelivery: true },
   }

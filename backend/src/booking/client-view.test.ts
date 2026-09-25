@@ -106,6 +106,8 @@ describe('the whole view', () => {
     expect(view).toStrictEqual({
       reference: booking.reference,
       status: 'confirmed',
+      // The shoot is still ahead of NOW (2026-09-25, booking/stage.ts).
+      stage: 'confirmed',
       clientName: CLIENT.name,
       // Masked, never the address itself (2026-09-25).
       maskedEmail: 'a•••••@example.com',

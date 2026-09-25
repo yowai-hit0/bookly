@@ -22,10 +22,31 @@ export const BOOKING_STATUSES = [
 
 export type BookingStatus = (typeof BOOKING_STATUSES)[number]
 
+/**
+ * The admin's display stages (2026-09-25, `backend/src/booking/stage.ts`):
+ * what the list filters by and every badge shows. The stored status is still
+ * on each row; the stage reads it together with the clock.
+ */
+export const BOOKING_STAGES = [
+  'awaiting_payment',
+  'confirmed',
+  'in_progress',
+  'needs_review',
+  'completed',
+  'closed',
+  'no_show',
+  'expired',
+  'cancelled_by_client',
+  'cancelled_by_admin',
+] as const
+
+export type BookingStage = (typeof BOOKING_STAGES)[number]
+
 export type BookingListRow = {
   id: string
   reference: string
   status: string
+  stage: BookingStage
   startsAt: string
   endsAt: string
   contactName: string
@@ -71,6 +92,7 @@ export type AdminBooking = {
   id: string
   reference: string
   status: string
+  stage: BookingStage
   locale: string
   client: { id: string; fullName: string; email: string; phone: string | null; anonymized: boolean }
   contact: { name: string; email: string; phone: string }
@@ -120,7 +142,9 @@ export type AdminBooking = {
 }
 
 export type BookingsFilter = {
+  /** Links made before stages still carry these; the API reads both. */
   statuses?: readonly BookingStatus[]
+  stages?: readonly BookingStage[]
   /** Kigali dates, inclusive. */
   from?: string
   to?: string
@@ -133,6 +157,7 @@ export const bookingsApi = {
   list(filter: BookingsFilter = {}): Promise<BookingsPage> {
     const query = new URLSearchParams()
     for (const status of filter.statuses ?? []) query.append('status', status)
+    for (const stage of filter.stages ?? []) query.append('stage', stage)
     for (const [key, value] of [
       ['from', filter.from],
       ['to', filter.to],

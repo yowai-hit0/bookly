@@ -1,6 +1,7 @@
 import { kigaliDateOf } from '../availability/engine.js';
 import type { AccessedBooking } from './access.js';
 import { maskEmail, pendingMaskedEmailOf } from './email-change.js';
+import { type ClientStage, bookingStage } from './stage.js';
 import { bookingTotals } from './totals.js';
 
 /**
@@ -21,6 +22,8 @@ const PAYABLE_STATUSES = ['confirmed', 'completed'];
 export type ClientBookingView = {
   reference: string;
   status: string;
+  /** The client's display stage (`stage.ts`): never `needs_review`. */
+  stage: ClientStage;
   clientName: string;
   /**
    * Where the booking's emails go, masked (`a•••••@example.com`) so the client
@@ -69,6 +72,7 @@ export function clientBookingView(booking: AccessedBooking, now: Date): ClientBo
   return {
     reference: booking.reference,
     status: booking.status,
+    stage: bookingStage(booking, now, 'client'),
     clientName: booking.contactName,
     maskedEmail: maskEmail(booking.contactEmail),
     pendingMaskedEmail: pendingMaskedEmailOf(booking, now),
