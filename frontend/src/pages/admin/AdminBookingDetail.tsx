@@ -1,20 +1,43 @@
+import {
+  CalendarClock,
+  CalendarSync,
+  Camera,
+  CircleAlert,
+  ClipboardList,
+  Hash,
+  History,
+  type LucideIcon,
+  MapPin,
+  MessageSquareText,
+  MessageSquareX,
+  Timer,
+  TriangleAlert,
+  Users,
+} from 'lucide-react'
 import { type FormEvent, type ReactNode, useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import { ApiError, UnauthenticatedError } from '@/admin/api'
+import { useBreadcrumbTail } from '@/admin/breadcrumb-tail'
 import { type AdminBooking, type AdminPayment, bookingFromRefusal, bookingsApi } from '@/admin/bookings'
 import { type AdminAddon, catalogueApi } from '@/admin/catalogue'
 import { kigaliDateOf } from '@/admin/calendar-dates'
+import { BackLink } from '@/components/ui/back-link'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Callout } from '@/components/ui/callout'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { StatusBadge, type StatusShape, StatusShapeGlyph } from '@/components/ui/status-badge'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDate, formatDateTime, formatMoney, formatTime } from '@/lib/format'
 import { SELECT_CLASS } from './AdminField'
 import { cn } from '@/lib/utils'
 import { StageLegend } from '@/pages/StageLegend'
+import { CHECKBOX, DATA, FIELD, META, PAGE, SECTION_TITLE, SUBPANEL, TEXTAREA } from './console/classes'
+import { MetaItem, PageHeader } from './console/PageHeader'
+import { StatGrid, StatTile } from './console/StatGrid'
 
 /**
  * One booking, and everything the photographer does to it (plan.md Task 19;
@@ -24,12 +47,31 @@ import { StageLegend } from '@/pages/StageLegend'
  * refusal: a slot taken while he was choosing, or a booking cancelled in
  * another tab, replaces what is on screen instead of leaving him to guess. The
  * buttons follow the API's own `actions` flags, which the API enforces again.
+ *
+ * Laid out as the admin console (design-system/bookly/admin-console.md 6.3,
+ * 6.6, 6.7): a page header and a status band, then flat sections divided by
+ * full-bleed hairlines, in the order the page has always had.
  */
 
 /** Kigali is UTC+2 with no DST (spec §6.5), so a fixed offset is exact. */
 const KIGALI_OFFSET = '+02:00'
 
 type Failure = { code: string } | null
+
+/** Help text under a field or a group of buttons: 13px, muted. */
+const HINT = 'text-muted-foreground text-[0.8125rem] leading-snug'
+
+/** A history line (message log, payment references): mono 13px. */
+const LOG = 'font-mono text-[0.8125rem] tabular-nums'
+
+/** A row of buttons: stacked full width on a phone, side by side from `sm`. */
+const BUTTONS = 'flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center'
+
+/** A button in such a row. */
+const BUTTON_WIDTH = 'w-full sm:w-auto'
+
+/** A field above its own label: the console's label-above layout. */
+const FIELD_GROUP = 'flex min-w-0 flex-col gap-2'
 
 export function AdminBookingDetail() {
   const { t } = useTranslation()
@@ -61,6 +103,11 @@ export function AdminBookingDetail() {
       cancelled = true
     }
   }, [id, navigate])
+
+  // The breadcrumb's last crumb is this booking's reference, from this page's
+  // own fetch (admin-console.md 6.2): a placeholder while it loads, and none
+  // once a load has failed or found nothing.
+  useBreadcrumbTail(state === 'loading', state === 'ready' && booking !== null ? booking.reference : null)
 
   /** Runs an action, then shows whatever the API says the booking now is. */
   async function act(action: () => Promise<{ booking: AdminBooking }>): Promise<void> {
@@ -99,245 +146,364 @@ export function AdminBookingDetail() {
 
   if (state === 'loading') {
     return (
-      <Shell>
-        <p className="text-muted-foreground text-sm" role="status">
-          {t('admin:booking.loading')}
-        </p>
-      </Shell>
+      <Shell
+        head={
+          <p className={META} role="status">
+            {t('admin:booking.loading')}
+          </p>
+        }
+      />
     )
   }
   // A load that failed leaves no booking either, so it is answered first:
   // only a 404 means the booking is really gone.
   if (state === 'failed') {
     return (
-      <Shell>
-        <p className="text-destructive text-sm" role="alert">
-          {t('admin:booking.loadFailed')}
-        </p>
-      </Shell>
+      <Shell
+        head={
+          <Callout variant="console" tone="destructive" icon={CircleAlert} role="alert">
+            {t('admin:booking.loadFailed')}
+          </Callout>
+        }
+      />
     )
   }
   if (state === 'missing' || booking === null) {
     return (
-      <Shell>
-        <h1 className="text-2xl font-semibold">{t('admin:booking.missing')}</h1>
-      </Shell>
+      <Shell head={<PageHeader eyebrow={t('admin:nav.bookings')} eyebrowIcon={ClipboardList} title={t('admin:booking.missing')} />} />
     )
   }
 
   const { schedule, money, actions } = booking
 
   return (
-    <Shell>
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="font-mono text-2xl font-semibold">{booking.reference}</h1>
-        {/* The display stage (2026-09-25): the stored status read with the clock. */}
-        <span className="inline-flex items-center gap-1">
-          <StatusBadge status={booking.stage} size="md">
-            {t(`admin:bookings.stage.${booking.stage}`)}
-          </StatusBadge>
-          <StageLegend audience="admin" />
-        </span>
-      </header>
+    <Shell
+      head={
+        <PageHeader
+          eyebrow={t('admin:nav.bookings')}
+          eyebrowIcon={ClipboardList}
+          title={booking.reference}
+          titleClassName="font-mono"
+          badges={
+            // The display stage (2026-09-25): the stored status read with the clock.
+            <span className="inline-flex items-center gap-1">
+              <StatusBadge status={booking.stage} size="md">
+                {t(`admin:bookings.stage.${booking.stage}`)}
+              </StatusBadge>
+              <StageLegend audience="admin" />
+            </span>
+          }
+        />
+      }
+    >
+      <StatusBand booking={booking} />
 
       {failure !== null && (
-        <p className="text-destructive text-sm" role="alert">
+        <Callout variant="console" tone="destructive" icon={CircleAlert} role="alert">
           {t(`admin:booking.errors.${failure.code}`, { defaultValue: t('admin:booking.errors.failed') })}
-        </p>
+        </Callout>
       )}
 
-      <Section title={t('admin:booking.sections.shoot')}>
-        <Line term={t('admin:booking.labels.when')}>
-          {formatDate(kigaliDateOf(schedule.startsAt))}, {formatTime(schedule.startsAt)} – {formatTime(schedule.endsAt)}
-        </Line>
-        <Line term={t('admin:booking.labels.service')}>
-          {booking.service.name}, {booking.package.name}
-        </Line>
-        <Line term={t('admin:booking.labels.location')}>{booking.details.locationText}</Line>
-        {booking.details.partySize !== null && <Line term={t('admin:booking.labels.people')}>{booking.details.partySize}</Line>}
-        {booking.details.specialRequests !== null && (
-          <Line term={t('admin:booking.labels.requests')}>
-            <span className="whitespace-pre-line">{booking.details.specialRequests}</span>
-          </Line>
-        )}
-        {schedule.originalStartsAt !== null && (
-          <Line term={t('admin:booking.labels.originally')}>{formatDateTime(schedule.originalStartsAt)}</Line>
-        )}
-        {schedule.rescheduledAt !== null && <Line term={t('admin:booking.labels.movedAt')}>{formatDateTime(schedule.rescheduledAt)}</Line>}
-        {booking.lifecycle.cancellationReason !== null && (
-          <Line term={t('admin:booking.labels.cancellationReason')}>{booking.lifecycle.cancellationReason}</Line>
-        )}
-      </Section>
-
-      <Section title={t('admin:booking.sections.client')}>
-        <Line term={t('admin:booking.labels.name')}>{booking.contact.name}</Line>
-        <Line term={t('admin:booking.labels.email')}>{booking.contact.email}</Line>
-        <Line term={t('admin:booking.labels.phone')}>{booking.contact.phone}</Line>
-        <Line term={t('admin:booking.labels.link')}>
-          {booking.access.hasLink
-            ? t('admin:booking.linkLive', { date: formatDateTime(booking.access.expiresAt ?? schedule.startsAt) })
-            : t('admin:booking.linkNone')}
-        </Line>
-      </Section>
-
-      <Section title={t('admin:booking.sections.money')}>
-        <Line term={booking.package.name}>{formatMoney(booking.package.priceRwf)}</Line>
-        {booking.addons.map((addon) => (
-          <Line
-            key={addon.id}
-            term={`${addon.name}${addon.quantity > 1 ? ` × ${addon.quantity}` : ''}${
-              addon.stage === 'post_shoot' ? ` (${t('admin:booking.postShoot')})` : ''
-            }`}
-          >
-            <span className="flex items-center gap-3">
-              <span className="tabular-nums">{formatMoney(addon.amountRwf)}</span>
-              {addon.canRemove && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  aria-disabled={busy}
-                  onClick={() => void act(() => bookingsApi.removeAddon(booking.id, addon.id))}
-                >
-                  {t('admin:booking.addons.remove')}
-                </Button>
-              )}
-            </span>
-          </Line>
-        ))}
-        <Line term={t('admin:booking.labels.total')} className="mt-1 border-t pt-2 font-semibold">
-          {formatMoney(money.totals.grandTotalRwf)}
-        </Line>
-        <Line term={t('admin:booking.labels.collected')}>{formatMoney(money.totals.collectedRwf)}</Line>
-        {/* Still to pay is the number that needs action, so it is a step heavier while it is above zero. */}
-        <Line term={t('admin:booking.labels.outstanding')} className={money.totals.outstandingRwf > 0 ? 'font-semibold' : undefined}>
-          {formatMoney(money.totals.outstandingRwf)}
-        </Line>
-        {money.totals.refundDueRwf > 0 && (
-          <Line term={t('admin:booking.labels.refundDue')} className="text-destructive font-semibold">
-            {formatMoney(money.totals.refundDueRwf)}
-          </Line>
-        )}
-        {actions.canEditAddons && (
-          <div className="mt-2 flex flex-col gap-2 border-t pt-3">
-            <p className="text-sm font-medium">{t('admin:booking.addons.title')}</p>
-            <AddonForm
-              serviceId={booking.service.id}
-              busy={busy}
-              onAdd={(addonId, quantity) => act(() => bookingsApi.addAddon(booking.id, addonId, quantity))}
-            />
-            <p className="text-muted-foreground text-xs">{t('admin:booking.addons.note')}</p>
-          </div>
-        )}
-      </Section>
-
-      <Payments booking={booking} busy={busy} onRefund={(paymentId, reference) => act(() => bookingsApi.recordRefund(paymentId, reference))} />
-
-      {actions.canEditDelivery || booking.delivery.url !== null ? (
-        <DeliveryForm
-          booking={booking}
-          busy={busy}
-          onSave={(body) => act(() => bookingsApi.saveDelivery(booking.id, body))}
-          onSend={(recipient) => act(() => bookingsApi.sendDelivery(booking.id, recipient))}
-        />
-      ) : (
-        // Where the form will be, once the shoot has begun: the photographer
-        // otherwise has no way to know it exists (2026-09-25). `canComplete` is
-        // the API's "confirmed and the shoot has begun", on its clock.
-        actions.canComplete && (
-          <Section title={t('admin:booking.sections.delivery')}>
-            <p className="text-muted-foreground text-sm">{t('admin:booking.delivery.opensWhenCompleted')}</p>
-          </Section>
-        )
-      )}
-
-      <Section title={t('admin:booking.sections.actions')}>
-        <div className="flex flex-col gap-4">
-          {actions.canReschedule && <RescheduleForm booking={booking} busy={busy} onSubmit={(startsAt) => act(() => bookingsApi.reschedule(booking.id, startsAt))} />}
-          {actions.canCancel && <CancelForm busy={busy} onSubmit={(reason) => act(() => bookingsApi.cancel(booking.id, reason))} />}
-          {actions.canRequestSessionFee && (
-            <div className="flex flex-col gap-2">
-              <Button
-                className="self-start"
-                aria-disabled={busy}
-                onClick={() => void act(() => bookingsApi.requestSessionFee(booking.id))}
+      <div className="flex flex-col">
+        <Section title={t('admin:booking.sections.shoot')}>
+          <StatGrid>
+            <StatTile icon={CalendarClock} label={t('admin:booking.labels.when')} mono className="sm:col-span-2">
+              {formatDate(kigaliDateOf(schedule.startsAt))},{' '}
+              <span className="whitespace-nowrap">
+                {formatTime(schedule.startsAt)} – {formatTime(schedule.endsAt)}
+              </span>
+            </StatTile>
+            <StatTile icon={Camera} label={t('admin:booking.labels.service')}>
+              {booking.service.name}, {booking.package.name}
+            </StatTile>
+            <StatTile icon={MapPin} label={t('admin:booking.labels.location')}>
+              {booking.details.locationText}
+            </StatTile>
+            {booking.details.partySize !== null && (
+              <StatTile icon={Users} label={t('admin:booking.labels.people')} mono>
+                {booking.details.partySize}
+              </StatTile>
+            )}
+            {booking.details.specialRequests !== null && (
+              // Free text of any length: the full width, its icon beside the first line.
+              <StatTile icon={MessageSquareText} label={t('admin:booking.labels.requests')} className="items-start sm:col-span-2">
+                <span className="whitespace-pre-line">{booking.details.specialRequests}</span>
+              </StatTile>
+            )}
+            {schedule.originalStartsAt !== null && (
+              <StatTile icon={History} label={t('admin:booking.labels.originally')} mono>
+                {formatDateTime(schedule.originalStartsAt)}
+              </StatTile>
+            )}
+            {schedule.rescheduledAt !== null && (
+              <StatTile icon={CalendarSync} label={t('admin:booking.labels.movedAt')} mono>
+                {formatDateTime(schedule.rescheduledAt)}
+              </StatTile>
+            )}
+            {booking.lifecycle.cancellationReason !== null && (
+              <StatTile
+                icon={MessageSquareX}
+                label={t('admin:booking.labels.cancellationReason')}
+                className="items-start sm:col-span-2"
               >
-                {t('admin:booking.sessionFee.request', { amount: formatMoney(money.totals.outstandingRwf) })}
-              </Button>
-              <p className="text-muted-foreground text-xs">{t('admin:booking.sessionFee.note')}</p>
+                {booking.lifecycle.cancellationReason}
+              </StatTile>
+            )}
+          </StatGrid>
+        </Section>
+
+        <Section title={t('admin:booking.sections.client')}>
+          <div className="flex flex-col gap-4 sm:gap-3">
+            <Fact term={t('admin:booking.labels.name')}>{booking.contact.name}</Fact>
+            <Fact term={t('admin:booking.labels.email')}>{breakableEmail(booking.contact.email)}</Fact>
+            <Fact term={t('admin:booking.labels.phone')} mono>
+              {booking.contact.phone}
+            </Fact>
+            <Fact term={t('admin:booking.labels.link')}>
+              {booking.access.hasLink
+                ? t('admin:booking.linkLive', { date: formatDateTime(booking.access.expiresAt ?? schedule.startsAt) })
+                : t('admin:booking.linkNone')}
+            </Fact>
+          </div>
+        </Section>
+
+        <Section title={t('admin:booking.sections.money')}>
+          <div className="flex flex-col gap-3">
+            <Line term={booking.package.name}>{formatMoney(booking.package.priceRwf)}</Line>
+            {booking.addons.map((addon) => (
+              <Line
+                key={addon.id}
+                term={`${addon.name}${addon.quantity > 1 ? ` × ${addon.quantity}` : ''}${
+                  addon.stage === 'post_shoot' ? ` (${t('admin:booking.postShoot')})` : ''
+                }`}
+                extra={
+                  addon.canRemove && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="console-sm"
+                      className="text-destructive hover:bg-console-danger-tint hover:text-destructive"
+                      aria-disabled={busy}
+                      onClick={() => void act(() => bookingsApi.removeAddon(booking.id, addon.id))}
+                    >
+                      {t('admin:booking.addons.remove')}
+                    </Button>
+                  )
+                }
+              >
+                {formatMoney(addon.amountRwf)}
+              </Line>
+            ))}
+            <Line term={t('admin:booking.labels.total')} tone="strong" className="mt-1 border-t pt-4">
+              {formatMoney(money.totals.grandTotalRwf)}
+            </Line>
+            <Line term={t('admin:booking.labels.collected')}>{formatMoney(money.totals.collectedRwf)}</Line>
+            {/* Still to pay is the number that needs action, so it is a step heavier while it is above zero. */}
+            <Line term={t('admin:booking.labels.outstanding')} tone={money.totals.outstandingRwf > 0 ? 'strong' : 'plain'}>
+              {formatMoney(money.totals.outstandingRwf)}
+            </Line>
+            {money.totals.refundDueRwf > 0 && (
+              // Owed back: red, heavier, and an icon, beside the words that say so.
+              <Line term={t('admin:booking.labels.refundDue')} tone="danger" icon={TriangleAlert}>
+                {formatMoney(money.totals.refundDueRwf)}
+              </Line>
+            )}
+          </div>
+          {actions.canEditAddons && (
+            <div className={SUBPANEL}>
+              <p className="text-base font-medium">{t('admin:booking.addons.title')}</p>
+              <AddonForm
+                serviceId={booking.service.id}
+                busy={busy}
+                onAdd={(addonId, quantity) => act(() => bookingsApi.addAddon(booking.id, addonId, quantity))}
+              />
+              <p className={HINT}>{t('admin:booking.addons.note')}</p>
             </div>
           )}
-          <div className="flex flex-wrap gap-2">
-            {actions.canComplete && (
-              <Button variant="outline" aria-disabled={busy} onClick={() => void act(() => bookingsApi.complete(booking.id))}>
-                {t('admin:booking.complete')}
-              </Button>
-            )}
-            {actions.canMarkNoShow && (
-              <Button variant="outline" aria-disabled={busy} onClick={() => void act(() => bookingsApi.markNoShow(booking.id))}>
-                {t('admin:booking.noShow')}
-              </Button>
-            )}
-            {actions.canResendLink && (
-              <Button variant="outline" aria-disabled={busy} onClick={() => void act(() => bookingsApi.resendLink(booking.id))}>
-                {t('admin:booking.resendLink')}
-              </Button>
-            )}
-          </div>
-          <p className="text-muted-foreground text-xs">{t('admin:booking.resendNote')}</p>
-        </div>
-      </Section>
+        </Section>
 
-      {/* Once a client has a page to read them on (2026-09-25). */}
-      {booking.lifecycle.confirmedAt !== null && (
-        <Notes
+        <Payments
           booking={booking}
           busy={busy}
-          onAdd={(note) => attempt(() => bookingsApi.addNote(booking.id, note))}
-          onDelete={(noteId) => act(() => bookingsApi.deleteNote(booking.id, noteId))}
+          onRefund={(paymentId, reference) => act(() => bookingsApi.recordRefund(paymentId, reference))}
         />
-      )}
 
-      <Section title={t('admin:booking.sections.messages')}>
-        {booking.messages.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t('admin:booking.noMessages')}</p>
+        {actions.canEditDelivery || booking.delivery.url !== null ? (
+          <DeliveryForm
+            booking={booking}
+            busy={busy}
+            onSave={(body) => act(() => bookingsApi.saveDelivery(booking.id, body))}
+            onSend={(recipient) => act(() => bookingsApi.sendDelivery(booking.id, recipient))}
+          />
         ) : (
-          <ul className="flex flex-col gap-2 text-sm">
-            {booking.messages.map((message) => (
-              <li key={message.id} className="flex flex-wrap justify-between gap-2">
-                <span>
-                  {t(`admin:booking.templates.${message.template ?? message.kind}`, {
-                    defaultValue: message.template ?? message.kind,
-                  })}
-                  <span className="text-muted-foreground"> · {formatDateTime(message.createdAt)}</span>
-                  {/* Named only when it went elsewhere than the booking's own address (a one-off delivery recipient). */}
-                  {message.recipient !== null && message.recipient !== booking.contact.email && (
-                    <span className="text-muted-foreground"> · {t('admin:booking.messageTo', { recipient: message.recipient })}</span>
-                  )}
-                </span>
-                <span className={message.status === 'failed' ? 'text-destructive' : 'text-muted-foreground'}>
-                  {t(`admin:booking.messageStatus.${message.status}`, { defaultValue: message.status })}
-                  {message.lastError !== null && ` · ${message.lastError}`}
-                </span>
-              </li>
-            ))}
-          </ul>
+          // Where the form will be, once the shoot has begun: the photographer
+          // otherwise has no way to know it exists (2026-09-25). `canComplete` is
+          // the API's "confirmed and the shoot has begun", on its clock.
+          actions.canComplete && (
+            <Section title={t('admin:booking.sections.delivery')}>
+              <p className={META}>{t('admin:booking.delivery.opensWhenCompleted')}</p>
+            </Section>
+          )
         )}
-      </Section>
+
+        <Section title={t('admin:booking.sections.actions')}>
+          <div className="flex flex-col gap-6">
+            {actions.canReschedule && (
+              <RescheduleForm booking={booking} busy={busy} onSubmit={(startsAt) => act(() => bookingsApi.reschedule(booking.id, startsAt))} />
+            )}
+            {actions.canCancel && <CancelForm busy={busy} onSubmit={(reason) => act(() => bookingsApi.cancel(booking.id, reason))} />}
+            {actions.canRequestSessionFee && (
+              <div className="flex flex-col gap-2">
+                {/* The page's one main action: the inverted neutral button. */}
+                <Button
+                  size="console"
+                  className={cn(BUTTON_WIDTH, 'sm:self-start')}
+                  aria-disabled={busy}
+                  onClick={() => void act(() => bookingsApi.requestSessionFee(booking.id))}
+                >
+                  {t('admin:booking.sessionFee.request', { amount: formatMoney(money.totals.outstandingRwf) })}
+                </Button>
+                <p className={HINT}>{t('admin:booking.sessionFee.note')}</p>
+              </div>
+            )}
+            <div className="flex flex-col gap-2">
+              {/* Hidden while no routine action is open, so it leaves no gap behind. */}
+              <div className={cn(BUTTONS, 'empty:hidden')}>
+                {actions.canComplete && (
+                  <Button
+                    variant="console-outline"
+                    size="console"
+                    className={BUTTON_WIDTH}
+                    aria-disabled={busy}
+                    onClick={() => void act(() => bookingsApi.complete(booking.id))}
+                  >
+                    {t('admin:booking.complete')}
+                  </Button>
+                )}
+                {actions.canMarkNoShow && (
+                  <Button
+                    variant="console-outline"
+                    size="console"
+                    className={BUTTON_WIDTH}
+                    aria-disabled={busy}
+                    onClick={() => void act(() => bookingsApi.markNoShow(booking.id))}
+                  >
+                    {t('admin:booking.noShow')}
+                  </Button>
+                )}
+                {actions.canResendLink && (
+                  <Button
+                    variant="console-outline"
+                    size="console"
+                    className={BUTTON_WIDTH}
+                    aria-disabled={busy}
+                    onClick={() => void act(() => bookingsApi.resendLink(booking.id))}
+                  >
+                    {t('admin:booking.resendLink')}
+                  </Button>
+                )}
+              </div>
+              <p className={HINT}>{t('admin:booking.resendNote')}</p>
+            </div>
+          </div>
+        </Section>
+
+        {/* Once a client has a page to read them on (2026-09-25). */}
+        {booking.lifecycle.confirmedAt !== null && (
+          <Notes
+            booking={booking}
+            busy={busy}
+            onAdd={(note) => attempt(() => bookingsApi.addNote(booking.id, note))}
+            onDelete={(noteId) => act(() => bookingsApi.deleteNote(booking.id, noteId))}
+          />
+        )}
+
+        <Section title={t('admin:booking.sections.messages')}>
+          {booking.messages.length === 0 ? (
+            <p className={META}>{t('admin:booking.noMessages')}</p>
+          ) : (
+            // A log: one mono line per message, the shape and the word on the right.
+            <ul className={cn(LOG, 'flex flex-col')}>
+              {booking.messages.map((message) => (
+                <li
+                  key={message.id}
+                  className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 border-b py-3 first:pt-0 last:border-b-0 last:pb-0"
+                >
+                  <span className="min-w-0 wrap-anywhere">
+                    {t(`admin:booking.templates.${message.template ?? message.kind}`, {
+                      defaultValue: message.template ?? message.kind,
+                    })}
+                    <span className="text-muted-foreground"> · {formatDateTime(message.createdAt)}</span>
+                    {/* Named only when it went elsewhere than the booking's own address (a one-off delivery recipient). */}
+                    {message.recipient !== null && message.recipient !== booking.contact.email && (
+                      <span className="text-muted-foreground"> · {t('admin:booking.messageTo', { recipient: message.recipient })}</span>
+                    )}
+                  </span>
+                  <span
+                    className={cn(
+                      'ml-auto flex min-w-0 items-start gap-2',
+                      message.status === 'failed' ? 'text-destructive' : 'text-muted-foreground',
+                    )}
+                  >
+                    <Glyph shape={MESSAGE_SHAPES[message.status]} className="mt-px" />
+                    <span className="min-w-0 wrap-anywhere">
+                      {t(`admin:booking.messageStatus.${message.status}`, { defaultValue: message.status })}
+                      {message.lastError !== null && ` · ${message.lastError}`}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+      </div>
     </Shell>
   )
 }
 
-function Shell({ children }: { children: ReactNode }) {
+/**
+ * The page column: the back link and whatever heads the page (`head`), close
+ * together; then the rest of the page, a section's gap below.
+ */
+function Shell({ head, children }: { head: ReactNode; children?: ReactNode }) {
   const { t } = useTranslation()
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6">
-      <Link to="/admin/bookings" className="text-muted-foreground self-start text-sm hover:underline">
-        ← {t('admin:booking.back')}
-      </Link>
+    <main className={cn(PAGE, 'max-w-3xl')}>
+      <div className="flex flex-col gap-4 lg:gap-6">
+        <BackLink to="/admin/bookings" className="max-lg:min-h-11">
+          {t('admin:booking.back')}
+        </BackLink>
+        {head}
+      </div>
       {children}
     </main>
+  )
+}
+
+/**
+ * The booking at a glance, under the header (admin-console.md 6.3): its
+ * reference as a chip, when it starts and how long it runs, in mono. Only what
+ * the page already has, in strings that already exist. The status is not
+ * repeated here: its badge, with the legend beside it, is in the header just
+ * above, and a second copy of the word would be read out twice.
+ */
+function StatusBand({ booking }: { booking: AdminBooking }) {
+  const { t } = useTranslation()
+  const { startsAt, endsAt } = booking.schedule
+  const minutes = Math.round((Date.parse(endsAt) - Date.parse(startsAt)) / 60_000)
+  return (
+    <div className="bg-console-surface text-muted-foreground -mx-4 flex min-h-14 flex-wrap items-center gap-x-6 gap-y-2 border-y px-4 py-3 text-sm lg:-mx-12 lg:px-12">
+      <Badge variant="console" className="font-mono text-[0.8125rem] tabular-nums">
+        <Hash aria-hidden="true" />
+        {booking.reference}
+      </Badge>
+      <MetaItem icon={CalendarClock}>
+        <span className={cn(DATA, 'whitespace-nowrap')}>{formatDateTime(startsAt)}</span>
+      </MetaItem>
+      <MetaItem icon={Timer}>
+        <span className={cn(DATA, 'whitespace-nowrap')}>{t('admin:catalogue.duration', { minutes })}</span>
+      </MetaItem>
+    </div>
   )
 }
 
@@ -377,24 +543,26 @@ function Notes({
 
   return (
     <Section title={t('admin:booking.notes.title')}>
-      <p className="text-muted-foreground text-sm">{t('admin:booking.notes.intro')}</p>
+      <p className={cn(META, '-mt-2')}>{t('admin:booking.notes.intro')}</p>
       {booking.notes.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t('admin:booking.notes.none')}</p>
+        <p className={META}>{t('admin:booking.notes.none')}</p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col">
           {booking.notes.map((note) => (
-            <li key={note.id} className="flex flex-col gap-1 border-b pb-3 text-sm last:border-b-0">
+            <li key={note.id} className="flex flex-col gap-1.5 border-b py-4 first:pt-0 last:border-b-0">
               <p className="whitespace-pre-line wrap-anywhere">{note.body}</p>
-              <p className="text-muted-foreground text-xs">
-                {formatDateTime(note.createdAt)} · {t(note.emailed ? 'admin:booking.notes.emailed' : 'admin:booking.notes.pageOnly')}
+              <p className={HINT}>
+                <span className="font-mono tabular-nums">{formatDateTime(note.createdAt)}</span> ·{' '}
+                {t(note.emailed ? 'admin:booking.notes.emailed' : 'admin:booking.notes.pageOnly')}
               </p>
               {deleting === note.id ? (
-                <div className="flex flex-col gap-2 pt-1">
+                <div className="flex flex-col gap-3 pt-2">
                   <p className="text-sm font-medium">{t('admin:booking.notes.deleteConfirm')}</p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className={BUTTONS}>
                     <Button
                       variant="destructive"
-                      size="sm"
+                      size="console-sm"
+                      className={BUTTON_WIDTH}
                       aria-disabled={busy}
                       onClick={() => {
                         setDeleting(null)
@@ -403,13 +571,18 @@ function Notes({
                     >
                       {t('admin:booking.notes.deleteYes')}
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => setDeleting(null)}>
+                    <Button variant="console-outline" size="console-sm" className={BUTTON_WIDTH} onClick={() => setDeleting(null)}>
                       {t('admin:booking.notes.keep')}
                     </Button>
                   </div>
                 </div>
               ) : (
-                <Button variant="ghost" size="sm" className="text-destructive self-start" onClick={() => setDeleting(note.id)}>
+                <Button
+                  variant="ghost"
+                  size="console-sm"
+                  className="text-destructive hover:bg-console-danger-tint hover:text-destructive -ml-3 self-start"
+                  onClick={() => setDeleting(note.id)}
+                >
                   {t('admin:booking.notes.delete')}
                 </Button>
               )}
@@ -418,26 +591,35 @@ function Notes({
         </ul>
       )}
 
-      <form onSubmit={submit} className="flex flex-col gap-2 border-t pt-3">
-        <Label htmlFor={`${fieldId}body`}>{t('admin:booking.notes.label')}</Label>
-        <Textarea
-          id={`${fieldId}body`}
-          rows={3}
-          maxLength={1000}
-          value={body}
-          aria-describedby={`${fieldId}count`}
-          onChange={(event) => setBody(event.target.value)}
-        />
-        <p id={`${fieldId}count`} className="text-muted-foreground self-end text-xs tabular-nums">
-          {t('admin:booking.notes.count', { count: body.length })}
-        </p>
-        <div className="flex items-center gap-2">
-          <Checkbox id={`${fieldId}email`} checked={email} onCheckedChange={(value) => setEmail(value === true)} />
-          <Label htmlFor={`${fieldId}email`} className="font-normal">
+      <form onSubmit={submit} className={SUBPANEL}>
+        <div className={FIELD_GROUP}>
+          <Label htmlFor={`${fieldId}body`}>{t('admin:booking.notes.label')}</Label>
+          <Textarea
+            id={`${fieldId}body`}
+            rows={3}
+            maxLength={1000}
+            value={body}
+            aria-describedby={`${fieldId}count`}
+            onChange={(event) => setBody(event.target.value)}
+            className={TEXTAREA}
+          />
+          <p id={`${fieldId}count`} className={cn(HINT, 'self-end font-mono tabular-nums')}>
+            {t('admin:booking.notes.count', { count: body.length })}
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5">
+          {/* The label is the 44px target on a phone; the box's own hit area reaches 46px around it. */}
+          <Checkbox
+            id={`${fieldId}email`}
+            checked={email}
+            onCheckedChange={(value) => setEmail(value === true)}
+            className={cn(CHECKBOX, 'after:-inset-3.5')}
+          />
+          <Label htmlFor={`${fieldId}email`} className="min-h-11 flex-1 text-base font-normal lg:min-h-8 pointer-coarse:min-h-11">
             {t('admin:booking.notes.email')}
           </Label>
         </div>
-        <Button type="submit" size="sm" className="self-start" aria-disabled={busy || body.trim() === ''}>
+        <Button type="submit" variant="console-outline" size="console" className={cn(BUTTON_WIDTH, 'sm:self-start')} aria-disabled={busy || body.trim() === ''}>
           {t('admin:booking.notes.add')}
         </Button>
       </form>
@@ -445,22 +627,102 @@ function Notes({
   )
 }
 
+/**
+ * A section of the page: flat, its `h2`, and a full-bleed hairline above it
+ * (none above the first, which the status band already closes off).
+ */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="bg-card flex flex-col gap-2 rounded-xl border p-4 shadow-sm">
-      <h2 className="text-lg font-semibold">{title}</h2>
+    <section className="-mx-4 flex flex-col gap-6 border-t px-4 py-8 first:border-t-0 first:pt-0 last:pb-0 lg:-mx-12 lg:px-12 lg:py-10">
+      <h2 className={SECTION_TITLE}>{title}</h2>
       {children}
     </section>
   )
 }
 
-function Line({ term, children, className }: { term: string; children: ReactNode; className?: string }) {
+/** A labelled fact: the label beside the value from `sm`, above it on a phone. */
+function Fact({ term, children, mono = false }: { term: string; children: ReactNode; mono?: boolean }) {
   return (
-    <div className={cn('flex flex-wrap justify-between gap-x-4 text-sm', className)}>
-      <span className="text-muted-foreground">{term}</span>
-      <span className="tabular-nums">{children}</span>
+    <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-6">
+      <span className="text-muted-foreground text-sm sm:w-40 sm:shrink-0">{term}</span>
+      <span className={cn('min-w-0 wrap-break-word', mono && DATA)}>{children}</span>
     </div>
   )
+}
+
+const LINE_TONES = {
+  plain: { term: 'text-muted-foreground', value: '' },
+  strong: { term: 'text-foreground font-semibold', value: 'font-semibold' },
+  danger: { term: 'text-destructive font-semibold', value: 'text-destructive font-semibold' },
+} as const
+
+/**
+ * A line of the money: the words on the left (they wrap), the amount on the
+ * right in mono with tabular figures (it never wraps), then anything that acts
+ * on the line.
+ */
+function Line({
+  term,
+  children,
+  extra,
+  icon: Icon,
+  tone = 'plain',
+  className,
+}: {
+  term: string
+  children: ReactNode
+  extra?: ReactNode
+  icon?: LucideIcon
+  tone?: keyof typeof LINE_TONES
+  className?: string
+}) {
+  return (
+    <div className={cn('flex flex-wrap items-center justify-between gap-x-4 gap-y-1', className)}>
+      <span className={cn('flex min-w-0 flex-1 basis-24 items-center gap-2 wrap-break-word', LINE_TONES[tone].term)}>
+        {Icon !== undefined && <Icon aria-hidden="true" className="size-4 shrink-0" />}
+        {term}
+      </span>
+      <span className="ml-auto flex shrink-0 items-center gap-3">
+        <span className={cn(DATA, 'text-right whitespace-nowrap', LINE_TONES[tone].value)}>{children}</span>
+        {extra}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * Payments and messages speak the booking badges' four shapes (admin-console.md
+ * section 5): a filled check is done, an outlined check an earlier success, a
+ * clock is waiting, a cross failed; `lapsed` is a muted cross, for something
+ * that ended without failing.
+ */
+type Shape = StatusShape | 'lapsed'
+
+const PAYMENT_SHAPES: Record<string, Shape | undefined> = {
+  succeeded: 'current',
+  refunded: 'earlier',
+  initiated: 'waiting',
+  pending: 'waiting',
+  // Waiting on him: the money is to go back.
+  refund_due: 'waiting',
+  failed: 'failed',
+}
+
+const MESSAGE_SHAPES: Record<string, Shape | undefined> = {
+  done: 'current',
+  sent: 'current',
+  pending: 'waiting',
+  queued: 'waiting',
+  processing: 'waiting',
+  failed: 'failed',
+  cancelled: 'lapsed',
+}
+
+/** The shape beside a payment's or a message's word; a status with no shape shows the word alone. */
+function Glyph({ shape, className }: { shape: Shape | undefined; className?: string }) {
+  if (shape === undefined) return null
+  if (shape === 'lapsed') return <StatusShapeGlyph shape="failed" tone="muted" className={className} />
+  return <StatusShapeGlyph shape={shape} className={className} />
 }
 
 function Payments({
@@ -476,32 +738,42 @@ function Payments({
   return (
     <Section title={t('admin:booking.sections.payments')}>
       {booking.payments.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t('admin:booking.noPayments')}</p>
+        <p className={META}>{t('admin:booking.noPayments')}</p>
       ) : (
-        <ul className="flex flex-col gap-3">
-          {booking.payments.map((payment) => (
-            <li key={payment.id} className="flex flex-col gap-2 border-b pb-3 last:border-b-0 last:pb-0">
-              <div className="flex flex-wrap justify-between gap-2 text-sm">
-                <span>
-                  {t(`admin:booking.paymentKinds.${payment.kind}`, { defaultValue: payment.kind })} ·{' '}
-                  <span className="tabular-nums">{formatMoney(payment.amountRwf)}</span>
-                </span>
-                <span className={payment.status === 'failed' || payment.status === 'refund_due' ? 'text-destructive' : 'text-muted-foreground'}>
-                  {t(`admin:booking.paymentStatus.${payment.status}`, { defaultValue: payment.status })}
-                  {payment.settledAt !== null && ` · ${formatDateTime(payment.settledAt)}`}
-                </span>
-              </div>
-              <p className="text-muted-foreground text-xs">
-                {t('admin:booking.paymentRefs', {
-                  provider: payment.provider,
-                  ourRef: payment.ourRef,
-                  providerRef: payment.providerRef ?? '—',
-                })}
-                {payment.refundReference !== null && ` · ${t('admin:booking.refundReference', { reference: payment.refundReference })}`}
-              </p>
-              {payment.canRecordRefund && <RefundForm payment={payment} busy={busy} onSubmit={onRefund} />}
-            </li>
-          ))}
+        <ul className="flex flex-col">
+          {booking.payments.map((payment) => {
+            const owing = payment.status === 'failed' || payment.status === 'refund_due'
+            return (
+              <li key={payment.id} className="flex flex-col gap-2 border-b py-4 first:pt-0 last:border-b-0 last:pb-0">
+                <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
+                  <span className="min-w-0">
+                    {t(`admin:booking.paymentKinds.${payment.kind}`, { defaultValue: payment.kind })} ·{' '}
+                    <span className={cn(DATA, 'whitespace-nowrap')}>{formatMoney(payment.amountRwf)}</span>
+                  </span>
+                  <span className={cn('ml-auto flex min-w-0 items-center gap-2 text-sm', owing ? 'text-destructive' : 'text-muted-foreground')}>
+                    <Glyph shape={PAYMENT_SHAPES[payment.status]} className={payment.status === 'refund_due' ? 'text-destructive' : undefined} />
+                    <span className="min-w-0">
+                      <span className={owing ? 'font-medium' : undefined}>
+                        {t(`admin:booking.paymentStatus.${payment.status}`, { defaultValue: payment.status })}
+                      </span>
+                      {payment.settledAt !== null && (
+                        <span className={cn(LOG, 'text-muted-foreground whitespace-nowrap')}> · {formatDateTime(payment.settledAt)}</span>
+                      )}
+                    </span>
+                  </span>
+                </div>
+                <p className={cn(LOG, 'text-muted-foreground wrap-anywhere')}>
+                  {t('admin:booking.paymentRefs', {
+                    provider: payment.provider,
+                    ourRef: payment.ourRef,
+                    providerRef: payment.providerRef ?? '—',
+                  })}
+                  {payment.refundReference !== null && ` · ${t('admin:booking.refundReference', { reference: payment.refundReference })}`}
+                </p>
+                {payment.canRecordRefund && <RefundForm payment={payment} busy={busy} onSubmit={onRefund} />}
+              </li>
+            )
+          })}
         </ul>
       )}
     </Section>
@@ -528,15 +800,17 @@ function RefundForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor={fieldId}>{t('admin:booking.refund.reference')}</Label>
-        <Input id={fieldId} name="reference" required className="w-56" />
+    <form onSubmit={submit} className={cn(SUBPANEL, 'mt-2')}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className={FIELD_GROUP}>
+          <Label htmlFor={fieldId}>{t('admin:booking.refund.reference')}</Label>
+          <Input id={fieldId} name="reference" required className={cn(FIELD, 'font-mono sm:w-56')} />
+        </div>
+        <Button type="submit" variant="console-outline" size="console" className={BUTTON_WIDTH} aria-disabled={busy}>
+          {t('admin:booking.refund.record', { amount: formatMoney(payment.amountRwf) })}
+        </Button>
       </div>
-      <Button type="submit" variant="outline" size="sm" aria-disabled={busy}>
-        {t('admin:booking.refund.record', { amount: formatMoney(payment.amountRwf) })}
-      </Button>
-      <p className="text-muted-foreground w-full text-xs">{t('admin:booking.refund.note')}</p>
+      <p className={HINT}>{t('admin:booking.refund.note')}</p>
     </form>
   )
 }
@@ -584,14 +858,16 @@ function DeliveryForm({
   return (
     <Section title={t('admin:booking.sections.delivery')}>
       {delivery.sentAt === null ? (
-        <p className="text-muted-foreground text-sm">{t('admin:booking.delivery.unsent')}</p>
+        <p className={META}>{t('admin:booking.delivery.unsent')}</p>
       ) : (
-        <Line term={t('admin:booking.delivery.sent')}>{formatDateTime(delivery.sentAt)}</Line>
+        <Fact term={t('admin:booking.delivery.sent')} mono>
+          {formatDateTime(delivery.sentAt)}
+        </Fact>
       )}
 
       {actions.canEditDelivery ? (
-        <form onSubmit={submit} className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
+        <form onSubmit={submit} className="flex flex-col gap-5">
+          <div className={FIELD_GROUP}>
             <Label htmlFor={`${fieldId}url`}>{t('admin:booking.delivery.url')}</Label>
             <Input
               id={`${fieldId}url`}
@@ -600,36 +876,45 @@ function DeliveryForm({
               placeholder="https://"
               value={url}
               onChange={(event) => setUrl(event.target.value)}
+              className={FIELD}
             />
           </div>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${fieldId}expires`}>{t('admin:booking.delivery.expires')}</Label>
-              <Input
-                id={`${fieldId}expires`}
-                type="date"
-                value={expiresOn}
-                onChange={(event) => setExpiresOn(event.target.value)}
-                className="w-44"
-              />
-            </div>
-            <p className="text-muted-foreground text-xs">{t('admin:booking.delivery.expiresHint')}</p>
+          <div className={FIELD_GROUP}>
+            <Label htmlFor={`${fieldId}expires`}>{t('admin:booking.delivery.expires')}</Label>
+            <Input
+              id={`${fieldId}expires`}
+              type="date"
+              value={expiresOn}
+              onChange={(event) => setExpiresOn(event.target.value)}
+              className={cn(FIELD, 'tabular-nums sm:w-44')}
+            />
+            <p className={HINT}>{t('admin:booking.delivery.expiresHint')}</p>
           </div>
-          <div className="flex flex-col gap-1.5">
+          <div className={FIELD_GROUP}>
             <Label htmlFor={`${fieldId}note`}>{t('admin:booking.delivery.note')}</Label>
-            <Textarea id={`${fieldId}note`} rows={2} value={note} onChange={(event) => setNote(event.target.value)} />
+            <Textarea id={`${fieldId}note`} rows={2} value={note} onChange={(event) => setNote(event.target.value)} className={TEXTAREA} />
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" variant="outline" size="sm" aria-disabled={busy}>
-              {t('admin:booking.delivery.save')}
-            </Button>
-            {actions.canSendDelivery && !confirming && (
-              <Button type="button" size="sm" aria-disabled={busy} onClick={() => setConfirming(true)}>
-                {t(delivery.sentAt === null ? 'admin:booking.delivery.send' : 'admin:booking.delivery.sendAgain')}
+          <div className="flex flex-col gap-2">
+            <div className={BUTTONS}>
+              <Button type="submit" variant="console-outline" size="console" className={BUTTON_WIDTH} aria-disabled={busy}>
+                {t('admin:booking.delivery.save')}
               </Button>
-            )}
+              {/* Only opens the confirm step below; "Send now" there is what sends. */}
+              {actions.canSendDelivery && !confirming && (
+                <Button
+                  type="button"
+                  variant="console-outline"
+                  size="console"
+                  className={BUTTON_WIDTH}
+                  aria-disabled={busy}
+                  onClick={() => setConfirming(true)}
+                >
+                  {t(delivery.sentAt === null ? 'admin:booking.delivery.send' : 'admin:booking.delivery.sendAgain')}
+                </Button>
+              )}
+            </div>
+            <p className={HINT}>{t('admin:booking.delivery.note_hint')}</p>
           </div>
-          <p className="text-muted-foreground text-xs">{t('admin:booking.delivery.note_hint')}</p>
         </form>
       ) : null}
 
@@ -646,12 +931,12 @@ function DeliveryForm({
       )}
 
       {actions.canEditDelivery ? null : (
-        <>
-          <Line term={t('admin:booking.delivery.url')}>{delivery.url}</Line>
-          {delivery.expiresOn !== null && (
-            <Line term={t('admin:booking.delivery.expires')}>{formatDate(delivery.expiresOn)}</Line>
-          )}
-        </>
+        <div className="flex flex-col gap-4 sm:gap-3">
+          <Fact term={t('admin:booking.delivery.url')}>
+            <span className="wrap-anywhere">{delivery.url}</span>
+          </Fact>
+          {delivery.expiresOn !== null && <Fact term={t('admin:booking.delivery.expires')}>{formatDate(delivery.expiresOn)}</Fact>}
+        </div>
       )}
     </Section>
   )
@@ -692,9 +977,9 @@ function ConfirmRecipient({
   }
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-2 border-t pt-4">
-      <p className="text-sm font-medium">{t('admin:booking.delivery.confirmTitle')}</p>
-      <div className="flex flex-col gap-1.5">
+    <form onSubmit={submit} noValidate className={SUBPANEL}>
+      <p className="text-base font-medium">{t('admin:booking.delivery.confirmTitle')}</p>
+      <div className={FIELD_GROUP}>
         <Label htmlFor={fieldId}>{t('admin:booking.delivery.recipient')}</Label>
         <Input
           id={fieldId}
@@ -705,21 +990,25 @@ function ConfirmRecipient({
           aria-invalid={invalid || undefined}
           aria-describedby={`${fieldId}-hint${invalid ? ` ${fieldId}-error` : ''}`}
           onChange={(event) => setRecipient(event.target.value)}
+          className={FIELD}
         />
-        <p id={`${fieldId}-hint`} className="text-muted-foreground text-xs">
+        <p id={`${fieldId}-hint`} className={HINT}>
           {t('admin:booking.delivery.recipientHint', { email: contactEmail })}
         </p>
         {invalid && (
-          <p id={`${fieldId}-error`} className="text-destructive text-sm">
-            {t('admin:booking.delivery.recipientInvalid')}
+          // The icon repeats the words, so the error is not told by colour alone.
+          <p id={`${fieldId}-error`} className="text-destructive flex items-start gap-1.5 text-[0.8125rem] leading-snug">
+            <CircleAlert aria-hidden="true" className="mt-px size-3.5 shrink-0" />
+            <span>{t('admin:booking.delivery.recipientInvalid')}</span>
           </p>
         )}
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" size="sm" aria-disabled={busy}>
+      <div className={BUTTONS}>
+        {/* The step's commit: the inverted main button while the step is open. */}
+        <Button type="submit" size="console" className={BUTTON_WIDTH} aria-disabled={busy}>
           {t('admin:booking.delivery.confirmSend')}
         </Button>
-        <Button type="button" variant="outline" size="sm" onClick={onBack}>
+        <Button type="button" variant="console-outline" size="console" className={BUTTON_WIDTH} onClick={onBack}>
           {t('admin:booking.delivery.back')}
         </Button>
       </div>
@@ -767,7 +1056,7 @@ function AddonForm({
 
   if (choices === null) {
     return (
-      <p className="text-muted-foreground text-sm" role="status">
+      <p className={META} role="status">
         {t('admin:booking.addons.loading')}
       </p>
     )
@@ -776,12 +1065,13 @@ function AddonForm({
   // add-ons when the request failed would be a plain untruth.
   if (choices === 'failed') {
     return (
-      <p className="text-destructive text-sm" role="alert">
+      <p className="text-destructive flex items-start gap-2 text-sm" role="alert">
+        <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
         {t('admin:booking.addons.loadFailed')}
       </p>
     )
   }
-  if (choices.length === 0) return <p className="text-muted-foreground text-sm">{t('admin:booking.addons.none')}</p>
+  if (choices.length === 0) return <p className={META}>{t('admin:booking.addons.none')}</p>
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -790,15 +1080,10 @@ function AddonForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
-      <div className="flex flex-col gap-1.5">
+    <form onSubmit={submit} className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-3">
+      <div className={cn(FIELD_GROUP, 'sm:flex-1')}>
         <Label htmlFor={`${fieldId}addon`}>{t('admin:booking.addons.addon')}</Label>
-        <select
-          id={`${fieldId}addon`}
-          value={addonId}
-          onChange={(event) => setAddonId(event.target.value)}
-          className={SELECT_CLASS}
-        >
+        <select id={`${fieldId}addon`} value={addonId} onChange={(event) => setAddonId(event.target.value)} className={SELECT_CLASS}>
           <option value="">{t('admin:booking.addons.choose')}</option>
           {choices.map((addon) => (
             <option key={addon.id} value={addon.id}>
@@ -807,7 +1092,7 @@ function AddonForm({
           ))}
         </select>
       </div>
-      <div className="flex flex-col gap-1.5">
+      <div className={FIELD_GROUP}>
         <Label htmlFor={`${fieldId}quantity`}>{t('admin:booking.addons.quantity')}</Label>
         <Input
           id={`${fieldId}quantity`}
@@ -816,10 +1101,10 @@ function AddonForm({
           max={99}
           value={quantity}
           onChange={(event) => setQuantity(event.target.value)}
-          className="w-20"
+          className={cn(FIELD, 'font-mono tabular-nums sm:w-24')}
         />
       </div>
-      <Button type="submit" variant="outline" size="sm" aria-disabled={busy}>
+      <Button type="submit" variant="console-outline" size="console" className={BUTTON_WIDTH} aria-disabled={busy}>
         {t('admin:booking.addons.add')}
       </Button>
     </form>
@@ -847,19 +1132,32 @@ function RescheduleForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor={fieldId}>{t('admin:booking.reschedule.newStart')}</Label>
-        <Input id={fieldId} type="datetime-local" value={value} onChange={(event) => setValue(event.target.value)} className="w-60" />
+    <form onSubmit={submit} className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className={FIELD_GROUP}>
+          <Label htmlFor={fieldId}>{t('admin:booking.reschedule.newStart')}</Label>
+          <Input
+            id={fieldId}
+            type="datetime-local"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            className={cn(FIELD, 'tabular-nums sm:w-60')}
+          />
+        </div>
+        <Button type="submit" variant="console-outline" size="console" className={BUTTON_WIDTH} aria-disabled={busy}>
+          {t('admin:booking.reschedule.move')}
+        </Button>
       </div>
-      <Button type="submit" variant="outline" size="sm" aria-disabled={busy}>
-        {t('admin:booking.reschedule.move')}
-      </Button>
-      <p className="text-muted-foreground w-full text-xs">{t('admin:booking.reschedule.note')}</p>
+      <p className={HINT}>{t('admin:booking.reschedule.note')}</p>
     </form>
   )
 }
 
+/**
+ * Cancelling asks twice. Its block is set off from the routine actions by a
+ * hairline above and below (admin-booking-detail.md): the opener is the red
+ * tint, and the confirm, which cannot be undone, is the solid red.
+ */
 function CancelForm({ busy, onSubmit }: { busy: boolean; onSubmit: (reason: string | null) => Promise<void> }) {
   const { t } = useTranslation()
   const fieldId = useId()
@@ -873,10 +1171,9 @@ function CancelForm({ busy, onSubmit }: { busy: boolean; onSubmit: (reason: stri
   }
 
   if (!confirming) {
-    // Kept out of the row of routine buttons: its own top border and spacing (MASTER, admin-booking-detail.md).
     return (
-      <div className="border-t pt-4">
-        <Button variant="destructive" className="self-start" onClick={() => setConfirming(true)}>
+      <div className="border-y py-6">
+        <Button variant="destructive" size="console" className={BUTTON_WIDTH} onClick={() => setConfirming(true)}>
           {t('admin:booking.cancel.start')}
         </Button>
       </div>
@@ -884,27 +1181,40 @@ function CancelForm({ busy, onSubmit }: { busy: boolean; onSubmit: (reason: stri
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2 border-t pt-4">
-      <p className="text-sm font-medium">{t('admin:booking.cancel.warning')}</p>
-      <div className="flex flex-col gap-1.5">
+    <form onSubmit={submit} className="flex flex-col gap-4 border-y py-6">
+      <Callout variant="console" tone="destructive" icon={TriangleAlert}>
+        <p className="font-medium">{t('admin:booking.cancel.warning')}</p>
+      </Callout>
+      <div className={FIELD_GROUP}>
         <Label htmlFor={fieldId}>{t('admin:booking.cancel.reason')}</Label>
-        <Textarea id={fieldId} name="reason" rows={2} />
+        <Textarea id={fieldId} name="reason" rows={2} className={TEXTAREA} />
       </div>
-      <div className="flex flex-wrap gap-2">
-        {/* Irreversible, so it is the solid red variant, the same one the client booking page uses (MASTER section 6). */}
-        <Button
-          type="submit"
-          variant="destructive-solid"
-          size="sm"
-          aria-disabled={busy}
-        >
+      <div className={BUTTONS}>
+        {/* Irreversible: the console's solid red (never `destructive-solid`, whose dark fill is a text colour). */}
+        <Button type="submit" variant="console-destructive-solid" size="console" className={BUTTON_WIDTH} aria-disabled={busy}>
           {t('admin:booking.cancel.confirm')}
         </Button>
-        <Button type="button" variant="outline" size="sm" onClick={() => setConfirming(false)}>
+        <Button type="button" variant="console-outline" size="console" className={BUTTON_WIDTH} onClick={() => setConfirming(false)}>
           {t('admin:booking.cancel.keep')}
         </Button>
       </div>
     </form>
+  )
+}
+
+/**
+ * An email that wraps at its `@` in a narrow column rather than mid-word. The
+ * `<wbr>` adds a break opportunity without changing the text.
+ */
+function breakableEmail(email: string) {
+  const at = email.indexOf('@')
+  if (at <= 0) return email
+  return (
+    <>
+      {email.slice(0, at)}
+      <wbr />
+      {email.slice(at)}
+    </>
   )
 }
 
