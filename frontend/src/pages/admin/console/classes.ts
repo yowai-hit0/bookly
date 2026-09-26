@@ -32,17 +32,20 @@ export const REF_LINK =
 
 /** A standalone muted link (back to sign in, forgot password). */
 export const QUIET_LINK =
-  'inline-flex min-h-6 items-center gap-1.5 self-start rounded-xs text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline pointer-coarse:min-h-11'
+  'inline-flex min-h-6 items-center gap-1.5 self-start rounded-xs text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline max-lg:min-h-11 pointer-coarse:min-h-11'
 
 /**
  * A text field in the console, added to `Input`, `Textarea` or a native select:
  * 40px from `lg`, 44px below it and on touch, no fill, a 3:1 `--input` edge
- * (decision 5), 15px text from `md` (16px on a phone so iOS does not zoom).
+ * (decision 5), 15px text from `md` (16px on a phone so iOS does not zoom). An
+ * invalid field shows its red edge without the primitive's red halo: the
+ * console has no shadows, and the error sentence under it carries the meaning.
  */
-export const FIELD = 'h-11 lg:h-10 pointer-coarse:h-11 rounded-xs bg-transparent px-3 md:text-[0.9375rem]'
+export const FIELD =
+  'h-11 lg:h-10 pointer-coarse:h-11 rounded-xs bg-transparent px-3 aria-invalid:ring-0 md:text-[0.9375rem]'
 
 /** A textarea keeps its own height. */
-export const TEXTAREA = 'rounded-xs bg-transparent px-3 py-2.5 md:text-[0.9375rem]'
+export const TEXTAREA = 'rounded-xs bg-transparent px-3 py-2.5 aria-invalid:ring-0 md:text-[0.9375rem]'
 
 /** A native select, styled as a console field. */
 export const SELECT =

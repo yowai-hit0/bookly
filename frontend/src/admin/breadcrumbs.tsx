@@ -25,11 +25,13 @@ export function Breadcrumbs({ pathname, tail, className }: { pathname: string; t
   const { t } = useTranslation()
   const section = navItemFor(pathname)
 
-  type Crumb = { key: string; content: ReactNode; to: string | null; mono?: boolean }
+  type Crumb = { key: string; content: ReactNode; to: string | null; mono?: boolean; className?: string }
   const crumbs: Crumb[] = [
     {
       key: 'admin',
       to: '/admin',
+      // Icon-only below `sm`, so it needs its own width to be a 44px target.
+      className: 'max-sm:min-w-11 max-sm:justify-center',
       content: (
         <>
           <House aria-hidden="true" className="size-4 shrink-0" />
@@ -100,7 +102,7 @@ export function Breadcrumbs({ pathname, tail, className }: { pathname: string; t
                   {crumb.content}
                 </span>
               ) : (
-                <Link to={crumb.to} className={cn(CRUMB, LINK)}>
+                <Link to={crumb.to} className={cn(CRUMB, LINK, crumb.className)}>
                   {crumb.content}
                 </Link>
               )}

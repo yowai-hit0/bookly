@@ -184,7 +184,7 @@ export function BlockForm({ title, submitLabel, values, onSave, onCancel }: Prop
             ))}
           </ul>
           <p className="text-muted-foreground text-sm">{t('admin:availability.blocks.overlapBody')}</p>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             {/* Irreversible, so it is the solid red variant (MASTER section 6). */}
             <Button
               type="button"
@@ -209,7 +209,7 @@ export function BlockForm({ title, submitLabel, values, onSave, onCancel }: Prop
         </p>
       )}
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Button type="submit" size="console" disabled={saving}>
           {saving ? t('admin:availability.saving') : submitLabel}
         </Button>

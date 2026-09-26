@@ -49,13 +49,14 @@ const buttonVariants = cva(
           "size-7 pointer-coarse:size-11 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
         "icon-lg": "size-9 pointer-coarse:size-11",
         // Admin console only: 40px from `lg`, 44px below it and on touch, no
-        // press nudge (the console moves colour, never position).
+        // press nudge, and colour-only transitions behind `motion-safe` (the
+        // console moves colour, never position, and never animates focus).
         console:
-          "h-11 lg:h-10 pointer-coarse:h-11 gap-2 px-4 text-[0.9375rem] active:not-aria-[haspopup]:translate-y-0",
+          "h-11 lg:h-10 pointer-coarse:h-11 gap-2 px-4 text-[0.9375rem] transition-none motion-safe:transition-colors motion-safe:duration-150 active:not-aria-[haspopup]:translate-y-0",
         "console-sm":
-          "h-11 lg:h-8 pointer-coarse:h-11 gap-1.5 px-3 text-sm active:not-aria-[haspopup]:translate-y-0",
+          "h-11 lg:h-8 pointer-coarse:h-11 gap-1.5 px-3 text-sm transition-none motion-safe:transition-colors motion-safe:duration-150 active:not-aria-[haspopup]:translate-y-0",
         "console-icon":
-          "size-11 lg:size-10 pointer-coarse:size-11 active:not-aria-[haspopup]:translate-y-0",
+          "size-11 lg:size-10 pointer-coarse:size-11 transition-none motion-safe:transition-colors motion-safe:duration-150 active:not-aria-[haspopup]:translate-y-0",
       },
     },
     defaultVariants: {

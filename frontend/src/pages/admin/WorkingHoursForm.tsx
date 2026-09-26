@@ -172,7 +172,7 @@ export function WorkingHoursForm({ title, submitLabel, values, onSave, onCancel 
         </p>
       )}
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Button type="submit" size="console" disabled={saving}>
           {saving ? t('admin:availability.saving') : submitLabel}
         </Button>
