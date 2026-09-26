@@ -33,7 +33,8 @@ export function Breadcrumbs({ pathname, tail, className }: { pathname: string; t
       content: (
         <>
           <House aria-hidden="true" className="size-4 shrink-0" />
-          {t('admin:nav.label')}
+          {/* On the narrowest phones the house alone says "Admin"; the name stays for assistive tech. */}
+          <span className="max-sm:sr-only">{t('admin:nav.label')}</span>
         </>
       ),
     },

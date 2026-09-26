@@ -4,10 +4,11 @@ import { cn } from "cn"
 /**
  * `console` is the admin console's panel (design-system/bookly/admin-console.md
  * 6.5-6.7): a flat plane set apart by a hairline, no shadow, 2px corners,
- * 24px padding and 16px body text. Admin files opt in; the default is unchanged.
+ * 16px body text, and 24px padding (16px on a phone, where every pixel of a
+ * 375px column counts). Admin files opt in; the default is unchanged.
  */
 const CONSOLE_PANEL =
-  "rounded-xs shadow-none text-base [--card-spacing:--spacing(6)] *:[img:first-child]:rounded-t-xs *:[img:last-child]:rounded-b-xs"
+  "rounded-xs shadow-none text-base [--card-spacing:--spacing(4)] sm:[--card-spacing:--spacing(6)] *:[img:first-child]:rounded-t-xs *:[img:last-child]:rounded-b-xs"
 
 function Card({
   className,

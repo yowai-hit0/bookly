@@ -28,6 +28,9 @@ import { Toolbar, ToolbarCell } from './console/Toolbar'
 
 const LOAD_MORE_KEY = 'more'
 
+/** A cell stacked on a phone: no cell padding, and indented past the row's status glyph. */
+const CELL = 'max-md:block max-md:p-0 max-md:pl-9'
+
 export function AdminBookings() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -216,13 +219,23 @@ export function AdminBookings() {
       {showing !== null && rows.length === 0 && <p className="text-muted-foreground text-sm">{t('admin:bookings.empty')}</p>}
 
       {rows.length > 0 && (
-        <div className="-mx-4 overflow-x-auto px-4 lg:mx-0 lg:px-0">
-          <table className="w-full min-w-[52rem] border-collapse text-[0.9375rem]">
+        // From `md` a table with columns; on a phone each booking stacks into one
+        // block, so nothing scrolls sideways. The explicit roles keep it a table
+        // for assistive tech after `display` changes (Safari drops table
+        // semantics without them). On a phone only the Status header stays in
+        // view, because it carries the legend.
+        <div className="md:overflow-x-auto">
+          <table role="table" className="w-full border-collapse text-[0.9375rem] md:min-w-[52rem]">
             <caption className="sr-only">{t('admin:bookings.title')}</caption>
-            <thead>
-              <tr className="border-b">
+            <thead role="rowgroup" className="max-md:block">
+              <tr role="row" className="border-b max-md:flex max-md:justify-end">
                 {(['when', 'reference', 'client', 'service', 'status', 'money'] as const).map((column) => (
-                  <th key={column} scope="col" className={cn(TH, column === 'money' && 'text-right')}>
+                  <th
+                    key={column}
+                    role="columnheader"
+                    scope="col"
+                    className={cn(TH, column === 'money' && 'text-right', column !== 'status' && 'max-md:hidden', 'max-md:px-0')}
+                  >
                     {column === 'status' ? (
                       // What each stage means, beside the column that shows them (2026-09-25).
                       <span className="-my-2 inline-flex items-center gap-1">
@@ -236,10 +249,10 @@ export function AdminBookings() {
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody role="rowgroup" className="max-md:block">
               {rows.map((booking) => (
-                <tr key={booking.id} className={TR}>
-                  <td className={cn(TD, 'whitespace-nowrap')}>
+                <tr key={booking.id} role="row" className={cn(TR, 'max-md:flex max-md:flex-col max-md:gap-2 max-md:py-4')}>
+                  <td role="cell" className={cn(TD, CELL, 'max-md:pl-0 md:whitespace-nowrap')}>
                     <div className="flex items-start gap-3.5">
                       <StatusGlyph status={booking.stage} className="mt-px" />
                       <div className="flex flex-col gap-1">
@@ -250,32 +263,37 @@ export function AdminBookings() {
                       </div>
                     </div>
                   </td>
-                  <td className={cn(TD, 'whitespace-nowrap')}>
+                  <td role="cell" className={cn(TD, CELL, 'whitespace-nowrap')}>
                     <Link
                       to={`/admin/bookings/${booking.id}`}
-                      // 44px to a thumb below `lg`, without growing the row on a mouse.
-                      className={cn(REF_LINK, 'inline-flex items-center max-lg:-my-3 max-lg:min-h-11 pointer-coarse:-my-3 pointer-coarse:min-h-11')}
+                      // 44px to a thumb below `lg`. In the table row (from `md`) a
+                      // negative margin keeps the row from growing; stacked on a
+                      // phone it takes its full height so it never overlaps a neighbour.
+                      className={cn(
+                        REF_LINK,
+                        'inline-flex items-center max-lg:min-h-11 pointer-coarse:min-h-11 md:max-lg:-my-3 md:pointer-coarse:-my-3',
+                      )}
                     >
                       {booking.reference}
                     </Link>
                   </td>
-                  <td className={TD}>
+                  <td role="cell" className={cn(TD, CELL)}>
                     <div className="flex flex-col gap-1">
                       <span>{booking.contactName}</span>
                       <span className={cn(META, 'wrap-break-word')}>{breakableEmail(booking.contactEmail)}</span>
                     </div>
                   </td>
-                  <td className={TD}>
+                  <td role="cell" className={cn(TD, CELL)}>
                     <div className="flex flex-col gap-1">
                       <span>{booking.serviceName}</span>
                       <span className={META}>{booking.packageName}</span>
                     </div>
                   </td>
-                  <td className={TD}>
+                  <td role="cell" className={cn(TD, CELL)}>
                     <StatusBadge status={booking.stage}>{t(`admin:bookings.stage.${booking.stage}`)}</StatusBadge>
                   </td>
-                  <td className={cn(TD, 'text-right whitespace-nowrap')}>
-                    <div className="flex flex-col items-end gap-1">
+                  <td role="cell" className={cn(TD, CELL, 'whitespace-nowrap md:text-right')}>
+                    <div className="flex flex-col gap-1 md:items-end">
                       <span className={DATA}>{formatMoney(booking.grandTotalRwf)}</span>
                       {booking.outstandingRwf > 0 && (
                         <span className={META}>
