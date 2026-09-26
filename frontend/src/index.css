@@ -285,6 +285,16 @@
   :root[data-admin-theme] .font-heading {
     font-family: var(--console-font-sans);
   }
+  /* The shared popover (the stage legend) is a raised surface with a hairline
+     in the console: no shadow in dark, the faintest one in light. It portals
+     into <body>, which is why the admin tokens live on <html>. */
+  :root[data-admin-theme] [data-slot="popover-content"] {
+    background-color: var(--popover);
+    box-shadow: none;
+  }
+  :root[data-admin-theme="light"] [data-slot="popover-content"] {
+    box-shadow: 0 4px 12px rgb(0 0 0 / 0.06);
+  }
 }
 
 @layer base {
