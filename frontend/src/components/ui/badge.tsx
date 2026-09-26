@@ -18,6 +18,18 @@ const badgeVariants = cva(
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",
+        // Admin console only (design-system/bookly/admin-console.md 6.3):
+        // rectangles, never pills, 14px medium text, 5px x 10px padding.
+        console:
+          "h-auto rounded-xs bg-console-chip px-2.5 py-[5px] text-sm text-foreground [&>svg]:size-3.5!",
+        // The one headline badge a page may have.
+        "console-accent":
+          "h-auto rounded-xs bg-console-accent-strong px-2.5 py-[5px] text-sm text-white [&>svg]:size-3.5!",
+        "console-success":
+          "h-auto rounded-xs bg-console-success-tint px-2.5 py-[5px] text-sm text-console-success [&>svg]:size-3.5!",
+        // A count beside a table label ("BOOKINGS 24"): mono, square, on the chip colour.
+        "console-count":
+          "h-auto rounded-xs bg-console-chip px-1.5 py-0.5 font-mono text-xs text-foreground tabular-nums",
       },
     },
     defaultVariants: {

@@ -1,17 +1,28 @@
 import * as React from "react"
 import { cn } from "cn"
 
+/**
+ * `console` is the admin console's panel (design-system/bookly/admin-console.md
+ * 6.5-6.7): a flat plane set apart by a hairline, no shadow, 2px corners,
+ * 24px padding and 16px body text. Admin files opt in; the default is unchanged.
+ */
+const CONSOLE_PANEL =
+  "rounded-xs shadow-none text-base [--card-spacing:--spacing(6)] *:[img:first-child]:rounded-t-xs *:[img:last-child]:rounded-b-xs"
+
 function Card({
   className,
   size = "default",
+  variant = "default",
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+}: React.ComponentProps<"div"> & { size?: "default" | "sm"; variant?: "default" | "console" }) {
   return (
     <div
       data-slot="card"
       data-size={size}
+      {...(variant === "console" ? { "data-variant": "console" } : {})}
       className={cn(
         "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground border shadow-sm [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        variant === "console" && CONSOLE_PANEL,
         className
       )}
       {...props}

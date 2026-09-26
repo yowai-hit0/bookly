@@ -25,6 +25,16 @@ const buttonVariants = cva(
         "destructive-solid":
           "bg-destructive text-white hover:bg-[color-mix(in_oklch,var(--destructive),black_12%)] focus-visible:border-ring focus-visible:ring-ring/50",
         link: "text-primary underline-offset-4 hover:underline",
+        // Admin console only (design-system/bookly/admin-console.md 6.10).
+        // Its outline edge is the canvas's strong border, which a labelled
+        // button may use although it is under 3:1; fields keep `--input`.
+        "console-outline":
+          "border-console-border-strong bg-transparent hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
+        // The irreversible confirm in the console: `--destructive` is a text
+        // colour there (dark #F87171 cannot carry a white label), so the fill
+        // has its own token (white on it: 4.83:1 dark, 6.47:1 light).
+        "console-destructive-solid":
+          "bg-console-danger-solid text-white hover:bg-[color-mix(in_oklch,var(--console-danger-solid),black_12%)]",
       },
       size: {
         default:
@@ -38,6 +48,14 @@ const buttonVariants = cva(
         "icon-sm":
           "size-7 pointer-coarse:size-11 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
         "icon-lg": "size-9 pointer-coarse:size-11",
+        // Admin console only: 40px from `lg`, 44px below it and on touch, no
+        // press nudge (the console moves colour, never position).
+        console:
+          "h-11 lg:h-10 pointer-coarse:h-11 gap-2 px-4 text-[0.9375rem] active:not-aria-[haspopup]:translate-y-0",
+        "console-sm":
+          "h-11 lg:h-8 pointer-coarse:h-11 gap-1.5 px-3 text-sm active:not-aria-[haspopup]:translate-y-0",
+        "console-icon":
+          "size-11 lg:size-10 pointer-coarse:size-11 active:not-aria-[haspopup]:translate-y-0",
       },
     },
     defaultVariants: {

@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { cn } from "cn"
 import { Badge } from "./badge"
+import { StatusBadgeVariantContext } from "./status-badge-context"
 
 type Treatment = { icon: LucideIcon | null; className: string }
 
@@ -59,18 +60,114 @@ const SIZES = {
   md: "h-7 gap-1.5 px-3 has-data-[icon=inline-start]:pl-2.5 text-sm [&>svg]:size-4!",
 } as const
 
+// --- The admin console (design-system/bookly/admin-console.md section 5) -------
+
+/**
+ * Four icon shapes carry the console's status language: a filled check is the
+ * current, live state; an outlined check is an earlier success; a clock is
+ * waiting; a cross is failed, cancelled or lapsed. The icon takes the tone;
+ * the word is always there.
+ */
+type ConsoleShape = "current" | "earlier" | "waiting" | "failed"
+type ConsoleTreatment = { shape: ConsoleShape | null; icon: string; className: string }
+
+const CONSOLE_TREATMENTS = new Map<string, ConsoleTreatment>([
+  ["confirmed", { shape: "current", icon: "text-console-success", className: "border-transparent bg-console-success-tint text-console-success" }],
+  // Happening now: the one solid status.
+  ["in_progress", { shape: "current", icon: "text-background", className: "border-transparent bg-console-success text-background" }],
+  ["awaiting_payment", { shape: "waiting", icon: "text-muted-foreground", className: "border-dashed border-input bg-transparent text-foreground" }],
+  ["pending_payment", { shape: "waiting", icon: "text-muted-foreground", className: "border-dashed border-input bg-transparent text-foreground" }],
+  ["needs_review", { shape: "waiting", icon: "text-console-warning", className: "border-transparent bg-console-warning-tint text-console-warning" }],
+  ["completed", { shape: "earlier", icon: "text-console-success", className: "border-transparent bg-console-chip text-foreground" }],
+  ["closed", { shape: "earlier", icon: "text-muted-foreground", className: "border-border bg-transparent text-muted-foreground" }],
+  ["no_show", { shape: "failed", icon: "text-destructive", className: "border-transparent bg-console-danger-tint text-destructive" }],
+  ["cancelled_by_client", { shape: "failed", icon: "text-destructive", className: "border-destructive/40 bg-transparent text-destructive" }],
+  ["cancelled_by_admin", { shape: "failed", icon: "text-destructive", className: "border-border bg-transparent text-muted-foreground" }],
+  ["expired", { shape: "failed", icon: "text-muted-foreground", className: "border-dotted border-input bg-transparent text-muted-foreground" }],
+])
+
+const CONSOLE_FALLBACK: ConsoleTreatment = { shape: null, icon: "", className: "border-border bg-transparent text-foreground" }
+
+const CONSOLE_SIZES = {
+  sm: "h-auto gap-1.5 rounded-xs px-2 py-0.5 text-[0.8125rem] [&>svg]:size-3.5!",
+  md: "h-auto gap-1.5 rounded-xs px-2.5 py-[5px] text-sm [&>svg]:size-4!",
+} as const
+
+/**
+ * The console status icon on its own, for the leading column of a table row.
+ * Decorative: the row's badge or text says the status in words.
+ */
+function StatusGlyph({ status, className }: { status: string; className?: string }) {
+  const { shape, icon } = CONSOLE_TREATMENTS.get(status) ?? CONSOLE_FALLBACK
+  if (shape === null) return null
+  // In a badge with a solid fill the glyph takes the label's colour; alone it takes the tone.
+  const tone = status === "in_progress" ? "text-console-success" : icon
+  return <ConsoleShapeIcon shape={shape} className={cn("size-5.5 shrink-0", tone, className)} />
+}
+
+/**
+ * Filled shapes are drawn here rather than taken from lucide, whose outline
+ * icons cannot hold a check in the page colour inside a filled circle.
+ */
+function ConsoleShapeIcon({
+  shape,
+  ink = "var(--background)",
+  className,
+}: {
+  shape: ConsoleShape
+  /** The check inside a filled circle: the page colour, or the badge fill on a solid badge. */
+  ink?: string
+  className?: string
+}) {
+  if (shape === "current") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" data-icon="inline-start" data-shape={shape} className={className}>
+        <circle cx="12" cy="12" r="10" fill="currentColor" />
+        <path d="M7.5 12.2l3 3 6-6.4" fill="none" stroke={ink} strokeWidth="2.2" />
+      </svg>
+    )
+  }
+  const Icon = shape === "earlier" ? CircleCheck : shape === "waiting" ? Clock : CircleX
+  return <Icon aria-hidden="true" data-icon="inline-start" data-shape={shape} className={className} />
+}
+
 function StatusBadge({
   status,
   size = "sm",
+  variant,
   className,
   children,
   ...props
 }: Omit<React.ComponentProps<"span">, "children"> & {
   status: string
   size?: keyof typeof SIZES
+  variant?: "default" | "console"
   /** The translated label. The client and the admin word some statuses differently. */
   children: React.ReactNode
 }) {
+  const inherited = React.useContext(StatusBadgeVariantContext)
+  if ((variant ?? inherited) === "console") {
+    const { shape, icon, className: treatment } = CONSOLE_TREATMENTS.get(status) ?? CONSOLE_FALLBACK
+    return (
+      <Badge
+        variant="outline"
+        data-status={status}
+        data-variant="console"
+        className={cn(treatment, CONSOLE_SIZES[size], className)}
+        {...props}
+      >
+        {shape !== null && (
+          <ConsoleShapeIcon
+            shape={shape}
+            className={icon}
+            {...(status === "in_progress" ? { ink: "var(--console-success)" } : {})}
+          />
+        )}
+        {children}
+      </Badge>
+    )
+  }
+
   const { icon: Icon, className: treatment } = TREATMENTS.get(status) ?? FALLBACK
 
   return (
@@ -86,4 +183,4 @@ function StatusBadge({
   )
 }
 
-export { StatusBadge }
+export { StatusBadge, StatusGlyph }
