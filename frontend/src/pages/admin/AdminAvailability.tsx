@@ -1,4 +1,4 @@
-import { CircleSlash } from 'lucide-react'
+import { CalendarClock, CircleAlert, CircleSlash, Plus, TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
@@ -14,9 +14,13 @@ import {
 } from '@/admin/availability'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Callout } from '@/components/ui/callout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDate, formatTime } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { BlockForm } from './BlockForm'
+import { META, PAGE, SECTION_TITLE } from './console/classes'
+import { PageHeader } from './console/PageHeader'
 import { WorkingHoursForm } from './WorkingHoursForm'
 
 /**
@@ -32,6 +36,29 @@ type Data = { workingHours: AdminWorkingHours[]; blocks: AdminBlock[] }
 
 /** Which form is open: `hours:new`, `hours:<id>`, `block:new`, `block:<id>`. */
 type Editing = string | null
+
+/**
+ * Both lists: the list cancels its panel's side padding and each row puts it
+ * back, so the hairlines run edge to edge across the panel, as the console's
+ * table rows do (design-system/bookly/admin-console.md 6.5).
+ */
+const LIST = '-mx-(--card-spacing) border-y'
+
+/**
+ * One row: the words on the left, Edit and Delete on the right from `sm`.
+ * Below `sm` the pair drops under the words, and the console sizes keep each
+ * button 44px tall to a thumb (32px from `lg`).
+ */
+const ROW =
+  'flex flex-col gap-3 border-b px-(--card-spacing) py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-6 lg:py-3.5'
+
+/** A row with an open form in its place. */
+const FORM_ROW = 'border-b px-(--card-spacing) py-4 last:border-b-0'
+
+/** The two lines of a row's words: the name, then its qualifiers. */
+const ROW_TEXT = 'flex min-w-0 flex-col gap-1'
+
+const ROW_ACTIONS = 'flex shrink-0 flex-wrap gap-2'
 
 export function AdminAvailability() {
   const { t } = useTranslation()
@@ -124,7 +151,7 @@ export function AdminAvailability() {
 
     if (editing === key) {
       return (
-        <li key={row.id}>
+        <li key={row.id} className={FORM_ROW}>
           <WorkingHoursForm
             title={t('admin:availability.hours.editTitle')}
             submitLabel={t('admin:availability.save')}
@@ -139,42 +166,49 @@ export function AdminAvailability() {
     const isClosed = !(row.isOpen && row.opensMinute !== null && row.closesMinute !== null)
 
     return (
-      <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 border-b py-2 last:border-b-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">
-            {row.weekday === null ? name : t('admin:availability.hours.everyDay', { day: name })}
-          </span>
-          <Badge variant="outline">
-            {t(row.weekday === null ? 'admin:availability.hours.datedBadge' : 'admin:availability.hours.weeklyBadge')}
-          </Badge>
-          {/* A closed day is a different state, not a lesser one: an icon marks
-              it, never colour or opacity alone (`pages/availability.md`). */}
-          {isClosed ? (
-            <span className="text-muted-foreground inline-flex items-center gap-1 text-sm">
-              <CircleSlash aria-hidden="true" className="size-4" />
-              {t('admin:availability.hours.closed')}
+      <li key={row.id} className={ROW}>
+        <div className={ROW_TEXT}>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <span className="min-w-0 font-medium wrap-break-word">
+              {row.weekday === null ? name : t('admin:availability.hours.everyDay', { day: name })}
             </span>
-          ) : (
-            <span className="text-muted-foreground text-sm">
-              {t('admin:availability.hours.window', {
-                opens: formatMinuteOfDay(row.opensMinute ?? 0),
-                closes: formatMinuteOfDay(row.closesMinute ?? 0),
-              })}
-            </span>
-          )}
-          {row.note !== null && <span className="text-muted-foreground text-sm">· {row.note}</span>}
+            {/* The row-sized chip (13px, as the spec's small status badge), so
+                it sits on the name's line without outweighing it. */}
+            <Badge variant="console" className="px-2 py-0.5 text-[0.8125rem]">
+              {t(row.weekday === null ? 'admin:availability.hours.datedBadge' : 'admin:availability.hours.weeklyBadge')}
+            </Badge>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {/* A closed day is a different state, not a lesser one: an icon and
+                the word mark it in the text colour, never colour or opacity
+                alone, and the row itself is not dimmed (`pages/availability.md`). */}
+            {isClosed ? (
+              <span className="text-foreground inline-flex items-center gap-1.5 text-sm font-medium">
+                <CircleSlash aria-hidden="true" className="size-4 shrink-0" />
+                {t('admin:availability.hours.closed')}
+              </span>
+            ) : (
+              <span className={cn(META, 'font-mono tabular-nums')}>
+                {t('admin:availability.hours.window', {
+                  opens: formatMinuteOfDay(row.opensMinute ?? 0),
+                  closes: formatMinuteOfDay(row.closesMinute ?? 0),
+                })}
+              </span>
+            )}
+            {row.note !== null && <span className={cn(META, 'min-w-0 wrap-break-word')}>· {row.note}</span>}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className={ROW_ACTIONS}>
           <Button
-            size="sm"
-            variant="outline"
+            size="console-sm"
+            variant="console-outline"
             aria-label={t('admin:availability.hours.editNamed', { name })}
             onClick={() => setEditing(key)}
           >
             {t('admin:availability.edit')}
           </Button>
           <Button
-            size="sm"
+            size="console-sm"
             variant="destructive"
             aria-label={t('admin:availability.hours.deleteNamed', { name })}
             onClick={() =>
@@ -202,7 +236,7 @@ export function AdminAvailability() {
 
     if (editing === key) {
       return (
-        <li key={block.id}>
+        <li key={block.id} className={FORM_ROW}>
           <BlockForm
             title={t('admin:availability.blocks.editTitle')}
             submitLabel={t('admin:availability.save')}
@@ -215,24 +249,24 @@ export function AdminAvailability() {
     }
 
     return (
-      <li key={block.id} className="flex flex-wrap items-center justify-between gap-2 border-b py-2 last:border-b-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">{describeBlock(block)}</span>
-          <span className="text-muted-foreground text-sm">
+      <li key={block.id} className={ROW}>
+        <div className={ROW_TEXT}>
+          <span className="min-w-0 font-medium tabular-nums wrap-break-word">{describeBlock(block)}</span>
+          <span className={cn(META, 'min-w-0 wrap-break-word')}>
             {block.reason ?? t('admin:availability.blocks.noReason')}
           </span>
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className={ROW_ACTIONS}>
           <Button
-            size="sm"
-            variant="outline"
+            size="console-sm"
+            variant="console-outline"
             aria-label={t('admin:availability.blocks.editNamed', { name })}
             onClick={() => setEditing(key)}
           >
             {t('admin:availability.edit')}
           </Button>
           <Button
-            size="sm"
+            size="console-sm"
             variant="destructive"
             aria-label={t('admin:availability.blocks.deleteNamed', { name })}
             onClick={() =>
@@ -251,27 +285,30 @@ export function AdminAvailability() {
   const data = loaded?.data ?? null
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
-      <div className="flex flex-col">
-        <h1 className="text-2xl font-semibold">{t('admin:availability.title')}</h1>
-        <p className="text-muted-foreground text-sm">{t('admin:availability.intro')}</p>
-      </div>
+    <main className={cn(PAGE, 'max-w-5xl')}>
+      <PageHeader eyebrow={t('admin:nav.label')} eyebrowIcon={CalendarClock} title={t('admin:availability.title')}>
+        <p className={cn(META, 'max-w-prose text-pretty')}>{t('admin:availability.intro')}</p>
+      </PageHeader>
 
       {actionError !== null && (
-        <p className="text-destructive text-sm" role="alert">
+        <p className="text-destructive flex items-start gap-2 text-sm" role="alert">
+          <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
           {actionError}
         </p>
       )}
 
       {loaded === null && (
-        <p className="text-muted-foreground text-sm" role="status">
+        <p className={META} role="status">
           {t('admin:availability.loading')}
         </p>
       )}
       {loaded !== null && data === null && (
-        <div className="flex items-center gap-2" role="alert">
-          <p className="text-destructive text-sm">{t('admin:availability.loadFailed')}</p>
-          <Button variant="outline" size="sm" onClick={reload}>
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4" role="alert">
+          <p className="text-destructive flex items-start gap-2 text-sm">
+            <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            {t('admin:availability.loadFailed')}
+          </p>
+          <Button variant="console-outline" size="console-sm" onClick={reload}>
             {t('admin:availability.retry')}
           </Button>
         </div>
@@ -279,18 +316,22 @@ export function AdminAvailability() {
 
       {data !== null && (
         <>
-          <Card>
-            <CardHeader>
+          <Card variant="console">
+            <CardHeader className="gap-1.5">
               <CardTitle>
-                <h2>{t('admin:availability.hours.title')}</h2>
+                <h2 className={SECTION_TITLE}>{t('admin:availability.hours.title')}</h2>
               </CardTitle>
-              <p className="text-muted-foreground text-sm">{t('admin:availability.hours.intro')}</p>
+              <p className={cn(META, 'max-w-prose text-pretty')}>{t('admin:availability.hours.intro')}</p>
             </CardHeader>
-            <CardContent className="flex flex-col gap-2">
+            <CardContent className="flex flex-col gap-4">
               {data.workingHours.length === 0 ? (
-                <p className="text-muted-foreground text-sm">{t('admin:availability.hours.empty')}</p>
+                // With no hours nothing can ever be booked, so the one sentence
+                // this list has for itself is a warning, not a quiet line.
+                <Callout variant="console" tone="warning" icon={TriangleAlert}>
+                  {t('admin:availability.hours.empty')}
+                </Callout>
               ) : (
-                <ul>{data.workingHours.map(hoursRow)}</ul>
+                <ul className={LIST}>{data.workingHours.map(hoursRow)}</ul>
               )}
               {editing === 'hours:new' ? (
                 <WorkingHoursForm
@@ -301,25 +342,31 @@ export function AdminAvailability() {
                   onCancel={() => setEditing(null)}
                 />
               ) : (
-                <Button size="sm" variant="outline" className="self-start" onClick={() => setEditing('hours:new')}>
+                <Button
+                  size="console"
+                  variant="console-outline"
+                  className="sm:self-start"
+                  onClick={() => setEditing('hours:new')}
+                >
+                  <Plus aria-hidden="true" />
                   {t('admin:availability.hours.add')}
                 </Button>
               )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
+          <Card variant="console">
+            <CardHeader className="gap-1.5">
               <CardTitle>
-                <h2>{t('admin:availability.blocks.title')}</h2>
+                <h2 className={SECTION_TITLE}>{t('admin:availability.blocks.title')}</h2>
               </CardTitle>
-              <p className="text-muted-foreground text-sm">{t('admin:availability.blocks.intro')}</p>
+              <p className={cn(META, 'max-w-prose text-pretty')}>{t('admin:availability.blocks.intro')}</p>
             </CardHeader>
-            <CardContent className="flex flex-col gap-2">
+            <CardContent className="flex flex-col gap-4">
               {data.blocks.length === 0 ? (
-                <p className="text-muted-foreground text-sm">{t('admin:availability.blocks.empty')}</p>
+                <p className={META}>{t('admin:availability.blocks.empty')}</p>
               ) : (
-                <ul>{data.blocks.map(blockRow)}</ul>
+                <ul className={LIST}>{data.blocks.map(blockRow)}</ul>
               )}
               {editing === 'block:new' ? (
                 <BlockForm
@@ -330,7 +377,13 @@ export function AdminAvailability() {
                   onCancel={() => setEditing(null)}
                 />
               ) : (
-                <Button size="sm" variant="outline" className="self-start" onClick={() => setEditing('block:new')}>
+                <Button
+                  size="console"
+                  variant="console-outline"
+                  className="sm:self-start"
+                  onClick={() => setEditing('block:new')}
+                >
+                  <Plus aria-hidden="true" />
                   {t('admin:availability.blocks.add')}
                 </Button>
               )}

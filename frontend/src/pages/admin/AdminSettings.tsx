@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react'
+import { Check, CircleAlert, Settings as SettingsIcon } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
@@ -12,9 +12,13 @@ import {
   settingsFormValues,
 } from '@/admin/settings'
 import { Button } from '@/components/ui/button'
+import { Callout } from '@/components/ui/callout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import { AdminField } from './AdminField'
+import { FIELD, META, PAGE } from './console/classes'
+import { PageHeader } from './console/PageHeader'
 
 /**
  * The five operating values (plan.md Task 8, spec P-30): the booking-fee rate,
@@ -94,36 +98,38 @@ export function AdminSettings() {
   const values = loaded?.values ?? null
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
-      <div className="flex flex-col">
-        <h1 className="text-2xl font-semibold">{t('admin:settings.title')}</h1>
-        <p className="text-muted-foreground text-sm">{t('admin:settings.intro')}</p>
-      </div>
+    <main className={cn(PAGE, 'max-w-3xl')}>
+      <PageHeader eyebrow={t('admin:nav.label')} eyebrowIcon={SettingsIcon} title={t('admin:settings.title')}>
+        <p className={cn(META, 'max-w-prose text-pretty')}>{t('admin:settings.intro')}</p>
+      </PageHeader>
 
       {loaded === null && (
-        <p className="text-muted-foreground text-sm" role="status">
+        <p className={META} role="status">
           {t('admin:settings.loading')}
         </p>
       )}
       {loaded !== null && values === null && (
-        <div className="flex items-center gap-2" role="alert">
-          <p className="text-destructive text-sm">{t('admin:settings.loadFailed')}</p>
-          <Button variant="outline" size="sm" onClick={() => setVersion((n) => n + 1)}>
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4" role="alert">
+          <p className="text-destructive flex items-start gap-2 text-sm">
+            <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            {t('admin:settings.loadFailed')}
+          </p>
+          <Button variant="console-outline" size="console-sm" onClick={() => setVersion((n) => n + 1)}>
             {t('admin:settings.retry')}
           </Button>
         </div>
       )}
 
       {values !== null && (
-        <Card>
+        <Card variant="console">
           <CardContent>
             <form
-              className="flex flex-col gap-4"
+              className="flex flex-col gap-6"
               aria-label={t('admin:settings.title')}
               noValidate
               onSubmit={(event) => void onSubmit(event)}
             >
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 {SETTINGS_FIELDS.map((field) => (
                   <AdminField
                     key={field}
@@ -137,7 +143,9 @@ export function AdminSettings() {
                         name={field}
                         type="text"
                         inputMode="decimal"
-                        className="max-w-40 tabular-nums"
+                        // Five short numbers: narrow inside their cell, not
+                        // full-bleed, with figures that do not shift as typed.
+                        className={cn(FIELD, 'max-w-40 tabular-nums')}
                         // Keyed on the loaded values, so a save redraws the
                         // inputs from what the API stored.
                         key={values[field]}
@@ -148,21 +156,26 @@ export function AdminSettings() {
                 ))}
               </div>
 
-              {saved && (
-                <p className="flex items-center gap-1.5 text-sm" role="status">
-                  <Check aria-hidden="true" className="text-primary size-4" />
-                  {t('admin:settings.saved')}
-                </p>
-              )}
-              {formError !== null && (
-                <p className="text-destructive text-sm" role="alert">
-                  {formError}
-                </p>
-              )}
+              {/* The saved line, the error and the button share one region under
+                  a hairline, so a confirmation only ever pushes the button down:
+                  the fields above never move. */}
+              <div className="-mx-(--card-spacing) flex flex-col gap-4 border-t px-(--card-spacing) pt-(--card-spacing)">
+                {saved && (
+                  <Callout variant="console" tone="success" icon={Check} role="status">
+                    {t('admin:settings.saved')}
+                  </Callout>
+                )}
+                {formError !== null && (
+                  <p className="text-destructive flex items-start gap-2 text-sm" role="alert">
+                    <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                    {formError}
+                  </p>
+                )}
 
-              <Button type="submit" className="self-start" disabled={saving}>
-                {saving ? t('admin:settings.saving') : t('admin:settings.save')}
-              </Button>
+                <Button type="submit" size="console" className="sm:min-w-36 sm:self-start" disabled={saving}>
+                  {saving ? t('admin:settings.saving') : t('admin:settings.save')}
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>
