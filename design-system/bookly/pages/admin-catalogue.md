@@ -4,6 +4,7 @@
 > **Route:** `/admin/catalogue` · **Files:** `frontend/src/pages/admin/AdminCatalogue.tsx` and `EntityForm.tsx` (the one form behind every editor)
 > Generator template: UI UX Pro Max, 2026-09-19 ("Dashboard / Data View", 1200px). Replaced by the shipped `max-w-5xl`.
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
+> **Overridden 2026-09-26 by `design-system/bookly/admin-console.md` (admin console redesign), which wins where they conflict:** Restyled per `admin-console.md`: service cards become flat bordered panels (no `shadow-sm`, 2px radius); `EntityForm` is a raised-surface sub-panel with a hairline (§6.7); active/inactive badges become the console success and chip badges. Order, row actions and `window.confirm` hold.
 
 ## Layout (keep the order)
 

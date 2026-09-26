@@ -478,3 +478,9 @@ Calendar blocks are not a status: muted fill with a diagonal hatch (pattern, not
 - **Known and left:** at 375px a calendar day cell is 44px tall and 41px wide, because seven columns cannot each be 44px wide in a 309px card (the WCAG 2.5.8 minimum is 24px); a service card's link measures 78x25 but is stretched over the whole card (`after:absolute after:inset-0`), so the target is the card.
 - **Not fixed, because it is behaviour and this redesign is visual-only:** after "Yes, cancel my booking" the confirm button unmounts, so keyboard focus falls to the page body and nothing announces the change (the pill and the summary do change). A fix (move focus to the heading, or a live region) is logic work for the feature branch.
 - **Not run:** the journey against the real backend and database. That is a manual pass, and it is the one thing this mocked run cannot show.
+
+### 12. The admin console (2026-09-26)
+
+**The admin no longer shares the client's look.** The brief `docs/prompts/admin-console-redesign.md` (user decisions 1-4) gives every `/admin/*` route, including login and reset password, its own developer-console system: light and dark themes (following the OS, with a System / Light / Dark toggle), a violet accent, Geist and Geist Mono, a 2px radius, hairline borders and no shadows. Section 8's "Admin: ... denser, never different in kind" and section 2's "Light theme only" no longer describe admin. The system lives in `design-system/bookly/admin-console.md`, which wins over this file and over the admin page files for the admin; the client side and everything above still hold for it, unchanged.
+
+The admin tokens are scoped to `:root[data-admin-theme]`, set only while an admin route is mounted, so client pages never see them. Two contrast decisions were taken with the user on 2026-09-26 (field edges at 3:1; login drops the client header), and three values were darkened to pass AA; all are recorded in `admin-console.md` section 0.

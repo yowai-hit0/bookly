@@ -5,6 +5,7 @@
 > **Files:** `frontend/src/pages/admin/AdminAvailability.tsx`, `WorkingHoursForm.tsx`, `BlockForm.tsx` (and the shared `AdminField.tsx`)
 > **Added by the discovery rule (2026-09-21):** the page shipped as feature work on `main` (commit `d02bd41`) and had no design file, so Section 5 would have restyled it blind.
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
+> **Overridden 2026-09-26 by `design-system/bookly/admin-console.md` (admin console redesign), which wins where they conflict:** Restyled per `admin-console.md`: the two cards become flat bordered panels, the `h1` is 30px Geist, the overlap warning is the console destructive callout with the solid confirm (`--console-danger-solid`), and closed rows keep their `CircleSlash` state marker. The two-lists-on-one-page rule, inline forms and `window.confirm` hold.
 
 Two things on one screen — the weekly/dated **working hours** and the dated **blocks** — because between them they answer one question: when can a client book? Reading either alone gives the wrong answer (`AdminAvailability.tsx` header comment; user decision, 2026-09-21).
 

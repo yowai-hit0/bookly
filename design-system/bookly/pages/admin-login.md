@@ -5,6 +5,7 @@
 > **File:** `frontend/src/pages/admin/AdminLogin.tsx`
 > Generator template: UI UX Pro Max, 2026-09-19 ("Dashboard / Data View", 1200px). Wrong for a single sign-in card; replaced.
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
+> **Overridden 2026-09-26 by `design-system/bookly/admin-console.md` (admin console redesign), which wins where they conflict:** **The client header is removed** (user decision, 2026-09-26, reversing the 2026-09-25 one): login and reset password are one place again, a centred 400px console panel with the Bookly monogram, a mono `ADMIN` eyebrow, the `h1`, the fields and an inverted-neutral full-width submit. The theme applies; there is no toggle. See `admin-console.md` §6.8 and decision 6.
 
 ## Layout
 

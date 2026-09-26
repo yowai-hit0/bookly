@@ -5,6 +5,7 @@
 > **File:** `frontend/src/pages/admin/AdminResetPassword.tsx` (shared `AdminField.tsx`)
 > **Added by the discovery rule (2026-09-21):** the page shipped as feature work on `main` (commit `d02bd41`) and had no design file, so Section 5 would have restyled it blind.
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
+> **Overridden 2026-09-26 by `design-system/bookly/admin-console.md` (admin console redesign), which wins where they conflict:** The card becomes the console panel shared with login (`admin-console.md` §6.8). Login no longer wears the client header (decision 6), so "visibly the same place" holds again. The three shapes, the back link and every security rule on the token hold.
 
 One route doing two jobs, told apart by whether the emailed link carried a token in the URL **fragment**: ask for the link, or choose the new password. The fragment is never sent to a server, so it reaches no log, proxy or referrer — nothing in the visual pass may put the token into a link, a heading, an `img` URL or anything else that navigates.
 

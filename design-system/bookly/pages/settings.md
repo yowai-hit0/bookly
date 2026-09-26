@@ -5,6 +5,7 @@
 > **File:** `frontend/src/pages/admin/AdminSettings.tsx` (shared `AdminField.tsx`)
 > **Added by the discovery rule (2026-09-21):** the page shipped as feature work on `main` (commit `d02bd41`) and had no design file, so Section 5 would have restyled it blind.
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
+> **Overridden 2026-09-26 by `design-system/bookly/admin-console.md` (admin console redesign), which wins where they conflict:** Restyled per `admin-console.md`: the card becomes a flat bordered panel, hints are 13px muted, and the saved confirmation is the console success callout (still `role="status"`, still above the button). Field behaviour and `disabled` while saving hold.
 
 Five numbers that change what every future booking costs and when it can be made: the booking-fee percentage, the minimum notice, how long a hold lasts, the buffer between shoots, and how long a photo link keeps working. Nothing already booked moves when they change — a booking snapshots its own fee and buffer.
 

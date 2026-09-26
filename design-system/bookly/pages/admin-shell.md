@@ -7,6 +7,7 @@
 > **Revised at the user's request:** navigation is a **sidebar** (the shipped shell and the first version of this file used a top header bar).
 > Generator template: UI UX Pro Max, 2026-09-19 ("Dashboard / Data View"). The 1200px width is wrong here; each admin page sets its own width.
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
+> **Overridden 2026-09-26 by `design-system/bookly/admin-console.md` (admin console redesign), which wins where they conflict:** Sidebar is **260px** (was 240px); the active link is the violet `--sidebar-primary` fill (was `bg-primary/10 text-primary`); a **56px top bar** is added from `lg` (mark cell, breadcrumbs, theme toggle), with a slim breadcrumb row below `lg`. *Do not*'s "no breadcrumbs" is lifted for the breadcrumbs only (the brief's one new feature); a theme toggle is added. The skip link, the one reflowing `nav`, the link order, `aria-current`, `min-w-0`, per-page widths and the red ghost Sign out all hold. See `admin-console.md` §6.1-6.2.
 
 ## Structure
 

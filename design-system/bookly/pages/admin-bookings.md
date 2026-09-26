@@ -5,6 +5,7 @@
 > Generator template: UI UX Pro Max, 2026-09-19 ("Dashboard / Data View", 1200px). Replaced by the shipped `max-w-6xl`.
 > This is a **data-dense operate screen** (statuses, money due, refunds). Legibility beats decoration.
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
+> **Overridden 2026-09-26 by `design-system/bookly/admin-console.md` (admin console redesign), which wins where they conflict:** Restyled per `admin-console.md` §6.5: the date and search filters join one bordered toolbar strip; the header row is mono uppercase with a count chip; rows lead with a filled status icon and two lines (the reference as an underlined mono link in the meta line); status badges are the console treatments (§5). The stage toggles stay, pressed = inverted neutral with a check. Table semantics, the URL filters, the order and Load more hold.
 
 ## Layout (keep the order)
 

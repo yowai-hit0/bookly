@@ -5,6 +5,7 @@
 > **Files:** `frontend/src/pages/admin/AdminCalendar.tsx` **and the FullCalendar block in `frontend/src/index.css` (lines 131-179)**. A pass that only scans `.tsx` files will miss the CSS, which is where most of this page's look lives. Section 6 needs an explicit, named CSS pass.
 > Generator template: UI UX Pro Max, 2026-09-19 ("Dashboard / Data View", 1200px). Replaced.
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
+> **Overridden 2026-09-26 by `design-system/bookly/admin-console.md` (admin console redesign), which wins where they conflict:** The FullCalendar chrome and events are restyled to the console (`admin-console.md` §6.9): square hairline cells, mono hour labels and date numbers, a violet today chip, square events on the raised surface with a **3px left edge in the status colour** (the brief asks for it; it is the one sanctioned side edge in admin, since the word and icon are still inside the event), a joined toolbar strip with a segmented view switch. The toolbar title is Geist, not the heading font. Status colours follow §5 there. The conflict outline, the block hatch, click-through and the TSX constants hold.
 
 ## Layout (keep)
 

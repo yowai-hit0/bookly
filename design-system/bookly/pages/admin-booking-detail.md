@@ -5,6 +5,7 @@
 > Generator template: UI UX Pro Max, 2026-09-19 ("Dashboard / Data View", 1200px). Replaced by the shipped `max-w-3xl`.
 > This is the **highest-risk screen in the redesign**: money due, refunds, and destructive cancel/refund actions on one page. Every action button follows the API's own `actions` flags; the API enforces them again.
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
+> **Overridden 2026-09-26 by `design-system/bookly/admin-console.md` (admin console redesign), which wins where they conflict:** Restyled per `admin-console.md` §6.3 and §6.6: an eyebrow + mono reference `h1` + console status badge header, an optional status band, flat sections divided by hairlines instead of `rounded-xl` cards, and stat tiles where the Shoot facts fit them. The section order, action gating, the two-step cancel with its solid confirm and every money rule hold. The page sets the breadcrumb's reference crumb from its own fetch.
 
 ## Layout (keep one column, keep the order)
 
