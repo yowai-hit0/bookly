@@ -11,23 +11,22 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import luxonPlugin from '@fullcalendar/luxon3'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
-import { CheckCheck, CircleCheck, Clock, type LucideIcon, TriangleAlert, UserX } from 'lucide-react'
+import { CalendarDays, CircleAlert, Globe, TriangleAlert } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router'
 import { UnauthenticatedError, adminFetch } from '@/admin/api'
 import { availabilityApi, blockFormValues } from '@/admin/availability'
 import { CALENDAR_VIEWS, type CalendarView, isKigaliDate, kigaliDateOf } from '@/admin/calendar-dates'
-import {
-  type BookingStatus,
-  type CalendarData,
-  type CalendarEntry,
-  kigaliRangeOf,
-  toEventInputs,
-} from '@/admin/calendar-events'
+import { type CalendarData, type CalendarEntry, kigaliRangeOf, toEventInputs } from '@/admin/calendar-events'
 import { Button } from '@/components/ui/button'
+import { Callout } from '@/components/ui/callout'
+import { StatusGlyph } from '@/components/ui/status-badge'
 import { TIME_ZONE } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { BlockForm } from './BlockForm'
+import { META, PAGE } from './console/classes'
+import { MetaItem, PageHeader } from './console/PageHeader'
 
 /**
  * The admin calendar (plan.md Task 9, spec §3.3 step 1): bookings, live holds
@@ -186,14 +185,20 @@ export function AdminCalendar() {
   }
 
   return (
-    <main className="mx-auto flex max-w-7xl flex-col gap-4 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="flex flex-col">
-          <h1 className="text-2xl font-semibold">{t('admin:calendar.title')}</h1>
-          <p className="text-muted-foreground text-sm">{t('admin:calendar.timezoneNote')}</p>
-        </div>
-        {!blocking && <Button onClick={() => setBlocking(true)}>{t('admin:calendar.blockTime')}</Button>}
-      </div>
+    <main className={cn(PAGE, 'max-w-7xl')}>
+      <PageHeader
+        eyebrow={t('admin:nav.label')}
+        eyebrowIcon={CalendarDays}
+        title={t('admin:calendar.title')}
+        meta={<MetaItem icon={Globe}>{t('admin:calendar.timezoneNote')}</MetaItem>}
+        actions={
+          blocking ? undefined : (
+            <Button size="console" onClick={() => setBlocking(true)}>
+              {t('admin:calendar.blockTime')}
+            </Button>
+          )
+        }
+      />
 
       {/* Blocking time is most often decided while looking at the calendar, so
           the form opens here rather than sending him to the availability page. */}
@@ -211,47 +216,58 @@ export function AdminCalendar() {
         />
       )}
 
-      {loading && (
-        <p className="text-muted-foreground text-sm" role="status">
-          {t('admin:calendar.loading')}
-        </p>
-      )}
-      {failed && (
-        <div className="flex items-center gap-2" role="alert">
-          <p className="text-destructive text-sm">{t('admin:calendar.loadFailed')}</p>
-          <Button variant="outline" size="sm" onClick={retry}>
-            {t('admin:calendar.retry')}
-          </Button>
-        </div>
-      )}
+      {/* The loading line and the failure sit close above the calendar they
+          are about, not a section's gap away from it. */}
+      <div className="flex min-w-0 flex-col gap-4">
+        {loading && (
+          <p className={META} role="status">
+            {t('admin:calendar.loading')}
+          </p>
+        )}
+        {failed && (
+          <Callout
+            variant="console"
+            tone="destructive"
+            icon={CircleAlert}
+            role="alert"
+            action={
+              <Button variant="console-outline" size="console-sm" onClick={retry}>
+                {t('admin:calendar.retry')}
+              </Button>
+            }
+          >
+            <p>{t('admin:calendar.loadFailed')}</p>
+          </Callout>
+        )}
 
-      <FullCalendar
-        ref={calendarRef}
-        plugins={PLUGINS}
-        locale={enGbLocale}
-        timeZone={TIME_ZONE}
-        initialView={initial.view}
-        initialDate={initial.date}
-        views={VIEW_OPTIONS}
-        headerToolbar={HEADER_TOOLBAR}
-        buttonText={buttonText}
-        buttonHints={buttonHints}
-        allDayText={t('admin:calendar.allDay')}
-        firstDay={1}
-        fixedWeekCount={false}
-        height={viewType === FULLCALENDAR_VIEW.month ? 'auto' : TIME_GRID_HEIGHT}
-        scrollTime={SCROLL_TIME}
-        navLinks
-        eventDisplay="block"
-        eventTimeFormat={TIME_FORMAT}
-        slotLabelFormat={TIME_FORMAT}
-        events={fetchEvents}
-        eventSourceFailure={ignoreFailure}
-        loading={setLoading}
-        datesSet={onDatesSet}
-        eventClick={onEventClick}
-        eventContent={renderEventContent}
-      />
+        <FullCalendar
+          ref={calendarRef}
+          plugins={PLUGINS}
+          locale={enGbLocale}
+          timeZone={TIME_ZONE}
+          initialView={initial.view}
+          initialDate={initial.date}
+          views={VIEW_OPTIONS}
+          headerToolbar={HEADER_TOOLBAR}
+          buttonText={buttonText}
+          buttonHints={buttonHints}
+          allDayText={t('admin:calendar.allDay')}
+          firstDay={1}
+          fixedWeekCount={false}
+          height={viewType === FULLCALENDAR_VIEW.month ? 'auto' : TIME_GRID_HEIGHT}
+          scrollTime={SCROLL_TIME}
+          navLinks
+          eventDisplay="block"
+          eventTimeFormat={TIME_FORMAT}
+          slotLabelFormat={TIME_FORMAT}
+          events={fetchEvents}
+          eventSourceFailure={ignoreFailure}
+          loading={setLoading}
+          datesSet={onDatesSet}
+          eventClick={onEventClick}
+          eventContent={renderEventContent}
+        />
+      </div>
     </main>
   )
 }
@@ -264,62 +280,75 @@ function renderEventContent(arg: EventContentArg) {
     <EventContent
       entry={arg.event.extendedProps.entry as CalendarEntry}
       timeText={arg.timeText}
-      detailed={arg.view.type !== FULLCALENDAR_VIEW.month}
+      view={viewOf(arg.view.type)}
     />
   )
 }
 
 /**
- * The seven-status icon set (MASTER.md section 7), reused here for the four
- * statuses that can reach the calendar -- a cancelled or expired booking
- * never appears in `CalendarData`. The icon repeats the chip's text label; it
- * never stands in for it (the label is always shown).
+ * Below `sm` a month cell is about 40px wide and a week column less, too
+ * narrow for words: there an event keeps its status icon (and the month its
+ * start time) and the words stay for assistive tech, not hidden from it. The
+ * day view has the width, so it always shows everything.
  */
-const STATUS_ICON: Record<BookingStatus, LucideIcon> = {
-  pending_payment: Clock,
-  confirmed: CircleCheck,
-  completed: CheckCheck,
-  no_show: UserX,
-}
+const PHONE_WORDS = 'max-sm:sr-only'
+const PHONE_MONTH_TIME = 'max-sm:text-[0.6875rem] max-[22.5rem]:text-[0.625rem]'
 
 /**
- * One booking or block. The status is visible text plus an icon, not colour
- * alone, and a booking overlapping a block carries a conflict marker (spec
- * §6.4). Week and day views have room for the service, package and
- * reference, or the block's private reason, and for a slightly larger chip
- * (`design-system/bookly/pages/admin-calendar.md`: 0.7rem in month, 0.75rem
- * where there is more room).
+ * One booking or block (design-system/bookly/admin-console.md 6.9): the start
+ * time in mono, the client's name, the status as its console icon and word
+ * (never colour alone: the edge FullCalendar draws is the status colour too),
+ * and, when a booking overlaps a block, a conflict marker (spec §6.4). Week
+ * and day views have room for the service, package and reference, or the
+ * block's private reason. The event box itself -- its fill, its 3px status
+ * edge and the conflict outline -- is styled by the `.bookly-event` rules in
+ * `index.css`.
  */
-function EventContent({ entry, timeText, detailed }: { entry: CalendarEntry; timeText: string; detailed: boolean }) {
+function EventContent({ entry, timeText, view }: { entry: CalendarEntry; timeText: string; view: CalendarView }) {
   const { t } = useTranslation()
   const status = entry.kind === 'booking' ? entry.booking.status : 'block'
   const time = timeText !== '' ? timeText : entry.kind === 'block' && entry.block.isAllDay ? t('admin:calendar.allDay') : ''
-  const StatusIcon = status === 'block' ? null : STATUS_ICON[status]
-  const chipSize = detailed ? 'text-[0.75rem]' : 'text-[0.7rem]'
+  const detailed = view !== 'month'
+  const words = view === 'day' ? undefined : PHONE_WORDS
+  // In the hourly grids an event's place already says when it is. A phone's
+  // month cell keeps the start time, a size smaller so "23:30" fits at 320px.
+  const phoneTime = view === 'week' ? PHONE_WORDS : view === 'month' ? PHONE_MONTH_TIME : undefined
 
   return (
-    <div className="flex h-full flex-col gap-0.5 overflow-hidden px-1 py-0.5 text-xs" data-kind={entry.kind} data-status={status}>
-      <div className="flex flex-wrap items-center gap-1">
-        {time !== '' && <span className="font-medium tabular-nums">{time}</span>}
-        {entry.kind === 'booking' && <span className="truncate">{entry.booking.contactName}</span>}
-        <span className={`inline-flex items-center gap-0.5 rounded border border-current px-1 leading-4 font-medium ${chipSize}`}>
-          {StatusIcon !== null && <StatusIcon aria-hidden="true" className="size-3" />}
-          {t(`admin:calendar.status.${status}`)}
+    <div
+      // Lines keep their height and the event clips what does not fit, rather
+      // than the name squeezing to nothing in a short hourly event. An hour is
+      // 56px in the hourly grids: time, name and status fit it exactly.
+      className={cn(
+        'flex h-full min-w-0 flex-col overflow-hidden px-1.5 text-xs leading-4 *:shrink-0',
+        detailed ? 'py-0.5 max-sm:px-1' : 'gap-0.5 py-1 max-sm:px-0.5',
+      )}
+      data-kind={entry.kind}
+      data-status={status}
+    >
+      {time !== '' && <span className={cn('font-mono tabular-nums', phoneTime)}>{time}</span>}
+      {entry.kind === 'booking' && (
+        <span className={cn('truncate text-[0.8125rem] font-medium', words)}>{entry.booking.contactName}</span>
+      )}
+      <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+        <span className="inline-flex min-w-0 items-center gap-1">
+          {status !== 'block' && <StatusGlyph status={status} className="size-3.5" />}
+          <span className={cn('truncate', words)}>{t(`admin:calendar.status.${status}`)}</span>
         </span>
         {entry.kind === 'booking' && entry.booking.conflictsWithBlock && (
-          <span className={`bg-destructive inline-flex items-center gap-0.5 rounded px-1 leading-4 font-medium text-white ${chipSize}`}>
-            <TriangleAlert aria-hidden="true" className="size-3" />
-            {t('admin:calendar.conflict')}
+          <span className="bg-console-danger-tint text-destructive inline-flex min-w-0 items-start gap-1 px-1 font-medium whitespace-normal">
+            <TriangleAlert aria-hidden="true" className="mt-px size-3.5 shrink-0" />
+            <span className={words}>{t('admin:calendar.conflict')}</span>
           </span>
         )}
-      </div>
+      </span>
       {detailed && entry.kind === 'booking' && (
-        <div className="opacity-80">
-          {entry.booking.serviceName} · {entry.booking.packageName} · {entry.booking.reference}
-        </div>
+        <span className={cn('text-muted-foreground wrap-break-word', phoneTime)}>
+          {entry.booking.serviceName} · {entry.booking.packageName} · <span className="font-mono">{entry.booking.reference}</span>
+        </span>
       )}
       {detailed && entry.kind === 'block' && entry.block.reason !== null && (
-        <div className="opacity-80">{entry.block.reason}</div>
+        <span className={cn('wrap-break-word', phoneTime)}>{entry.block.reason}</span>
       )}
     </div>
   )
