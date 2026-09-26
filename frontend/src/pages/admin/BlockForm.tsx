@@ -1,4 +1,4 @@
-import { TriangleAlert } from 'lucide-react'
+import { CircleAlert, TriangleAlert } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
@@ -15,7 +15,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDateTime, formatTime } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { AdminField } from './AdminField'
+import { CHOICE, EYEBROW, FIELD, SUBPANEL, TEXTAREA } from './console/classes'
 
 /**
  * Creating or editing one block (plan.md Task 8, spec §3.3 step 3, §6.4). The
@@ -103,25 +105,25 @@ export function BlockForm({ title, submitLabel, values, onSave, onCancel }: Prop
 
   return (
     <form
-      className="bg-muted/40 flex flex-col gap-3 rounded-lg border p-3"
+      className={SUBPANEL}
       aria-label={title}
       noValidate
       onSubmit={onSubmit}
     >
-      <h3 className="font-heading text-sm font-medium">{title}</h3>
+      <h3 className="text-base font-medium">{title}</h3>
 
-      <fieldset className="flex flex-col gap-1.5">
-        <legend className="font-heading text-sm font-medium">{t('admin:availability.fields.mode')}</legend>
-        <div className="flex flex-wrap gap-4">
+      <fieldset className="flex flex-col gap-2">
+        <legend className={cn(EYEBROW, 'mb-1')}>{t('admin:availability.fields.mode')}</legend>
+        <div className="flex flex-wrap gap-x-6 gap-y-1">
           {(['all-day', 'time-range'] as const).map((option) => (
-            <Label key={option} className="min-h-6 items-center gap-2 font-normal pointer-coarse:min-h-11">
+            <Label key={option} className="min-h-11 items-center gap-2.5 text-base font-normal lg:min-h-8">
               <input
                 type="radio"
                 name="mode"
                 value={option}
                 checked={mode === option}
                 onChange={() => setMode(option)}
-                className="accent-primary size-4"
+                className={CHOICE}
               />
               {t(option === 'all-day' ? 'admin:availability.fields.modeAllDay' : 'admin:availability.fields.modeTimeRange')}
             </Label>
@@ -130,28 +132,28 @@ export function BlockForm({ title, submitLabel, values, onSave, onCancel }: Prop
       </fieldset>
 
       {mode === 'all-day' ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <AdminField label={t('admin:availability.fields.startDate')} error={errorFor('startDate')}>
-            {(props) => <Input {...props} name="startDate" type="date" defaultValue={values.startDate} />}
+            {(props) => <Input {...props} className={FIELD} name="startDate" type="date" defaultValue={values.startDate} />}
           </AdminField>
           <AdminField
             label={t('admin:availability.fields.endDate')}
             hint={t('admin:availability.hints.endDate')}
             error={errorFor('endDate')}
           >
-            {(props) => <Input {...props} name="endDate" type="date" defaultValue={values.endDate} />}
+            {(props) => <Input {...props} className={FIELD} name="endDate" type="date" defaultValue={values.endDate} />}
           </AdminField>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-3">
           <AdminField label={t('admin:availability.fields.date')} error={errorFor('date')}>
-            {(props) => <Input {...props} name="date" type="date" defaultValue={values.date} />}
+            {(props) => <Input {...props} className={FIELD} name="date" type="date" defaultValue={values.date} />}
           </AdminField>
           <AdminField label={t('admin:availability.fields.startTime')} error={errorFor('startTime')}>
-            {(props) => <Input {...props} name="startTime" type="time" defaultValue={values.startTime} />}
+            {(props) => <Input {...props} className={FIELD} name="startTime" type="time" defaultValue={values.startTime} />}
           </AdminField>
           <AdminField label={t('admin:availability.fields.endTime')} error={errorFor('endTime')}>
-            {(props) => <Input {...props} name="endTime" type="time" defaultValue={values.endTime} />}
+            {(props) => <Input {...props} className={FIELD} name="endTime" type="time" defaultValue={values.endTime} />}
           </AdminField>
         </div>
       )}
@@ -161,16 +163,19 @@ export function BlockForm({ title, submitLabel, values, onSave, onCancel }: Prop
         hint={t('admin:availability.hints.reason')}
         error={errorFor('reason')}
       >
-        {(props) => <Textarea {...props} name="reason" defaultValue={values.reason} />}
+        {(props) => <Textarea {...props} className={TEXTAREA} name="reason" defaultValue={values.reason} />}
       </AdminField>
 
       {overlap !== null && (
-        <div className="border-destructive bg-destructive/5 flex flex-col gap-2 rounded-lg border p-3" role="alert">
-          <p className="flex items-center gap-2 text-sm font-medium">
-            <TriangleAlert aria-hidden="true" className="text-destructive size-4 shrink-0" />
+        // The page's one destructive-consequence moment (pages/availability.md):
+        // the console's danger tint with a full danger edge, so it outranks
+        // every other box on the page.
+        <div className="border-destructive bg-console-danger-tint flex flex-col gap-3 rounded-xs border p-4" role="alert">
+          <p className="flex items-center gap-2.5 text-base font-medium">
+            <TriangleAlert aria-hidden="true" className="text-destructive size-4.5 shrink-0" />
             {t('admin:availability.blocks.overlapTitle', { count: overlap.bookings.length })}
           </p>
-          <ul className="flex flex-col gap-1 text-sm">
+          <ul className="flex flex-col gap-1.5 font-mono text-[0.8125rem] tabular-nums">
             {overlap.bookings.map((booking) => (
               <li key={booking.id}>
                 {booking.reference} · {booking.contactName} · {formatDateTime(booking.startsAt)} to{' '}
@@ -179,17 +184,18 @@ export function BlockForm({ title, submitLabel, values, onSave, onCancel }: Prop
             ))}
           </ul>
           <p className="text-muted-foreground text-sm">{t('admin:availability.blocks.overlapBody')}</p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
             {/* Irreversible, so it is the solid red variant (MASTER section 6). */}
             <Button
               type="button"
-              variant="destructive-solid"
+              variant="console-destructive-solid"
+              size="console"
               disabled={saving}
               onClick={() => void save({ ...overlap.payload, confirm: true })}
             >
               {saving ? t('admin:availability.blocks.overlapSaving') : t('admin:availability.blocks.overlapConfirm')}
             </Button>
-            <Button type="button" variant="ghost" onClick={() => setOverlap(null)}>
+            <Button type="button" variant="console-outline" size="console" onClick={() => setOverlap(null)}>
               {t('admin:availability.blocks.overlapCancel')}
             </Button>
           </div>
@@ -197,16 +203,17 @@ export function BlockForm({ title, submitLabel, values, onSave, onCancel }: Prop
       )}
 
       {formError !== null && (
-        <p className="text-destructive text-sm" role="alert">
+        <p className="text-destructive flex items-start gap-2 text-sm" role="alert">
+          <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
           {formError}
         </p>
       )}
 
-      <div className="flex gap-2">
-        <Button type="submit" disabled={saving}>
+      <div className="flex flex-wrap gap-3">
+        <Button type="submit" size="console" disabled={saving}>
           {saving ? t('admin:availability.saving') : submitLabel}
         </Button>
-        <Button type="button" variant="ghost" onClick={onCancel}>
+        <Button type="button" variant="console-outline" size="console" onClick={onCancel}>
           {t('admin:availability.cancel')}
         </Button>
       </div>

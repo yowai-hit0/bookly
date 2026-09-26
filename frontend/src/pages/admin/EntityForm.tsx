@@ -1,3 +1,4 @@
+import { CircleAlert } from 'lucide-react'
 import { type FormEvent, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
@@ -10,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { CHECKBOX, FIELD, SUBPANEL, TEXTAREA } from './console/classes'
 
 /**
  * The one form behind every catalogue editor (plan.md Task 10). Inputs are
@@ -89,9 +91,9 @@ export function EntityForm<T>({ title, submitLabel, fields, values, schema, onSa
   }
 
   return (
-    <form className="bg-muted/40 flex flex-col gap-3 rounded-lg p-3" aria-label={title} noValidate onSubmit={onSubmit}>
-      <h3 className="text-sm font-medium">{title}</h3>
-      <div className="grid gap-3 sm:grid-cols-2">
+    <form className={SUBPANEL} aria-label={title} noValidate onSubmit={onSubmit}>
+      <h3 className="text-base font-medium">{title}</h3>
+      <div className="grid gap-4 sm:grid-cols-2">
         {fields.map((field) => {
           const inputId = `${idPrefix}-${field.name}`
           const errorId = `${inputId}-error`
@@ -101,8 +103,8 @@ export function EntityForm<T>({ title, submitLabel, fields, values, schema, onSa
 
           if (field.kind === 'checkbox') {
             return (
-              <div key={field.name} className="flex items-center gap-2 sm:col-span-2">
-                <Checkbox id={inputId} name={field.name} defaultChecked={values[field.name] === true} />
+              <div key={field.name} className="flex min-h-11 items-center gap-2.5 sm:col-span-2 lg:min-h-8">
+                <Checkbox id={inputId} name={field.name} className={CHECKBOX} defaultChecked={values[field.name] === true} />
                 <Label htmlFor={inputId}>{label}</Label>
               </div>
             )
@@ -117,17 +119,27 @@ export function EntityForm<T>({ title, submitLabel, fields, values, schema, onSa
           }
 
           return (
-            <div key={field.name} className={cn('flex flex-col gap-1.5', field.kind === 'textarea' && 'sm:col-span-2')}>
+            <div key={field.name} className={cn('flex flex-col gap-2', field.kind === 'textarea' && 'sm:col-span-2')}>
               <Label htmlFor={inputId}>{label}</Label>
               {field.kind === 'textarea' ? (
-                <Textarea {...inputProps} />
+                <Textarea {...inputProps} className={TEXTAREA} />
               ) : (
-                <Input {...inputProps} type="text" inputMode={field.kind === 'number' ? 'numeric' : undefined} />
+                <Input
+                  {...inputProps}
+                  className={cn(FIELD, field.kind === 'number' && 'tabular-nums')}
+                  type="text"
+                  inputMode={field.kind === 'number' ? 'numeric' : undefined}
+                />
               )}
-              {field.hint && <p className="text-muted-foreground text-sm">{t(`admin:catalogue.hints.${field.name}`)}</p>}
+              {field.hint && (
+                <p className="text-muted-foreground text-[0.8125rem] leading-snug">{t(`admin:catalogue.hints.${field.name}`)}</p>
+              )}
               {isInvalid && (
-                <p id={errorId} className="text-destructive text-sm">
-                  {t(showsSlugTaken ? 'admin:catalogue.invalid.slugTaken' : `admin:catalogue.invalid.${field.name}`)}
+                <p id={errorId} className="text-destructive flex items-start gap-1.5 text-[0.8125rem] leading-snug">
+                  <CircleAlert aria-hidden="true" className="mt-px size-3.5 shrink-0" />
+                  <span>
+                    {t(showsSlugTaken ? 'admin:catalogue.invalid.slugTaken' : `admin:catalogue.invalid.${field.name}`)}
+                  </span>
                 </p>
               )}
             </div>
@@ -135,15 +147,16 @@ export function EntityForm<T>({ title, submitLabel, fields, values, schema, onSa
         })}
       </div>
       {formError !== null && (
-        <p className="text-destructive text-sm" role="alert">
+        <p className="text-destructive flex items-start gap-2 text-sm" role="alert">
+          <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
           {formError}
         </p>
       )}
-      <div className="flex gap-2">
-        <Button type="submit" disabled={saving}>
+      <div className="flex flex-wrap gap-3">
+        <Button type="submit" size="console" disabled={saving}>
           {saving ? t('admin:catalogue.saving') : submitLabel}
         </Button>
-        <Button type="button" variant="ghost" onClick={onCancel}>
+        <Button type="button" variant="console-outline" size="console" onClick={onCancel}>
           {t('admin:catalogue.cancel')}
         </Button>
       </div>

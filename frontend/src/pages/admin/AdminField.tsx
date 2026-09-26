@@ -1,6 +1,8 @@
+import { CircleAlert } from 'lucide-react'
 import { type ReactNode, useId } from 'react'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import { SELECT } from './console/classes'
 
 /**
  * One labelled control on an admin form: the label above, an optional hint
@@ -35,7 +37,7 @@ export function AdminField({ label, hint, error = null, className, children }: P
   const describedBy = [hint === undefined ? null : hintId, error === null ? null : errorId].filter(Boolean).join(' ')
 
   return (
-    <div className={cn('flex flex-col gap-1.5', className)}>
+    <div className={cn('flex flex-col gap-2', className)}>
       <Label htmlFor={id}>{label}</Label>
       {children({
         id,
@@ -43,19 +45,20 @@ export function AdminField({ label, hint, error = null, className, children }: P
         ...(describedBy === '' ? {} : { 'aria-describedby': describedBy }),
       })}
       {hint !== undefined && (
-        <p id={hintId} className="text-muted-foreground text-xs">
+        <p id={hintId} className="text-muted-foreground text-[0.8125rem] leading-snug">
           {hint}
         </p>
       )}
       {error !== null && (
-        <p id={errorId} className="text-destructive text-xs">
-          {error}
+        // The icon repeats the words, so the error is not told by colour alone.
+        <p id={errorId} className="text-destructive flex items-start gap-1.5 text-[0.8125rem] leading-snug">
+          <CircleAlert aria-hidden="true" className="mt-px size-3.5 shrink-0" />
+          <span>{error}</span>
         </p>
       )}
     </div>
   )
 }
 
-/** A native select styled like `Input`, so the admin forms have one look. */
-export const SELECT_CLASS =
-  'h-8 pointer-coarse:h-11 w-full min-w-0 rounded-lg border border-input bg-card px-2.5 py-1 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm'
+/** A native select styled as a console field, so the admin forms have one look. */
+export const SELECT_CLASS = SELECT

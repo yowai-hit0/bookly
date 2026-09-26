@@ -1,3 +1,4 @@
+import { CircleAlert } from 'lucide-react'
 import { type FormEvent, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
@@ -13,7 +14,9 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
 import { AdminField, SELECT_CLASS } from './AdminField'
+import { CHECKBOX, CHOICE, EYEBROW, FIELD, SUBPANEL, TEXTAREA } from './console/classes'
 
 /**
  * One working-hours row: a weekly rule, or one date that differs from it
@@ -89,25 +92,25 @@ export function WorkingHoursForm({ title, submitLabel, values, onSave, onCancel 
 
   return (
     <form
-      className="bg-muted/40 flex flex-col gap-3 rounded-lg border p-3"
+      className={SUBPANEL}
       aria-label={title}
       noValidate
       onSubmit={onSubmit}
     >
-      <h3 className="font-heading text-sm font-medium">{title}</h3>
+      <h3 className="text-base font-medium">{title}</h3>
 
-      <fieldset className="flex flex-col gap-1.5">
-        <legend className="font-heading text-sm font-medium">{t('admin:availability.fields.kind')}</legend>
-        <div className="flex flex-wrap gap-4">
+      <fieldset className="flex flex-col gap-2">
+        <legend className={cn(EYEBROW, 'mb-1')}>{t('admin:availability.fields.kind')}</legend>
+        <div className="flex flex-wrap gap-x-6 gap-y-1">
           {(['weekday', 'date'] as const).map((option) => (
-            <Label key={option} className="min-h-6 items-center gap-2 font-normal pointer-coarse:min-h-11">
+            <Label key={option} className="min-h-11 items-center gap-2.5 text-base font-normal lg:min-h-8">
               <input
                 type="radio"
                 name="kind"
                 value={option}
                 checked={kind === option}
                 onChange={() => setKind(option)}
-                className="accent-primary size-4"
+                className={CHOICE}
               />
               {t(option === 'weekday' ? 'admin:availability.fields.kindWeekday' : 'admin:availability.fields.kindDate')}
             </Label>
@@ -115,7 +118,7 @@ export function WorkingHoursForm({ title, submitLabel, values, onSave, onCancel 
         </div>
       </fieldset>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         {kind === 'weekday' ? (
           <AdminField label={t('admin:availability.fields.weekday')} error={errorFor('weekday')}>
             {(props) => (
@@ -130,26 +133,26 @@ export function WorkingHoursForm({ title, submitLabel, values, onSave, onCancel 
           </AdminField>
         ) : (
           <AdminField label={t('admin:availability.fields.effectiveDate')} error={errorFor('effectiveDate')}>
-            {(props) => <Input {...props} name="effectiveDate" type="date" defaultValue={values.effectiveDate} />}
+            {(props) => <Input {...props} className={FIELD} name="effectiveDate" type="date" defaultValue={values.effectiveDate} />}
           </AdminField>
         )}
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-2">
-          <Checkbox id={openId} checked={isOpen} onCheckedChange={(checked) => setIsOpen(checked === true)} />
+      <div className="flex flex-col gap-2">
+        <div className="flex min-h-11 items-center gap-2.5 lg:min-h-8">
+          <Checkbox id={openId} className={CHECKBOX} checked={isOpen} onCheckedChange={(checked) => setIsOpen(checked === true)} />
           <Label htmlFor={openId}>{t('admin:availability.fields.isOpen')}</Label>
         </div>
-        <p className="text-muted-foreground text-xs">{t('admin:availability.hints.isOpen')}</p>
+        <p className="text-muted-foreground text-[0.8125rem] leading-snug">{t('admin:availability.hints.isOpen')}</p>
       </div>
 
       {isOpen && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <AdminField label={t('admin:availability.fields.opens')} error={errorFor('opens')}>
-            {(props) => <Input {...props} name="opens" type="time" defaultValue={values.opens} />}
+            {(props) => <Input {...props} className={FIELD} name="opens" type="time" defaultValue={values.opens} />}
           </AdminField>
           <AdminField label={t('admin:availability.fields.closes')} error={errorFor('closes')}>
-            {(props) => <Input {...props} name="closes" type="time" defaultValue={values.closes} />}
+            {(props) => <Input {...props} className={FIELD} name="closes" type="time" defaultValue={values.closes} />}
           </AdminField>
         </div>
       )}
@@ -159,20 +162,21 @@ export function WorkingHoursForm({ title, submitLabel, values, onSave, onCancel 
         hint={t('admin:availability.hints.note')}
         error={errorFor('note')}
       >
-        {(props) => <Textarea {...props} name="note" defaultValue={values.note} />}
+        {(props) => <Textarea {...props} className={TEXTAREA} name="note" defaultValue={values.note} />}
       </AdminField>
 
       {formError !== null && (
-        <p className="text-destructive text-sm" role="alert">
+        <p className="text-destructive flex items-start gap-2 text-sm" role="alert">
+          <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
           {formError}
         </p>
       )}
 
-      <div className="flex gap-2">
-        <Button type="submit" disabled={saving}>
+      <div className="flex flex-wrap gap-3">
+        <Button type="submit" size="console" disabled={saving}>
           {saving ? t('admin:availability.saving') : submitLabel}
         </Button>
-        <Button type="button" variant="ghost" onClick={onCancel}>
+        <Button type="button" variant="console-outline" size="console" onClick={onCancel}>
           {t('admin:availability.cancel')}
         </Button>
       </div>
