@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -53,6 +53,17 @@ function renderPage(hash = '') {
 
 const user = () => userEvent.setup({ delay: null })
 
+/**
+ * Every shape wears the same way home as sign in (2026-09-26, decision 6: the
+ * login dropped the client header, so the panel's Bookly mark is the way back
+ * to the client site): a link to `/`, first in tab order.
+ */
+function expectBooklyLinkHome() {
+  const home = within(screen.getByRole('main')).getByRole('link', { name: 'Bookly' })
+  expect(home).toHaveAttribute('href', '/')
+  expect(document.querySelector('a[href], button, input')).toBe(home)
+}
+
 async function choosePassword(password: string, repeated = password) {
   await user().type(screen.getByLabelText('New password'), password)
   await user().type(screen.getByLabelText('Repeat the new password'), repeated)
@@ -78,6 +89,7 @@ describe('AdminResetPassword, asking for a link', () => {
     expect(screen.getByRole('heading', { name: 'Reset your password' })).toBeInTheDocument()
     expect(screen.getByLabelText('Email')).toHaveAttribute('type', 'email')
     expect(screen.queryByLabelText('New password')).not.toBeInTheDocument()
+    expectBooklyLinkHome()
   })
 
   it('posts the address and then says a link is on its way', async () => {
@@ -96,6 +108,7 @@ describe('AdminResetPassword, asking for a link', () => {
     })
     // The form is gone, so a second send cannot be used to probe addresses.
     expect(screen.queryByRole('button', { name: 'Send the link' })).not.toBeInTheDocument()
+    expectBooklyLinkHome()
   })
 
   it('says exactly the same thing for an address that cannot sign in', async () => {
@@ -141,6 +154,7 @@ describe('AdminResetPassword, choosing the new password', () => {
     expect(screen.getByLabelText('New password')).toHaveAttribute('type', 'password')
     expect(screen.getByLabelText('Repeat the new password')).toHaveAttribute('type', 'password')
     expect(screen.queryByLabelText('Email')).not.toBeInTheDocument()
+    expectBooklyLinkHome()
   })
 
   it('sends the token in the body and in no URL at all', async () => {
@@ -166,6 +180,7 @@ describe('AdminResetPassword, choosing the new password', () => {
 
     expect(await screen.findByRole('heading', { name: 'Password changed' })).toBeInTheDocument()
     expect(screen.queryByLabelText('New password')).not.toBeInTheDocument()
+    expectBooklyLinkHome()
 
     await user().click(screen.getByRole('link', { name: 'Back to sign in' }))
     expect(router.state.location.pathname).toBe('/admin/login')

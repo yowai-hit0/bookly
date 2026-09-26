@@ -1,12 +1,14 @@
-import { MailCheck, TriangleAlert } from 'lucide-react'
+import { CircleAlert, MailCheck, TriangleAlert } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router'
 import { apiUrl } from '@/admin/api'
+import { useAdminTheme } from '@/admin/theme'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { AdminField } from './AdminField'
+import { AdminAuthFrame } from './console/AuthFrame'
+import { FIELD, QUIET_LINK } from './console/classes'
 
 /**
  * `/admin/reset-password` (plan.md Task 7, spec §6.23, A-11). One route, two
@@ -23,29 +25,28 @@ import { AdminField } from './AdminField'
  * The request form always says the same thing, whether or not the address can
  * sign in here: the API answers 202 either way, so this page cannot and does
  * not reveal who has an account.
+ *
+ * Every shape sits in the console panel shared with `/admin/login`
+ * (`AdminAuthFrame`), so arriving here from sign in lands somewhere that
+ * visibly matches, not something phishing-shaped.
  */
 
 /** Mirrors the API's own floor (`MIN_NEW_PASSWORD_LENGTH`). */
 const MIN_PASSWORD_LENGTH = 12
 
+/** The muted way back to sign in: a link, never a second button. */
+const BACK_LINK = QUIET_LINK
+
 type RequestStatus = 'idle' | 'submitting' | 'sent' | 'failed'
 type ConfirmStatus = 'idle' | 'submitting' | 'done' | 'invalidToken' | 'failed'
 
 export function AdminResetPassword() {
-  const { t } = useTranslation()
+  // The admin theme (stored or system) applies here too; there is no toggle.
+  useAdminTheme()
   const { hash } = useLocation()
   const token = new URLSearchParams(hash.replace(/^#/, '')).get('token')
 
-  return (
-    <main className="mx-auto flex min-h-svh max-w-sm flex-col justify-center gap-4 p-6">
-      {/* Same frame as `/admin/login`: a photographer arriving from there must
-          land somewhere that visibly matches, not something phishing-shaped. */}
-      <span className="font-heading text-foreground/80 self-center text-lg font-semibold">
-        {t('common:appName')}
-      </span>
-      {token === null || token === '' ? <RequestLink /> : <ChoosePassword token={token} />}
-    </main>
-  )
+  return token === null || token === '' ? <RequestLink /> : <ChoosePassword token={token} />
 }
 
 /** Step one: ask the API to email a link. */
@@ -72,44 +73,45 @@ function RequestLink() {
     }
   }
 
+  // Sent replaces the intro and the form, so a second send cannot be used to
+  // probe addresses. It is one rendering for every address (the same words,
+  // icon and colour), because the page is never told which addresses exist.
   return (
-    <Card className="shadow-md">
-      <CardHeader>
-        <CardTitle>
-          <h1 className="text-xl">{t('admin:resetPassword.requestTitle')}</h1>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+    <AdminAuthFrame
+      title={t('admin:resetPassword.requestTitle')}
+      intro={status === 'sent' ? undefined : t('admin:resetPassword.requestBody')}
+    >
+      <div className="flex flex-col gap-4">
         {status === 'sent' ? (
           <p className="flex items-start gap-2 text-sm" role="status">
-            <MailCheck aria-hidden="true" className="text-primary mt-0.5 size-4 shrink-0" />
-            {t('admin:resetPassword.requestSent')}
+            <MailCheck aria-hidden="true" className="text-console-link mt-0.5 size-4 shrink-0" />
+            <span>{t('admin:resetPassword.requestSent')}</span>
           </p>
         ) : (
-          <>
-            <p className="text-muted-foreground text-sm">{t('admin:resetPassword.requestBody')}</p>
-            <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void onSubmit(event)}>
-              <AdminField label={t('admin:resetPassword.email')}>
-                {(props) => <Input {...props} name="email" type="email" autoComplete="username" required />}
-              </AdminField>
-              {status === 'failed' && (
-                <p className="text-destructive text-sm" role="alert">
-                  {t('admin:resetPassword.requestFailed')}
-                </p>
+          <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void onSubmit(event)}>
+            <AdminField label={t('admin:resetPassword.email')}>
+              {(props) => (
+                <Input {...props} name="email" type="email" autoComplete="username" required className={FIELD} />
               )}
-              <Button type="submit" className="w-full" disabled={status === 'submitting'}>
-                {status === 'submitting'
-                  ? t('admin:resetPassword.requestSubmitting')
-                  : t('admin:resetPassword.requestSubmit')}
-              </Button>
-            </form>
-          </>
+            </AdminField>
+            {status === 'failed' && (
+              <p className="text-destructive flex items-start gap-2 text-sm" role="alert">
+                <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                <span>{t('admin:resetPassword.requestFailed')}</span>
+              </p>
+            )}
+            <Button type="submit" size="console" className="w-full" disabled={status === 'submitting'}>
+              {status === 'submitting'
+                ? t('admin:resetPassword.requestSubmitting')
+                : t('admin:resetPassword.requestSubmit')}
+            </Button>
+          </form>
         )}
-        <Link to="/admin/login" className="text-muted-foreground text-sm underline-offset-4 hover:underline">
+        <Link to="/admin/login" className={BACK_LINK}>
           {t('admin:resetPassword.backToSignIn')}
         </Link>
-      </CardContent>
-    </Card>
+      </div>
+    </AdminAuthFrame>
   )
 }
 
@@ -156,72 +158,75 @@ function ChoosePassword({ token }: { token: string }) {
 
   if (status === 'done') {
     return (
-      <Card className="shadow-md">
-        <CardHeader>
-          <CardTitle>
-            <h1 className="text-xl">{t('admin:resetPassword.doneTitle')}</h1>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
+      <AdminAuthFrame title={t('admin:resetPassword.doneTitle')}>
+        <div className="flex flex-col gap-4">
           <p className="text-sm" role="status">
             {t('admin:resetPassword.doneBody')}
           </p>
           {/* The one shape where the way out is a button: the job is finished
               and there is exactly one next thing to do. */}
-          <Button asChild className="self-start">
+          <Button asChild size="console" className="w-full">
             <Link to="/admin/login">{t('admin:resetPassword.backToSignIn')}</Link>
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </AdminAuthFrame>
     )
   }
 
   return (
-    <Card className="shadow-md">
-      <CardHeader>
-        <CardTitle>
-          <h1 className="text-xl">{t('admin:resetPassword.chooseTitle')}</h1>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <p className="text-muted-foreground text-sm">{t('admin:resetPassword.chooseBody')}</p>
+    <AdminAuthFrame title={t('admin:resetPassword.chooseTitle')} intro={t('admin:resetPassword.chooseBody')}>
+      <div className="flex flex-col gap-4">
         <form className="flex flex-col gap-4" noValidate onSubmit={(event) => void onSubmit(event)}>
           <AdminField
             label={t('admin:resetPassword.newPassword')}
             hint={t('admin:resetPassword.passwordHint')}
             error={invalid === 'tooShort' ? t('admin:resetPassword.tooShort') : null}
           >
-            {(props) => <Input {...props} name="newPassword" type="password" autoComplete="new-password" required />}
+            {(props) => (
+              <Input {...props} name="newPassword" type="password" autoComplete="new-password" required className={FIELD} />
+            )}
           </AdminField>
           <AdminField
             label={t('admin:resetPassword.confirmPassword')}
             error={invalid === 'mismatch' ? t('admin:resetPassword.mismatch') : null}
           >
             {(props) => (
-              <Input {...props} name="confirmPassword" type="password" autoComplete="new-password" required />
+              <Input
+                {...props}
+                name="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                required
+                className={FIELD}
+              />
             )}
           </AdminField>
 
           {(status === 'invalidToken' || status === 'failed') && (
             <p className="text-destructive flex items-start gap-2 text-sm" role="alert">
-              {/* The dead end gets an icon; a plain retry-worthy failure does not. */}
-              {status === 'invalidToken' && (
+              {/* The dead end keeps its warning triangle, so it does not read as
+                  a retry-worthy failure: only a new link helps. */}
+              {status === 'invalidToken' ? (
                 <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              ) : (
+                <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
               )}
-              {t(status === 'invalidToken' ? 'admin:resetPassword.invalidToken' : 'admin:resetPassword.chooseFailed')}
+              <span>
+                {t(status === 'invalidToken' ? 'admin:resetPassword.invalidToken' : 'admin:resetPassword.chooseFailed')}
+              </span>
             </p>
           )}
 
-          <Button type="submit" className="w-full" disabled={status === 'submitting'}>
+          <Button type="submit" size="console" className="w-full" disabled={status === 'submitting'}>
             {status === 'submitting'
               ? t('admin:resetPassword.chooseSubmitting')
               : t('admin:resetPassword.chooseSubmit')}
           </Button>
         </form>
-        <Link to="/admin/login" className="text-muted-foreground text-sm underline-offset-4 hover:underline">
+        <Link to="/admin/login" className={BACK_LINK}>
           {t('admin:resetPassword.backToSignIn')}
         </Link>
-      </CardContent>
-    </Card>
+      </div>
+    </AdminAuthFrame>
   )
 }

@@ -1,14 +1,15 @@
+import { CircleAlert } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router'
 import { apiUrl } from '@/admin/api'
 import { saveSession } from '@/admin/session'
+import { useAdminTheme } from '@/admin/theme'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { SkipLink } from '@/components/ui/skip-link'
-import { ClientHeader } from '@/pages/ClientShell'
+import { AdminAuthFrame } from './console/AuthFrame'
+import { FIELD, QUIET_LINK } from './console/classes'
 
 type Status = 'idle' | 'submitting' | 'invalid' | 'failed'
 
@@ -19,11 +20,13 @@ type LoginResponse = { token: string; expiresAt: string }
  * password and a locked account identically, so this page cannot and does not
  * tell them apart.
  *
- * It wears the client top bar (decided 2026-09-25), so a visitor who followed
- * the header's admin link has the same way back out. Only the header: the
- * footer's links are for clients.
+ * It no longer wears the client top bar (user decision, 2026-09-26, reversing
+ * the 2026-09-25 one): sign in and reset password are one place, the console
+ * panel below, and the Bookly mark in it is the way back to the client site.
  */
 export function AdminLogin() {
+  // The admin theme (stored or system) applies here too; there is no toggle.
+  useAdminTheme()
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [status, setStatus] = useState<Status>('idle')
@@ -59,56 +62,37 @@ export function AdminLogin() {
     status === 'invalid' ? t('admin:signIn.invalid') : status === 'failed' ? t('admin:signIn.failed') : null
 
   return (
-    <div className="flex min-h-svh flex-col">
-      <SkipLink targetId="main-content">{t('shell:skipToContent')}</SkipLink>
-      {/* The wordmark is the header's now, so none sits above the card. */}
-      <ClientHeader showAdminLogin={false} />
-      <main
-        id="main-content"
-        tabIndex={-1}
-        className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-4 p-6 outline-none"
-      >
-        <Card className="shadow-md">
-          <CardHeader>
-            <CardTitle>
-              <h1 className="text-xl">{t('admin:signIn.title')}</h1>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form className="flex flex-col gap-4" onSubmit={onSubmit}>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="admin-email">{t('admin:signIn.email')}</Label>
-                <Input id="admin-email" name="email" type="email" autoComplete="username" required />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="admin-password">{t('admin:signIn.password')}</Label>
-                <Input
-                  id="admin-password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                />
-              </div>
-              {message !== null && (
-                <p className="text-destructive text-sm" role="alert">
-                  {message}
-                </p>
-              )}
-              <Button type="submit" className="w-full" disabled={status === 'submitting'}>
-                {status === 'submitting' ? t('admin:signIn.submitting') : t('admin:signIn.submit')}
-              </Button>
-              {/* The reset page asks for the address itself; this link carries nothing. */}
-              <Link
-                to="/admin/reset-password"
-                className="text-muted-foreground self-start text-sm underline-offset-4 hover:underline"
-              >
-                {t('admin:signIn.forgot')}
-              </Link>
-            </form>
-          </CardContent>
-        </Card>
-      </main>
-    </div>
+    <AdminAuthFrame title={t('admin:signIn.title')}>
+      <form className="flex flex-col gap-4" onSubmit={onSubmit}>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="admin-email">{t('admin:signIn.email')}</Label>
+          <Input id="admin-email" name="email" type="email" autoComplete="username" required className={FIELD} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="admin-password">{t('admin:signIn.password')}</Label>
+          <Input
+            id="admin-password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            className={FIELD}
+          />
+        </div>
+        {message !== null && (
+          <p className="text-destructive flex items-start gap-2 text-sm" role="alert">
+            <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            <span>{message}</span>
+          </p>
+        )}
+        <Button type="submit" size="console" className="w-full" disabled={status === 'submitting'}>
+          {status === 'submitting' ? t('admin:signIn.submitting') : t('admin:signIn.submit')}
+        </Button>
+        {/* The reset page asks for the address itself; this link carries nothing. */}
+        <Link to="/admin/reset-password" className={QUIET_LINK}>
+          {t('admin:signIn.forgot')}
+        </Link>
+      </form>
+    </AdminAuthFrame>
   )
 }

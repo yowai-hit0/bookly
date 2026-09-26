@@ -79,32 +79,36 @@ describe('AdminLogin', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  // The reset page is reachable only from here. The page itself is tested in
-  // AdminResetPassword.test.tsx; without this, nothing proved the way in exists
-  // (the gap list's row 2, closed 2026-09-21 and checked here since).
-  it('wears the client top bar, without a link to itself, beside its own main', () => {
+  // The client top bar was dropped on 2026-09-26 (admin-console.md decision 6):
+  // sign in and reset password are one place, a console panel whose Bookly mark
+  // is the way back to the client site. These replace the two tests that
+  // guarded the header and the skip link that only skipped it.
+  it('wears no client top bar or footer, only its own main', () => {
     stubLogin(() => json(LOGIN_OK))
     const { container } = render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ['/admin/login'] })} />)
 
-    const banner = screen.getByRole('banner')
-    expect(within(banner).getByRole('link', { name: 'Bookly' })).toHaveAttribute('href', '/')
-    expect(within(banner).getByRole('link', { name: 'Book now' })).toHaveAttribute('href', '/services')
-    expect(within(banner).queryByRole('link', { name: 'Admin login' })).not.toBeInTheDocument()
-    expect(banner.contains(screen.getByRole('main'))).toBe(false)
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Book now' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Admin login' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Skip to content' })).not.toBeInTheDocument()
     expect(container.querySelectorAll('main')).toHaveLength(1)
     // No client footer: its links are for clients.
     expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument()
   })
 
-  it('opens with a skip link to the form, ahead of the top bar', () => {
+  it('opens on the Bookly mark, a link home, above its one heading', async () => {
     stubLogin(() => json(LOGIN_OK))
     renderLogin()
 
-    const skip = screen.getByRole('link', { name: 'Skip to content' })
-    expect(skip).toHaveAttribute('href', '#main-content')
-    expect(document.querySelector('a[href], button, input')).toBe(skip)
-    expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content')
-    expect(screen.getByRole('main')).toHaveAttribute('tabindex', '-1')
+    const home = within(screen.getByRole('main')).getByRole('link', { name: 'Bookly' })
+    expect(home).toHaveAttribute('href', '/')
+    expect(document.querySelector('a[href], button, input')).toBe(home)
+    await userEvent.setup({ delay: null }).tab()
+    expect(home).toHaveFocus()
+
+    const headings = screen.getAllByRole('heading', { level: 1 })
+    expect(headings).toHaveLength(1)
+    expect(headings[0]).toHaveAccessibleName('Admin sign in')
   })
 
   it('is reached from the client top bar', async () => {
@@ -119,6 +123,9 @@ describe('AdminLogin', () => {
     expect(await screen.findByRole('heading', { name: 'Admin sign in' })).toBeInTheDocument()
   })
 
+  // The reset page is reachable only from here. The page itself is tested in
+  // AdminResetPassword.test.tsx; without this, nothing proved the way in exists
+  // (the gap list's row 2, closed 2026-09-21 and checked here since).
   it('offers the way to the reset page, carrying nothing with it', async () => {
     stubLogin(() => json(LOGIN_OK))
     renderLogin()

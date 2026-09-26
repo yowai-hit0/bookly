@@ -66,12 +66,14 @@ describe('routing', () => {
     )
   })
 
-  it('leaves admin outside the client shell: the login wears only its top bar (2026-09-25)', async () => {
+  it('leaves admin outside the client shell: the login is bare, like reset password (2026-09-26)', async () => {
     renderAt('/admin/login')
 
     expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument()
     expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Book now' })).toHaveAttribute('href', '/services')
+    // The client top bar it wore from 2026-09-25 is gone (admin console decision 6).
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Book now' })).not.toBeInTheDocument()
     const shell = routes.find((route) => route.path === undefined)
     expect((shell?.children ?? []).map((child) => child.path)).not.toContain('/admin/login')
   })
