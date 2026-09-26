@@ -164,6 +164,9 @@
       "light": "Light",
       "dark": "Dark"
     },
+    "breadcrumb": {
+      "label": "Breadcrumb"
+    },
     "calendar": {
       "title": "Calendar",
       "timezoneNote": "All times are Kigali time (UTC+2).",
