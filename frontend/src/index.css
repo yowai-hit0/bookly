@@ -5,12 +5,35 @@
 @import "@fontsource/poppins/500.css";
 @import "@fontsource/poppins/600.css";
 @import "@fontsource-variable/open-sans";
+/* The admin console's faces (design-system/bookly/admin-console.md). Only
+   rules under `:root[data-admin-theme]` name them, so a client page never
+   downloads either file. */
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
     --font-heading: 'Poppins', sans-serif;
     --font-sans: 'Open Sans Variable', sans-serif;
+    /* Admin console colours: defined only under `:root[data-admin-theme]`
+       below, so these utilities resolve to nothing outside the admin. */
+    --color-console-surface: var(--console-surface);
+    --color-console-chip: var(--console-chip);
+    --color-console-border-strong: var(--console-border-strong);
+    --color-console-link: var(--console-link);
+    --color-console-link-hover: var(--console-link-hover);
+    --color-console-accent: var(--console-accent);
+    --color-console-accent-foreground: var(--console-accent-foreground);
+    --color-console-info-foreground: var(--console-info-foreground);
+    --color-console-info-icon: var(--console-info-icon);
+    --color-console-accent-strong: var(--console-accent-strong);
+    --color-console-success: var(--console-success);
+    --color-console-success-tint: var(--console-success-tint);
+    --color-console-warning: var(--console-warning);
+    --color-console-warning-tint: var(--console-warning-tint);
+    --color-console-danger-tint: var(--console-danger-tint);
+    --color-console-danger-solid: var(--console-danger-solid);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -118,6 +141,150 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* The admin console (design-system/bookly/admin-console.md section 2).
+   `src/admin/theme.ts` sets `data-admin-theme` on <html> only while an admin
+   route is mounted, and removes it on the way out, so nothing below reaches a
+   client page. The selectors above (`.dark`, `:root`) and the `dark:` variant
+   are the client's and are left alone: in this file `.dark` holds the client's
+   light palette (commit dc69157), so `dark:` never means "dark theme" here. */
+:root[data-admin-theme="dark"] {
+    color-scheme: dark;
+    --background: oklch(0.1452 0.0021 286.13);
+    --foreground: oklch(0.9674 0.0013 286.38);
+    --card: oklch(0.1452 0.0021 286.13);
+    --card-foreground: oklch(0.9674 0.0013 286.38);
+    --popover: oklch(0.1876 0.004 286.01);
+    --popover-foreground: oklch(0.9674 0.0013 286.38);
+    --primary: oklch(0.9851 0 0);
+    --primary-foreground: oklch(0.1452 0.0021 286.13);
+    --secondary: oklch(0.2739 0.0055 286.03);
+    --secondary-foreground: oklch(0.9674 0.0013 286.38);
+    --muted: oklch(0.2739 0.0055 286.03);
+    --muted-foreground: oklch(0.7118 0.0129 286.07);
+    --accent: oklch(0.1876 0.004 286.01);
+    --accent-foreground: oklch(0.9674 0.0013 286.38);
+    --destructive: oklch(0.7106 0.1661 22.22);
+    --border: oklch(0.2739 0.0055 286.03);
+    --input: oklch(0.5025 0.0126 285.94);
+    --ring: oklch(0.7679 0.1322 294.45);
+    --radius: 0.125rem;
+    --sidebar: oklch(0.1452 0.0021 286.13);
+    --sidebar-foreground: oklch(0.9674 0.0013 286.38);
+    --sidebar-primary: oklch(0.3364 0.1647 288.7);
+    --sidebar-primary-foreground: oklch(0.857 0.0795 295.94);
+    --sidebar-accent: oklch(0.1876 0.004 286.01);
+    --sidebar-accent-foreground: oklch(0.9674 0.0013 286.38);
+    --sidebar-border: oklch(0.2739 0.0055 286.03);
+    --sidebar-ring: oklch(0.7679 0.1322 294.45);
+
+    --console-surface: oklch(0.1876 0.004 286.01);
+    --console-chip: oklch(0.2739 0.0055 286.03);
+    --console-border-strong: oklch(0.3703 0.0119 285.81);
+    --console-link: oklch(0.7679 0.1322 294.45);
+    --console-link-hover: oklch(0.857 0.0795 295.94);
+    --console-accent: oklch(0.3364 0.1647 288.7);
+    --console-accent-foreground: oklch(0.857 0.0795 295.94);
+    --console-info-foreground: oklch(0.9674 0.0013 286.38);
+    --console-info-icon: oklch(0.9674 0.0013 286.38);
+    --console-accent-strong: oklch(0.432 0.2106 292.76);
+    --console-success: oklch(0.8003 0.1821 151.71);
+    --console-success-tint: oklch(0.2718 0.0501 155.43);
+    --console-warning: oklch(0.8369 0.1644 84.43);
+    --console-warning-tint: oklch(0.2535 0.0317 82.37);
+    --console-danger-tint: oklch(0.2189 0.0398 12.97);
+    --console-danger-solid: oklch(0.5771 0.2152 27.33);
+}
+
+:root[data-admin-theme="light"] {
+    color-scheme: light;
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.2103 0.0059 285.89);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.2103 0.0059 285.89);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.2103 0.0059 285.89);
+    --primary: oklch(0.2103 0.0059 285.89);
+    --primary-foreground: oklch(1 0 0);
+    --secondary: oklch(0.9674 0.0013 286.38);
+    --secondary-foreground: oklch(0.2103 0.0059 285.89);
+    --muted: oklch(0.9674 0.0013 286.38);
+    --muted-foreground: oklch(0.5517 0.0138 285.94);
+    --accent: oklch(0.9851 0 0);
+    --accent-foreground: oklch(0.2103 0.0059 285.89);
+    --destructive: oklch(0.5054 0.1905 27.52);
+    --border: oklch(0.9197 0.004 286.32);
+    --input: oklch(0.6493 0.0118 286.07);
+    --ring: oklch(0.5413 0.2466 293.01);
+    --radius: 0.125rem;
+    --sidebar: oklch(0.9851 0 0);
+    --sidebar-foreground: oklch(0.2103 0.0059 285.89);
+    --sidebar-primary: oklch(0.9522 0.0245 298.61);
+    --sidebar-primary-foreground: oklch(0.5413 0.2466 293.01);
+    --sidebar-accent: oklch(0.9674 0.0013 286.38);
+    --sidebar-accent-foreground: oklch(0.2103 0.0059 285.89);
+    --sidebar-border: oklch(0.9197 0.004 286.32);
+    --sidebar-ring: oklch(0.5413 0.2466 293.01);
+
+    --console-surface: oklch(0.9851 0 0);
+    --console-chip: oklch(0.9674 0.0013 286.38);
+    --console-border-strong: oklch(0.8711 0.0055 286.29);
+    --console-link: oklch(0.5413 0.2466 293.01);
+    --console-link-hover: oklch(0.432 0.2106 292.76);
+    --console-accent: oklch(0.9522 0.0245 298.61);
+    --console-accent-foreground: oklch(0.5413 0.2466 293.01);
+    --console-info-foreground: oklch(0.2103 0.0059 285.89);
+    --console-info-icon: oklch(0.5413 0.2466 293.01);
+    --console-accent-strong: oklch(0.5413 0.2466 293.01);
+    --console-success: oklch(0.5273 0.1371 150.07);
+    --console-success-tint: oklch(0.9662 0.0189 157.88);
+    --console-warning: oklch(0.5553 0.1455 49);
+    --console-warning-tint: oklch(0.9734 0.0209 79.1);
+    --console-danger-tint: oklch(0.9566 0.0185 17.48);
+    --console-danger-solid: oklch(0.5054 0.1905 27.52);
+}
+
+:root[data-admin-theme] {
+    --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --console-font-sans: 'Geist Variable', system-ui, sans-serif;
+}
+
+/* One focus indicator in the admin: a 2px violet outline, offset 2px, in both
+   themes (9.12:1 dark, 5.70:1 light). Unlayered on purpose, so it wins over
+   the `outline-none` the shadcn primitives carry; it also zeroes their 50%
+   ring halo, so there are not two indicators. Anything focused by script
+   (`tabindex="-1"`: the content wrapper, headings) is left without one. */
+:root[data-admin-theme] :focus-visible:not([tabindex="-1"]) {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    --tw-ring-shadow: 0 0 #0000;
+}
+
+@layer base {
+  /* Geist for everything in the admin, headings included. In the base layer,
+     so a utility on the element (`font-mono` on the booking reference `h1`)
+     still wins. */
+  :root[data-admin-theme] {
+    font-family: var(--console-font-sans);
+  }
+  :root[data-admin-theme] :is(h1, h2, h3) {
+    font-family: var(--console-font-sans);
+  }
+  /* Outline icons at 1.5px with square caps, as the style guide draws them.
+     A presentation attribute (`stroke-width="2"`) loses to any stylesheet
+     rule, so this needs no `!important`. */
+  :root[data-admin-theme] svg.lucide {
+    stroke-width: 1.5;
+    stroke-linecap: square;
+  }
+}
+
+@layer utilities {
+  /* `font-heading` inlines Poppins; inside the admin it is Geist too. */
+  :root[data-admin-theme] .font-heading {
+    font-family: var(--console-font-sans);
+  }
 }
 
 @layer base {

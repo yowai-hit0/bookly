@@ -158,6 +158,12 @@
       "availability": "Availability",
       "settings": "Settings"
     },
+    "theme": {
+      "label": "Theme",
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    },
     "calendar": {
       "title": "Calendar",
       "timezoneNote": "All times are Kigali time (UTC+2).",
