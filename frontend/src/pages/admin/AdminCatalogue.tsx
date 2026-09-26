@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { Check, CircleAlert, Package, Plus } from 'lucide-react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import { ApiError, UnauthenticatedError } from '@/admin/api'
@@ -20,8 +21,11 @@ import {
 } from '@/admin/catalogue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { formatMoney } from '@/lib/format'
+import { cn } from '@/lib/utils'
+import { EYEBROW, META, PAGE, SECTION_TITLE } from './console/classes'
+import { PageHeader } from './console/PageHeader'
 import { EntityForm, type FieldSpec } from './EntityForm'
 
 /**
@@ -63,6 +67,39 @@ const ADDON_FIELDS: readonly FieldSpec[] = [
 
 /** Which form is open: `service:new`, `service:<id>`, `package:new:<serviceId>`, … */
 type Editing = string | null
+
+/** A number inside a meta line: the data face, at the line's own size. */
+const FIGURE = 'font-mono tabular-nums'
+
+/** One item of a meta line ("Order 0"): the line wraps between items, never inside one. */
+const ITEM = 'whitespace-nowrap'
+
+/** A list's heading in a service panel: a mono label over a hairline, like a table's header row. */
+const LIST_HEADING = cn(EYEBROW, 'border-b pb-3')
+
+/** A package or add-on row: hairlines between rows, none under the last. */
+const LIST_ROW = 'flex flex-col gap-3 border-b py-4 last:border-b-0'
+
+/** An error line: danger text led by its icon. */
+const ERROR_LINE = 'flex items-start gap-2 text-sm text-destructive'
+
+/**
+ * A translated meta item with its number set in the data face ("Order 0",
+ * "Booking fee 37.5%", "20 photos"). Only the face changes: the words are the
+ * string's own and the text is exactly what `t` returned.
+ */
+function withFigure(phrase: string, value: number): ReactNode {
+  const figure = String(value)
+  const at = phrase.indexOf(figure)
+  if (at < 0) return <span className={ITEM}>{phrase}</span>
+  return (
+    <span className={ITEM}>
+      {phrase.slice(0, at)}
+      <span className={FIGURE}>{figure}</span>
+      {phrase.slice(at + figure.length)}
+    </span>
+  )
+}
 
 export function AdminCatalogue() {
   const { t } = useTranslation()
@@ -132,35 +169,71 @@ export function AdminCatalogue() {
   }
 
   function rowActions(name: string, isActive: boolean, key: string, toggle: () => Promise<unknown>, del: () => Promise<unknown>) {
+    // Quiet: three buttons on every row. Below `sm` they wrap under the row's
+    // text, each 44px tall; beside it from `sm`.
     return (
-      <div className="flex flex-wrap gap-1">
-        <Button size="sm" variant="outline" aria-label={t('admin:catalogue.editNamed', { name })} onClick={() => setEditing(key)}>
+      <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
+        <Button
+          size="console-sm"
+          variant="console-outline"
+          aria-label={t('admin:catalogue.editNamed', { name })}
+          onClick={() => setEditing(key)}
+        >
           {t('admin:catalogue.edit')}
         </Button>
         <Button
-          size="sm"
-          variant="outline"
+          size="console-sm"
+          variant="console-outline"
           aria-label={t(isActive ? 'admin:catalogue.deactivateNamed' : 'admin:catalogue.activateNamed', { name })}
           onClick={() => void act(toggle)}
         >
           {t(isActive ? 'admin:catalogue.deactivate' : 'admin:catalogue.activate')}
         </Button>
-        <Button size="sm" variant="destructive" aria-label={t('admin:catalogue.deleteNamed', { name })} onClick={() => remove(name, del)}>
+        <Button
+          size="console-sm"
+          variant="destructive"
+          aria-label={t('admin:catalogue.deleteNamed', { name })}
+          onClick={() => remove(name, del)}
+        >
           {t('admin:catalogue.delete')}
         </Button>
       </div>
     )
   }
 
+  /** Active is the success pair with a check; inactive the neutral chip. The word is always there. */
   function statusBadge(isActive: boolean) {
-    return <Badge variant={isActive ? 'default' : 'outline'}>{t(isActive ? 'admin:catalogue.active' : 'admin:catalogue.inactive')}</Badge>
+    return isActive ? (
+      <Badge variant="console-success">
+        <Check aria-hidden="true" />
+        {t('admin:catalogue.active')}
+      </Badge>
+    ) : (
+      <Badge variant="console">{t('admin:catalogue.inactive')}</Badge>
+    )
+  }
+
+  /** A row's name and badge over its meta line; the actions beside or below. */
+  function rowLayout(name: string, isActive: boolean, meta: ReactNode, actions: ReactNode) {
+    return (
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+            <span className="min-w-0 font-medium wrap-anywhere">{name}</span>
+            {statusBadge(isActive)}
+          </div>
+          <p className={cn(META, 'wrap-anywhere')}>{meta}</p>
+        </div>
+        {actions}
+      </div>
+    )
   }
 
   function packageRow(pkg: AdminPackage) {
     const key = `package:${pkg.id}`
     if (editing === key) {
       return (
-        <li key={pkg.id}>
+        <li key={pkg.id} className={LIST_ROW}>
           <EntityForm
             title={t('admin:catalogue.editPackage')}
             submitLabel={t('admin:catalogue.save')}
@@ -175,35 +248,38 @@ export function AdminCatalogue() {
     }
     const warning = warnings[pkg.id]
     return (
-      <li key={pkg.id} className="flex flex-col gap-1 border-b py-2 last:border-b-0">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">{pkg.nameEn}</span>
-            {statusBadge(pkg.isActive)}
-            <span className="text-muted-foreground text-sm">
-              {formatMoney(pkg.priceRwf)} · {t('admin:catalogue.photos', { count: pkg.photoCount })} ·{' '}
-              {t('admin:catalogue.duration', { minutes: pkg.durationMinutes })} · {t('admin:catalogue.order', { order: pkg.sortOrder })}
-            </span>
-          </div>
-          {rowActions(
+      <li key={pkg.id} className={LIST_ROW}>
+        {rowLayout(
+          pkg.nameEn,
+          pkg.isActive,
+          <>
+            <span className={cn(ITEM, FIGURE, 'text-foreground')}>{formatMoney(pkg.priceRwf)}</span> ·{' '}
+            {withFigure(t('admin:catalogue.photos', { count: pkg.photoCount }), pkg.photoCount)} ·{' '}
+            <span className={cn(ITEM, FIGURE)}>{t('admin:catalogue.duration', { minutes: pkg.durationMinutes })}</span> ·{' '}
+            {withFigure(t('admin:catalogue.order', { order: pkg.sortOrder }), pkg.sortOrder)}
+          </>,
+          rowActions(
             pkg.nameEn,
             pkg.isActive,
             key,
             () => catalogueApi.updatePackage(pkg.id, { isActive: !pkg.isActive }).then(rememberWarning),
             () => catalogueApi.deletePackage(pkg.id),
-          )}
-        </div>
+          ),
+        )}
         {warning !== undefined && (
-          <p className="text-destructive text-sm" role="alert">
-            {warning.longestWindow === null
-              ? t('admin:catalogue.durationWarningNoHours', { name: pkg.nameEn })
-              : t('admin:catalogue.durationWarning', {
-                  name: pkg.nameEn,
-                  minutes: pkg.durationMinutes,
-                  opens: formatMinuteOfDay(warning.longestWindow.opensMinute),
-                  closes: formatMinuteOfDay(warning.longestWindow.closesMinute),
-                  longest: warning.longestWindow.closesMinute - warning.longestWindow.opensMinute,
-                })}
+          <p className={ERROR_LINE} role="alert">
+            <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            <span className="min-w-0">
+              {warning.longestWindow === null
+                ? t('admin:catalogue.durationWarningNoHours', { name: pkg.nameEn })
+                : t('admin:catalogue.durationWarning', {
+                    name: pkg.nameEn,
+                    minutes: pkg.durationMinutes,
+                    opens: formatMinuteOfDay(warning.longestWindow.opensMinute),
+                    closes: formatMinuteOfDay(warning.longestWindow.closesMinute),
+                    longest: warning.longestWindow.closesMinute - warning.longestWindow.opensMinute,
+                  })}
+            </span>
           </p>
         )}
       </li>
@@ -214,7 +290,7 @@ export function AdminCatalogue() {
     const key = `addon:${addon.id}`
     if (editing === key) {
       return (
-        <li key={addon.id}>
+        <li key={addon.id} className={LIST_ROW}>
           <EntityForm
             title={t('admin:catalogue.editAddon')}
             submitLabel={t('admin:catalogue.save')}
@@ -228,33 +304,38 @@ export function AdminCatalogue() {
       )
     }
     return (
-      <li key={addon.id} className="flex flex-wrap items-center justify-between gap-2 border-b py-2 last:border-b-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">{addon.nameEn}</span>
-          {statusBadge(addon.isActive)}
-          <span className="text-muted-foreground text-sm">
-            {formatMoney(addon.priceRwf)} · {t('admin:catalogue.order', { order: addon.sortOrder })}
-          </span>
-        </div>
-        {rowActions(
+      <li key={addon.id} className={LIST_ROW}>
+        {rowLayout(
           addon.nameEn,
           addon.isActive,
-          key,
-          () => catalogueApi.updateAddon(addon.id, { isActive: !addon.isActive }),
-          () => catalogueApi.deleteAddon(addon.id),
+          <>
+            <span className={cn(ITEM, FIGURE, 'text-foreground')}>{formatMoney(addon.priceRwf)}</span> ·{' '}
+            {withFigure(t('admin:catalogue.order', { order: addon.sortOrder }), addon.sortOrder)}
+          </>,
+          rowActions(
+            addon.nameEn,
+            addon.isActive,
+            key,
+            () => catalogueApi.updateAddon(addon.id, { isActive: !addon.isActive }),
+            () => catalogueApi.deleteAddon(addon.id),
+          ),
         )}
       </li>
     )
   }
 
-  /** The add-on list plus its "Add add-on" control, for one service or for all. */
+  /**
+   * The add-on list plus its "Add add-on" control, for one service or for all.
+   * In a service panel its heading is a list label; the shared add-ons have a
+   * panel of their own, where it is that panel's title.
+   */
   function addonSection(serviceId: string | null, addons: AdminAddon[], heading: string) {
     const newKey = `addon:new:${serviceId ?? 'shared'}`
     return (
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">{heading}</h3>
+      <section className="flex flex-col">
+        <h3 className={serviceId === null ? cn(SECTION_TITLE, 'border-b pb-4') : LIST_HEADING}>{heading}</h3>
         {addons.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t('admin:catalogue.noAddons')}</p>
+          <p className={cn(META, 'py-4')}>{t('admin:catalogue.noAddons')}</p>
         ) : (
           <ul>{addons.map(addonRow)}</ul>
         )}
@@ -269,7 +350,8 @@ export function AdminCatalogue() {
             onCancel={() => setEditing(null)}
           />
         ) : (
-          <Button size="sm" variant="outline" className="self-start" onClick={() => setEditing(newKey)}>
+          <Button size="console-sm" variant="console-outline" className="mt-2 self-start" onClick={() => setEditing(newKey)}>
+            <Plus aria-hidden="true" />
             {t('admin:catalogue.addAddon')}
           </Button>
         )}
@@ -280,10 +362,12 @@ export function AdminCatalogue() {
   function serviceCard(service: CatalogueService) {
     const key = `service:${service.id}`
     const newPackageKey = `package:new:${service.id}`
+    const feePercent = service.bookingFeeRateOverride === null ? null : Number((service.bookingFeeRateOverride * 100).toFixed(1))
 
     return (
-      <Card key={service.id}>
-        <CardHeader>
+      <Card key={service.id} variant="console">
+        {/* The title row is split from the lists by a full-width hairline. */}
+        <CardHeader className="border-b">
           {editing === key ? (
             <EntityForm
               title={t('admin:catalogue.editService')}
@@ -295,19 +379,18 @@ export function AdminCatalogue() {
               onCancel={() => setEditing(null)}
             />
           ) : (
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="flex flex-col gap-1">
-                <CardTitle>
-                  <h2 className="flex flex-wrap items-center gap-2">
-                    {service.nameEn} {statusBadge(service.isActive)}
-                  </h2>
-                </CardTitle>
-                <p className="text-muted-foreground text-sm">
-                  /{service.slug} ·{' '}
-                  {service.bookingFeeRateOverride === null
-                    ? t('admin:catalogue.feeDefault')
-                    : t('admin:catalogue.feeOverride', { percent: Number((service.bookingFeeRateOverride * 100).toFixed(1)) })}{' '}
-                  · {t('admin:catalogue.order', { order: service.sortOrder })}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+              <div className="flex min-w-0 flex-col gap-1.5">
+                {/* The badge is part of the heading's name ("Portraits Active"); it wraps under a long name. */}
+                <h2 className={cn(SECTION_TITLE, 'flex flex-wrap items-center gap-x-3 gap-y-1.5')}>
+                  <span className="min-w-0 wrap-anywhere">{service.nameEn}</span> {statusBadge(service.isActive)}
+                </h2>
+                <p className={cn(META, 'wrap-anywhere')}>
+                  <span className={FIGURE}>/{service.slug}</span> ·{' '}
+                  {feePercent === null
+                    ? <span className={ITEM}>{t('admin:catalogue.feeDefault')}</span>
+                    : withFigure(t('admin:catalogue.feeOverride', { percent: feePercent }), feePercent)}{' '}
+                  · {withFigure(t('admin:catalogue.order', { order: service.sortOrder }), service.sortOrder)}
                 </p>
               </div>
               {rowActions(
@@ -320,11 +403,11 @@ export function AdminCatalogue() {
             </div>
           )}
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-semibold">{t('admin:catalogue.packages')}</h3>
+        <CardContent className="flex flex-col gap-8">
+          <section className="flex flex-col">
+            <h3 className={LIST_HEADING}>{t('admin:catalogue.packages')}</h3>
             {service.packages.length === 0 ? (
-              <p className="text-muted-foreground text-sm">{t('admin:catalogue.noPackages')}</p>
+              <p className={cn(META, 'py-4')}>{t('admin:catalogue.noPackages')}</p>
             ) : (
               <ul>{service.packages.map(packageRow)}</ul>
             )}
@@ -341,7 +424,8 @@ export function AdminCatalogue() {
                 onCancel={() => setEditing(null)}
               />
             ) : (
-              <Button size="sm" variant="outline" className="self-start" onClick={() => setEditing(newPackageKey)}>
+              <Button size="console-sm" variant="console-outline" className="mt-2 self-start" onClick={() => setEditing(newPackageKey)}>
+                <Plus aria-hidden="true" />
                 {t('admin:catalogue.addPackage')}
               </Button>
             )}
@@ -353,17 +437,27 @@ export function AdminCatalogue() {
   }
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-col">
-          <h1 className="text-2xl font-semibold">{t('admin:catalogue.title')}</h1>
-          <p className="text-muted-foreground text-sm">{t('admin:catalogue.intro')}</p>
-        </div>
-        {editing !== 'service:new' && <Button onClick={() => setEditing('service:new')}>{t('admin:catalogue.addService')}</Button>}
-      </div>
+    <main className={cn(PAGE, 'max-w-5xl')}>
+      <PageHeader
+        eyebrow={t('admin:nav.label')}
+        eyebrowIcon={Package}
+        title={t('admin:catalogue.title')}
+        actions={
+          // The page's one main action, hidden while the new-service form is open.
+          editing !== 'service:new' ? (
+            <Button size="console" onClick={() => setEditing('service:new')}>
+              <Plus aria-hidden="true" />
+              {t('admin:catalogue.addService')}
+            </Button>
+          ) : undefined
+        }
+      >
+        <p className={cn(META, 'max-w-prose')}>{t('admin:catalogue.intro')}</p>
+      </PageHeader>
 
       {actionError !== null && (
-        <p className="text-destructive text-sm" role="alert">
+        <p className={ERROR_LINE} role="alert">
+          <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
           {actionError}
         </p>
       )}
@@ -381,29 +475,33 @@ export function AdminCatalogue() {
       )}
 
       {loaded === null && (
-        <p className="text-muted-foreground text-sm" role="status">
+        <p className={META} role="status">
           {t('admin:catalogue.loading')}
         </p>
       )}
       {loaded !== null && loaded.data === null && (
-        <div className="flex items-center gap-2" role="alert">
-          <p className="text-destructive text-sm">{t('admin:catalogue.loadFailed')}</p>
-          <Button variant="outline" size="sm" onClick={reload}>
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4" role="alert">
+          <p className={ERROR_LINE}>
+            <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            {t('admin:catalogue.loadFailed')}
+          </p>
+          <Button variant="console-outline" size="console-sm" onClick={reload}>
             {t('admin:catalogue.retry')}
           </Button>
         </div>
       )}
       {loaded?.data != null && (
-        <>
-          {loaded.data.services.length === 0 && <p className="text-muted-foreground text-sm">{t('admin:catalogue.empty')}</p>}
+        // Panels in a list sit closer than the page's sections.
+        <div className="flex flex-col gap-4 lg:gap-6">
+          {loaded.data.services.length === 0 && <p className={META}>{t('admin:catalogue.empty')}</p>}
           {loaded.data.services.map(serviceCard)}
-          <Card>
-            <CardContent className="flex flex-col gap-1">
-              <p className="text-muted-foreground text-xs">{t('admin:catalogue.sharedAddonsHint')}</p>
+          <Card variant="console">
+            <CardContent className="flex flex-col gap-1.5">
+              <p className={META}>{t('admin:catalogue.sharedAddonsHint')}</p>
               {addonSection(null, loaded.data.sharedAddons, t('admin:catalogue.sharedAddons'))}
             </CardContent>
           </Card>
-        </>
+        </div>
       )}
     </main>
   )
