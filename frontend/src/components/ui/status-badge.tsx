@@ -105,6 +105,38 @@ function StatusGlyph({ status, className }: { status: string; className?: string
   return <ConsoleShapeIcon shape={shape} className={cn("size-5.5 shrink-0", tone, className)} />
 }
 
+const SHAPE_TONES = {
+  success: "text-console-success",
+  muted: "text-muted-foreground",
+  warning: "text-console-warning",
+  danger: "text-destructive",
+} as const
+
+const DEFAULT_TONE: Record<ConsoleShape, keyof typeof SHAPE_TONES> = {
+  current: "success",
+  earlier: "success",
+  waiting: "muted",
+  failed: "danger",
+}
+
+/**
+ * One of the four console status shapes, for things that are not bookings
+ * (payments, messages) but speak the same language: filled check done,
+ * outlined check an earlier success, clock waiting, cross failed. Decorative:
+ * the word beside it says the status.
+ */
+function StatusShapeGlyph({
+  shape,
+  tone = DEFAULT_TONE[shape],
+  className,
+}: {
+  shape: ConsoleShape
+  tone?: keyof typeof SHAPE_TONES
+  className?: string
+}) {
+  return <ConsoleShapeIcon shape={shape} className={cn("size-4 shrink-0", SHAPE_TONES[tone], className)} />
+}
+
 /**
  * Filled shapes are drawn here rather than taken from lucide, whose outline
  * icons cannot hold a check in the page colour inside a filled circle.
@@ -183,4 +215,5 @@ function StatusBadge({
   )
 }
 
-export { StatusBadge, StatusGlyph }
+export { StatusBadge, StatusGlyph, StatusShapeGlyph }
+export type { ConsoleShape as StatusShape }
