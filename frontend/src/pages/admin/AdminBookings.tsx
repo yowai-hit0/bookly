@@ -1,3 +1,4 @@
+import { Check, CircleAlert, ClipboardList, Search, X } from 'lucide-react'
 import { type FormEvent, useEffect, useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useSearchParams } from 'react-router'
@@ -7,10 +8,13 @@ import { kigaliDateOf } from '@/admin/calendar-dates'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { StatusBadge, StatusGlyph } from '@/components/ui/status-badge'
 import { formatDate, formatMoney, formatTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { StageLegend } from '@/pages/StageLegend'
+import { DATA, EYEBROW, FIELD, META, PAGE, REF_LINK, TD, TH, TR } from './console/classes'
+import { PageHeader } from './console/PageHeader'
+import { Toolbar, ToolbarCell } from './console/Toolbar'
 
 /**
  * The bookings list (plan.md Task 19): filtered by status and date, searched by
@@ -123,64 +127,82 @@ export function AdminBookings() {
   const showing = page?.key === filterKey ? page : null
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6">
-      <h1 className="text-2xl font-semibold">{t('admin:bookings.title')}</h1>
+    <main className={cn(PAGE, 'max-w-6xl')}>
+      <PageHeader eyebrow={t('admin:nav.label')} eyebrowIcon={ClipboardList} title={t('admin:bookings.title')} />
 
-      <section className="flex flex-col gap-3" aria-label={t('admin:bookings.filters.label')}>
+      <section className="flex flex-col gap-4" aria-label={t('admin:bookings.filters.label')}>
         <div className="flex flex-wrap gap-2">
-          {BOOKING_STAGES.map((stage) => (
-            <Button
-              key={stage}
-              variant={stages.includes(stage) ? 'default' : 'outline'}
-              size="sm"
-              aria-pressed={stages.includes(stage)}
-              onClick={() => toggleStage(stage)}
-            >
-              {t(`admin:bookings.stage.${stage}`)}
-            </Button>
-          ))}
+          {BOOKING_STAGES.map((stage) => {
+            const pressed = stages.includes(stage)
+            return (
+              <Button
+                key={stage}
+                // Pressed is the inverted fill plus a check, so it differs by more than colour.
+                variant={pressed ? 'default' : 'console-outline'}
+                size="console-sm"
+                aria-pressed={pressed}
+                onClick={() => toggleStage(stage)}
+                className="font-normal"
+              >
+                {pressed && <Check aria-hidden="true" />}
+                {t(`admin:bookings.stage.${stage}`)}
+              </Button>
+            )
+          })}
         </div>
 
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`${searchId}from`}>{t('admin:bookings.filters.from')}</Label>
+        <Toolbar>
+          <ToolbarCell className="max-lg:py-2">
+            <Label htmlFor={`${searchId}from`} className={cn(EYEBROW, 'shrink-0')}>
+              {t('admin:bookings.filters.from')}
+            </Label>
             <Input
               id={`${searchId}from`}
               type="date"
               value={from}
               onChange={(event) => applyFilter({ from: event.target.value })}
-              className="w-44"
+              className={cn(FIELD, 'w-full px-1 tabular-nums lg:w-40')}
             />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`${searchId}to`}>{t('admin:bookings.filters.to')}</Label>
+          </ToolbarCell>
+          <ToolbarCell className="max-lg:py-2">
+            <Label htmlFor={`${searchId}to`} className={cn(EYEBROW, 'shrink-0')}>
+              {t('admin:bookings.filters.to')}
+            </Label>
             <Input
               id={`${searchId}to`}
               type="date"
               value={to}
               onChange={(event) => applyFilter({ to: event.target.value })}
-              className="w-44"
+              className={cn(FIELD, 'w-full px-1 tabular-nums lg:w-40')}
             />
-          </div>
-          <form onSubmit={submitSearch} className="flex items-end gap-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${searchId}search`}>{t('admin:bookings.filters.search')}</Label>
-              <Input id={`${searchId}search`} name="search" defaultValue={search} className="w-64" />
-            </div>
-            <Button type="submit" variant="outline" size="sm">
-              {t('admin:bookings.filters.apply')}
-            </Button>
-          </form>
+          </ToolbarCell>
+          <ToolbarCell grow className="max-lg:py-2">
+            <form onSubmit={submitSearch} className="flex min-w-0 flex-1 items-center gap-3">
+              <Search aria-hidden="true" className="text-muted-foreground size-4.5 shrink-0" />
+              {/* The button beside it says "Search" too, so the field's own label is for assistive tech only. */}
+              <Label htmlFor={`${searchId}search`} className="sr-only">
+                {t('admin:bookings.filters.search')}
+              </Label>
+              <Input id={`${searchId}search`} name="search" defaultValue={search} className={cn(FIELD, 'min-w-0 flex-1 px-1')} />
+              <Button type="submit" variant="console-outline" size="console-sm">
+                {t('admin:bookings.filters.apply')}
+              </Button>
+            </form>
+          </ToolbarCell>
           {(stages.length > 0 || from !== '' || to !== '' || search !== '') && (
-            <Button variant="ghost" size="sm" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
-              {t('admin:bookings.filters.clear')}
-            </Button>
+            <ToolbarCell className="max-lg:py-2">
+              <Button variant="ghost" size="console-sm" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
+                <X aria-hidden="true" />
+                {t('admin:bookings.filters.clear')}
+              </Button>
+            </ToolbarCell>
           )}
-        </div>
+        </Toolbar>
       </section>
 
       {failed && (
-        <p className="text-destructive text-sm" role="alert">
+        <p className="text-destructive flex items-start gap-2 text-sm" role="alert">
+          <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
           {t('admin:bookings.loadFailed')}
         </p>
       )}
@@ -194,20 +216,16 @@ export function AdminBookings() {
       {showing !== null && rows.length === 0 && <p className="text-muted-foreground text-sm">{t('admin:bookings.empty')}</p>}
 
       {rows.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[48rem] border-collapse text-sm">
+        <div className="-mx-4 overflow-x-auto px-4 lg:mx-0 lg:px-0">
+          <table className="w-full min-w-[52rem] border-collapse text-[0.9375rem]">
             <caption className="sr-only">{t('admin:bookings.title')}</caption>
             <thead>
-              <tr className="border-b text-left">
+              <tr className="border-b">
                 {(['when', 'reference', 'client', 'service', 'status', 'money'] as const).map((column) => (
-                  <th
-                    key={column}
-                    scope="col"
-                    className={cn('text-muted-foreground px-2 py-2 font-medium', column === 'money' && 'text-right')}
-                  >
+                  <th key={column} scope="col" className={cn(TH, column === 'money' && 'text-right')}>
                     {column === 'status' ? (
                       // What each stage means, beside the column that shows them (2026-09-25).
-                      <span className="inline-flex items-center gap-1">
+                      <span className="-my-2 inline-flex items-center gap-1">
                         {t(`admin:bookings.columns.${column}`)}
                         <StageLegend audience="admin" />
                       </span>
@@ -220,41 +238,56 @@ export function AdminBookings() {
             </thead>
             <tbody>
               {rows.map((booking) => (
-                <tr key={booking.id} className="hover:bg-muted/50 border-b last:border-b-0">
-                  <td className="px-2 py-2 align-top whitespace-nowrap">
-                    {formatDate(kigaliDateOf(booking.startsAt))}
-                    <span className="text-muted-foreground block">
-                      {formatTime(booking.startsAt)} – {formatTime(booking.endsAt)}
-                    </span>
+                <tr key={booking.id} className={TR}>
+                  <td className={cn(TD, 'whitespace-nowrap')}>
+                    <div className="flex items-start gap-3.5">
+                      <StatusGlyph status={booking.stage} className="mt-px" />
+                      <div className="flex flex-col gap-1">
+                        <span>{formatDate(kigaliDateOf(booking.startsAt))}</span>
+                        <span className={cn(META, 'font-mono tabular-nums')}>
+                          {formatTime(booking.startsAt)} – {formatTime(booking.endsAt)}
+                        </span>
+                      </div>
+                    </div>
                   </td>
-                  <td className="px-2 py-2 align-top">
-                    <Link to={`/admin/bookings/${booking.id}`} className="font-mono font-medium hover:underline">
+                  <td className={cn(TD, 'whitespace-nowrap')}>
+                    <Link
+                      to={`/admin/bookings/${booking.id}`}
+                      // 44px to a thumb below `lg`, without growing the row on a mouse.
+                      className={cn(REF_LINK, 'inline-flex items-center max-lg:-my-3 max-lg:min-h-11 pointer-coarse:-my-3 pointer-coarse:min-h-11')}
+                    >
                       {booking.reference}
                     </Link>
                   </td>
-                  <td className="px-2 py-2 align-top">
-                    {booking.contactName}
-                    <span className="text-muted-foreground block">{booking.contactEmail}</span>
+                  <td className={TD}>
+                    <div className="flex flex-col gap-1">
+                      <span>{booking.contactName}</span>
+                      <span className={cn(META, 'wrap-break-word')}>{breakableEmail(booking.contactEmail)}</span>
+                    </div>
                   </td>
-                  <td className="px-2 py-2 align-top">
-                    {booking.serviceName}
-                    <span className="text-muted-foreground block">{booking.packageName}</span>
+                  <td className={TD}>
+                    <div className="flex flex-col gap-1">
+                      <span>{booking.serviceName}</span>
+                      <span className={META}>{booking.packageName}</span>
+                    </div>
                   </td>
-                  <td className="px-2 py-2 align-top">
+                  <td className={TD}>
                     <StatusBadge status={booking.stage}>{t(`admin:bookings.stage.${booking.stage}`)}</StatusBadge>
                   </td>
-                  <td className="px-2 py-2 text-right align-top tabular-nums">
-                    {formatMoney(booking.grandTotalRwf)}
-                    {booking.outstandingRwf > 0 && (
-                      <span className="text-muted-foreground block">
-                        {t('admin:bookings.outstanding', { amount: formatMoney(booking.outstandingRwf) })}
-                      </span>
-                    )}
-                    {booking.hasRefundDue && (
-                      <span className="text-destructive block">
-                        {t('admin:bookings.refundDue', { amount: formatMoney(booking.refundDueRwf) })}
-                      </span>
-                    )}
+                  <td className={cn(TD, 'text-right whitespace-nowrap')}>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={DATA}>{formatMoney(booking.grandTotalRwf)}</span>
+                      {booking.outstandingRwf > 0 && (
+                        <span className={META}>
+                          {t('admin:bookings.outstanding', { amount: formatMoney(booking.outstandingRwf) })}
+                        </span>
+                      )}
+                      {booking.hasRefundDue && (
+                        <span className="text-destructive text-sm">
+                          {t('admin:bookings.refundDue', { amount: formatMoney(booking.refundDueRwf) })}
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -264,11 +297,34 @@ export function AdminBookings() {
       )}
 
       {showing?.nextCursor != null && (
-        <Button key={`${LOAD_MORE_KEY}${more}`} variant="outline" className="self-start" onClick={() => void loadMore()} aria-busy={loading}>
+        <Button
+          key={`${LOAD_MORE_KEY}${more}`}
+          variant="console-outline"
+          size="console"
+          className="self-start"
+          onClick={() => void loadMore()}
+          aria-busy={loading}
+        >
           {loading ? t('admin:bookings.loading') : t('admin:bookings.loadMore')}
         </Button>
       )}
     </main>
+  )
+}
+
+/**
+ * An email that wraps at its `@` in a narrow column rather than mid-word. The
+ * `<wbr>` adds a break opportunity without changing the text.
+ */
+function breakableEmail(email: string) {
+  const at = email.indexOf('@')
+  if (at <= 0) return email
+  return (
+    <>
+      {email.slice(0, at)}
+      <wbr />
+      {email.slice(at)}
+    </>
   )
 }
 
