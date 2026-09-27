@@ -318,10 +318,12 @@ describe('the service page', () => {
     stubApi()
     await renderLoaded()
 
-    expect(packageRadio('Mini').closest('label')).toHaveTextContent('Mini25,000 RWF1 photo · 45 min')
-    expect(packageRadio('Standard').closest('label')).toHaveTextContent('Standard40,000 RWF20 photos · 1 h 30 minOne look, one location.')
-    expect(packageRadio('Extended').closest('label')).toHaveTextContent('Extended60,000 RWF2 photos · 2 hours')
-    expect(packageRadio('Quick').closest('label')).toHaveTextContent('Quick15,000 RWF0 photos · 1 hour')
+    // The board's card reads name, then meta and price below it (the price is
+    // no longer on the name's own row): updated 2026-09-27 for the restyle.
+    expect(packageRadio('Mini').closest('label')).toHaveTextContent('Mini1 photo · 45 min25,000 RWF')
+    expect(packageRadio('Standard').closest('label')).toHaveTextContent('Standard20 photos · 1 h 30 minOne look, one location.40,000 RWF')
+    expect(packageRadio('Extended').closest('label')).toHaveTextContent('Extended2 photos · 2 hours60,000 RWF')
+    expect(packageRadio('Quick').closest('label')).toHaveTextContent('Quick0 photos · 1 hour15,000 RWF')
     expect(addonCheckbox('Extra hour').closest('label')).toHaveTextContent('Extra hour10,000 RWF')
     expect(addonCheckbox('Rush edit').closest('label')).toHaveTextContent('Rush edit5,000 RWF')
   })

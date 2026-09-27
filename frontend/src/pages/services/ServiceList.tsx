@@ -1,11 +1,14 @@
+import { ArrowRight, Camera, CalendarCheck, CircleAlert, Info } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { ArrowRight, Camera } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { type PublicService, fetchServices } from '@/catalogue/api'
 import { Button } from '@/components/ui/button'
+import { Callout } from '@/components/ui/callout'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatMoney } from '@/lib/format'
+import { cn } from '@/lib/utils'
+import { container, eyebrow, lead, pageTitle, pageY } from '@/pages/client/classes'
 
 /**
  * The public service list (plan.md Task 11, spec §3.1 step 1). What is listed
@@ -37,10 +40,14 @@ export function ServiceList() {
   }
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-3xl font-semibold">{t('services:title')}</h1>
-        <p className="text-muted-foreground">{t('services:intro')}</p>
+    <main className={cn(container, pageY, 'flex flex-col gap-8')}>
+      <header className="flex flex-col gap-3">
+        <p className={eyebrow}>
+          <CalendarCheck aria-hidden="true" />
+          {t('services:title')}
+        </p>
+        <h1 className={pageTitle}>{t('services:title')}</h1>
+        <p className={lead}>{t('services:intro')}</p>
       </header>
 
       {loaded === null && (
@@ -54,19 +61,28 @@ export function ServiceList() {
       )}
 
       {loaded?.status === 'failed' && (
-        <div className="flex flex-wrap items-center gap-2" role="alert">
-          <p className="text-destructive text-sm">{t('services:loadFailed')}</p>
-          <Button variant="outline" size="sm" onClick={retry}>
-            {t('services:retry')}
-          </Button>
-        </div>
+        <Callout
+          variant="console"
+          tone="destructive"
+          icon={CircleAlert}
+          role="alert"
+          action={
+            <Button variant="outline" size="sm" onClick={retry}>
+              {t('services:retry')}
+            </Button>
+          }
+        >
+          <p>{t('services:loadFailed')}</p>
+        </Callout>
       )}
 
       {loaded?.status === 'ok' &&
         (loaded.services.length === 0 ? (
-          <p className="text-muted-foreground">{t('services:empty')}</p>
+          <Callout variant="console" tone="info" icon={Info}>
+            <p>{t('services:empty')}</p>
+          </Callout>
         ) : (
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+          <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {loaded.services.map((service, index) => (
               <li key={service.id}>
                 <ServiceCard service={service} priority={index === 0} />

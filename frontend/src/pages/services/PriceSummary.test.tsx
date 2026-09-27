@@ -168,10 +168,18 @@ describe('the non-refundable notice', () => {
       </PriceSummary>,
     )
 
-    // The only focusable element in the summary is the child: nothing
-    // interactive sits above the notice that could lead past it.
+    // The child is the first focusable element: nothing interactive sits above
+    // the notice that could lead past it. The "Questions?" contact links come
+    // after it, at the very end of the panel (client-front.md §8.3; the
+    // photographer's placeholder contact details render there, updated
+    // 2026-09-27 for the restyle that added `<ContactLine />`).
     const focusable = summary().querySelectorAll('a[href], button, input, select, textarea, [tabindex]')
-    expect(Array.from(focusable).map((element) => element.textContent)).toEqual(['Pay booking fee'])
+    expect(Array.from(focusable).map((element) => element.textContent)).toEqual([
+      'Pay booking fee',
+      '+250 700 000 000',
+      '+250 700 000 000',
+      'hello@example.com',
+    ])
   })
 })
 

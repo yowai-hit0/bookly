@@ -1,3 +1,4 @@
+import { Check, CircleAlert, Clock } from 'lucide-react'
 import type { TFunction } from 'i18next'
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -12,9 +13,11 @@ import {
 } from '@/catalogue/bookings'
 import { BackLink } from '@/components/ui/back-link'
 import { Button } from '@/components/ui/button'
+import { Callout } from '@/components/ui/callout'
 import { SelectableCard } from '@/components/ui/selectable-card'
 import { formatMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { container, eyebrow, pageTitle, pageY, panelTitle } from '@/pages/client/classes'
 import { NotFound } from '@/pages/NotFound'
 import { BookingDetailsForm } from './BookingDetailsForm'
 import { BookingHeld } from './BookingHeld'
@@ -24,7 +27,8 @@ import { stepNumber } from './step-number'
 
 /**
  * One service's packages and add-ons, with a total that updates as they are
- * chosen (plan.md Task 11, spec §3.1 steps 2, 3 and 7).
+ * chosen (plan.md Task 11, spec §3.1 steps 2, 3 and 7; restyled per
+ * design-system/bookly/client-front.md §8.3, the board's booking components).
  *
  * An unknown or deactivated slug is the not-found page: the API answers 404
  * for both, so a retired service does not exist to the public (spec §6.14).
@@ -69,19 +73,26 @@ export function ServiceDetail() {
   if (current?.status === 'ok') return <ServiceView key={current.service.id} service={current.service} />
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
+    <main className={cn(container, pageY, 'flex flex-col gap-6')}>
       <AllServicesLink />
       {current === null ? (
-        <p className="text-muted-foreground text-sm" role="status">
+        <p className="text-subtle-foreground text-sm" role="status">
           {t('services:loading')}
         </p>
       ) : (
-        <div className="flex flex-wrap items-center gap-2" role="alert">
-          <p className="text-destructive text-sm">{t('services:loadServiceFailed')}</p>
-          <Button variant="outline" size="sm" onClick={retry}>
-            {t('services:retry')}
-          </Button>
-        </div>
+        <Callout
+          variant="console"
+          tone="destructive"
+          icon={CircleAlert}
+          role="alert"
+          action={
+            <Button variant="outline" size="sm" onClick={retry}>
+              {t('services:retry')}
+            </Button>
+          }
+        >
+          <p>{t('services:loadServiceFailed')}</p>
+        </Callout>
       )}
     </main>
   )
@@ -169,89 +180,121 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
 
   if (held !== null) {
     return (
-      <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
+      <main className={cn(container, pageY, 'flex flex-col gap-6')}>
         <BookingHeld booking={held} />
       </main>
     )
   }
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
+    <main className={cn(container, pageY, 'flex flex-col gap-8')}>
       <AllServicesLink />
-      <header className="flex flex-col gap-3">
+      <header className="flex flex-col gap-4">
         {service.coverImageUrl !== null && (
           <img
             src={service.coverImageUrl}
             alt=""
-            className="bg-muted aspect-21/9 w-full rounded-xl object-cover"
+            className="bg-muted aspect-21/9 w-full rounded-xs object-cover"
             fetchPriority="high"
           />
         )}
-        <h1 className="mt-1 text-3xl font-semibold text-balance">{service.nameEn}</h1>
-        {service.descriptionEn !== null && (
-          <p className="text-muted-foreground max-w-2xl whitespace-pre-line">{service.descriptionEn}</p>
-        )}
+        <div className="flex flex-col gap-3">
+          <h1 className={pageTitle}>{service.nameEn}</h1>
+          {service.descriptionEn !== null && (
+            <p className="text-subtle-foreground max-w-2xl whitespace-pre-line">{service.descriptionEn}</p>
+          )}
+          <p className={eyebrow}>
+            <Clock aria-hidden="true" />
+            {t('services:picker.kigaliTime')}
+          </p>
+        </div>
       </header>
 
       {service.packages.length === 0 ? (
-        <p className="text-muted-foreground">{t('services:noPackages')}</p>
+        <p className="text-subtle-foreground">{t('services:noPackages')}</p>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[1fr_22rem] lg:items-start">
+        <div className="grid gap-10 lg:grid-cols-[1fr_22.5rem] lg:items-start">
           {/* The counter numbers the three groups: choose, pick a time, your details (step-number.ts). */}
           <div className="flex flex-col gap-8 [counter-reset:step]">
-            {/* The add-ons belong to step 1, so they sit closer to the packages than the steps sit to each other. */}
-            <div className="flex flex-col gap-4">
-              <fieldset className="flex flex-col gap-2">
-                <legend className={cn('font-heading mb-2 text-lg font-semibold', stepNumber)}>{t('services:choosePackage')}</legend>
-                {service.packages.map((pkg) => (
-                  <SelectableCard key={pkg.id} className="p-4">
-                    <input
-                      type="radio"
-                      name="package"
-                      value={pkg.id}
-                      checked={packageId === pkg.id}
-                      onChange={() => setPackageId(pkg.id)}
-                      className="accent-primary mt-1 size-4 shrink-0"
-                    />
-                    <span className="flex flex-1 flex-col gap-1">
-                      <span className="flex flex-wrap items-baseline justify-between gap-x-4">
-                        <span className="font-medium">{pkg.nameEn}</span>
-                        <span className="ml-auto font-semibold tabular-nums">{formatMoney(pkg.priceRwf)}</span>
+            {/* The add-ons belong to the package step, so they sit closer to the packages than the steps sit to each other. */}
+            <div className="flex flex-col gap-5">
+              <fieldset className="flex flex-col gap-3">
+                <legend className={cn(panelTitle, stepNumber)}>{t('services:choosePackage')}</legend>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {service.packages.map((pkg) => (
+                    <SelectableCard key={pkg.id} className="group relative flex-col items-stretch gap-3 p-4.5">
+                      <span className="flex items-start justify-between gap-3">
+                        <span className="text-[1.125rem] font-medium">{pkg.nameEn}</span>
+                        <span
+                          aria-hidden="true"
+                          className="bg-brand text-brand-foreground flex size-6 shrink-0 scale-40 items-center justify-center opacity-0 motion-safe:transition motion-safe:duration-250 motion-safe:ease-[cubic-bezier(0.2,0.7,0.2,1.4)] group-has-checked:scale-100 group-has-checked:opacity-100"
+                        >
+                          <Check strokeWidth={2.75} className="size-3.5" />
+                        </span>
                       </span>
-                      <span className="text-muted-foreground text-sm">
+                      <span className="text-subtle-foreground flex-1 text-sm">
                         {t('services:photos', { count: pkg.photoCount })} · {formatDuration(t, pkg.durationMinutes)}
                       </span>
                       {pkg.descriptionEn !== null && (
-                        <span className="text-muted-foreground text-sm whitespace-pre-line">{pkg.descriptionEn}</span>
+                        <span className="text-subtle-foreground text-sm whitespace-pre-line">{pkg.descriptionEn}</span>
                       )}
-                    </span>
-                  </SelectableCard>
-                ))}
+                      <span className="font-mono text-base font-medium">{formatMoney(pkg.priceRwf)}</span>
+                      {/* Last in the DOM (not `sr-only`) and stretched over the whole card: a
+                          clipped-to-1px hidden input's hit point lands on the visible content
+                          above it, which Playwright's mouse click cannot get past (real touch/
+                          click still reaches it via native label delegation either way, but the
+                          e2e suite drives this with real coordinates too). Invisible, not removed
+                          from hit-testing -- the name, price and tick still carry the meaning. */}
+                      <input
+                        type="radio"
+                        name="package"
+                        value={pkg.id}
+                        checked={packageId === pkg.id}
+                        onChange={() => setPackageId(pkg.id)}
+                        data-focus-ring="parent"
+                        className="absolute inset-0 cursor-pointer opacity-0"
+                      />
+                    </SelectableCard>
+                  ))}
+                </div>
               </fieldset>
 
               {service.addons.length > 0 && (
-                <fieldset className="flex flex-col gap-2">
-                  <legend className="font-heading mb-2 text-lg font-semibold">{t('services:chooseAddons')}</legend>
-                  {service.addons.map((addon) => (
-                    <SelectableCard key={addon.id} className="items-center p-3">
-                      <input
-                        type="checkbox"
-                        checked={addonIds.has(addon.id)}
-                        onChange={(event) => toggleAddon(addon.id, event.target.checked)}
-                        className="accent-primary size-4 shrink-0"
-                      />
-                      <span className="flex-1">{addon.nameEn}</span>
-                      <span className="tabular-nums">{formatMoney(addon.priceRwf)}</span>
-                    </SelectableCard>
-                  ))}
+                <fieldset className="flex flex-col gap-3">
+                  <legend className={panelTitle}>{t('services:chooseAddons')}</legend>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {service.addons.map((addon) => (
+                      <SelectableCard key={addon.id} className="group relative items-center gap-3 p-3.5">
+                        <span
+                          aria-hidden="true"
+                          className="border-input group-has-checked:border-brand group-has-checked:bg-brand flex size-5 shrink-0 items-center justify-center border motion-safe:transition-colors motion-safe:duration-150"
+                        >
+                          <Check
+                            strokeWidth={3}
+                            className="text-brand-foreground size-3 scale-40 opacity-0 motion-safe:transition motion-safe:duration-250 motion-safe:ease-[cubic-bezier(0.2,0.7,0.2,1.4)] group-has-checked:scale-100 group-has-checked:opacity-100"
+                          />
+                        </span>
+                        <span className="flex-1 text-[0.9375rem]">{addon.nameEn}</span>
+                        <span className="text-subtle-foreground font-mono text-sm">{formatMoney(addon.priceRwf)}</span>
+                        {/* Stretched and invisible, not `sr-only`: see the note on the package card above. */}
+                        <input
+                          type="checkbox"
+                          checked={addonIds.has(addon.id)}
+                          onChange={(event) => toggleAddon(addon.id, event.target.checked)}
+                          data-focus-ring="parent"
+                          className="absolute inset-0 cursor-pointer opacity-0"
+                        />
+                      </SelectableCard>
+                    ))}
+                  </div>
                 </fieldset>
               )}
             </div>
 
             {chosenPackage === null ? (
               <section className="flex flex-col gap-1">
-                <h2 className={cn('text-lg font-semibold', stepNumber)}>{t('services:picker.title')}</h2>
-                <p className="text-muted-foreground text-sm">{t('services:picker.choosePackageFirst')}</p>
+                <h2 className={cn(panelTitle, stepNumber)}>{t('services:picker.title')}</h2>
+                <p className="text-subtle-foreground text-sm">{t('services:picker.choosePackageFirst')}</p>
               </section>
             ) : (
               <>
@@ -268,16 +311,16 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
           </div>
 
           {/* Below lg it is the last thing on the page, the closing step, so it is spaced like the steps above it. */}
-          <div className="max-lg:mt-2 lg:sticky lg:top-4">
+          <div className="max-lg:mt-2 lg:sticky lg:top-6">
             <PriceSummary pkg={chosenPackage} addons={chosenAddons} bookingFeeRate={service.bookingFeeRate}>
               {chosenPackage !== null &&
                 (startsAt === null ? (
-                  <p className="text-muted-foreground text-sm">{t('services:booking.chooseTimeFirst')}</p>
+                  <p className="text-subtle-foreground text-sm">{t('services:booking.chooseTimeFirst')}</p>
                 ) : (
                   <Button
                     type="submit"
                     form={formId}
-                    className="w-full"
+                    className="h-12 w-full"
                     // Not `disabled`: that would drop keyboard focus mid-submit.
                     // `submit` ignores a second press instead.
                     aria-disabled={submitting}
@@ -288,9 +331,9 @@ function ServiceView({ service }: { service: PublicServiceDetail }) {
                 ))}
               {/* Outside the start check: a refusal can clear the start and still need saying. */}
               {chosenPackage !== null && submitError !== null && (
-                <p className="text-destructive text-sm" role="alert">
-                  {t(`services:booking.${submitError}`)}
-                </p>
+                <Callout variant="console" tone="destructive" icon={CircleAlert} role="alert">
+                  <p>{t(`services:booking.${submitError}`)}</p>
+                </Callout>
               )}
             </PriceSummary>
           </div>

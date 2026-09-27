@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Clock, CircleAlert, TriangleAlert } from 'lucide-react'
 import { type Ref, useEffect, useId, useImperativeHandle, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type KigaliDate, kigaliDateOf } from '@/admin/calendar-dates'
@@ -11,15 +11,18 @@ import {
   monthGrid,
 } from '@/catalogue/availability'
 import { Button } from '@/components/ui/button'
+import { Callout } from '@/components/ui/callout'
 import { formatDate, formatMonth, formatTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { panelTitle } from '@/pages/client/classes'
 import { stepNumber } from './step-number'
 
 /**
- * The public calendar and slot picker (plan.md Task 12, spec §3.1 steps 4-5):
- * a month of dates, then the genuinely bookable starts on the chosen date for
- * the chosen package. Every start comes from the API's engine as it stands
- * now -- nothing is cached, filtered or computed here.
+ * The public calendar and slot picker (plan.md Task 12, spec §3.1 steps 4-5;
+ * restyled per design-system/bookly/client-front.md §8.3): a month of dates,
+ * then the genuinely bookable starts on the chosen date for the chosen
+ * package. Every start comes from the API's engine as it stands now --
+ * nothing is cached, filtered or computed here.
  *
  * Choosing a start asks the API again before accepting it. Availability can
  * change between page load and click (spec §6.1): if the start is gone, the
@@ -72,6 +75,7 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange, ref }:
   const headingId = useId()
   const monthLabelId = useId()
   const currentMonth = kigaliMonthOf(new Date())
+  const today = kigaliDateOf(new Date())
 
   const [month, setMonth] = useState<KigaliMonth>(() => (value === null ? currentMonth : kigaliMonthOf(value)))
   const [selectedDate, setSelectedDate] = useState<KigaliDate | null>(() => (value === null ? null : kigaliDateOf(value)))
@@ -82,7 +86,7 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange, ref }:
   const [notice, setNotice] = useState<Notice>(null)
   /** Bumped on every "just taken", so a second one moves focus again. */
   const [takenCount, setTakenCount] = useState(0)
-  const noticeRef = useRef<HTMLParagraphElement>(null)
+  const noticeRef = useRef<HTMLDivElement>(null)
 
   const key = `${packageId}|${month}`
   const checkingStart = checking?.key === key ? checking.start : null
@@ -212,18 +216,19 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange, ref }:
   return (
     <section aria-labelledby={headingId} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 id={headingId} className={cn('text-lg font-semibold', stepNumber)}>
+        <h2 id={headingId} className={cn(panelTitle, stepNumber)}>
           {t('services:picker.title')}
         </h2>
-        <p className="text-muted-foreground text-sm">{t('services:picker.timezone')}</p>
+        {/* An existing string, read by slot-picker.spec.ts page-wide: never duplicated elsewhere on this page. */}
+        <p className="text-subtle-foreground text-sm">{t('services:picker.timezone')}</p>
       </div>
 
-      <div className="bg-card flex flex-col gap-3 rounded-xl border p-4 shadow-sm">
+      <div className="bg-background flex flex-col gap-4 rounded-xs border p-4">
         <div className="flex items-center justify-between gap-2">
           <Button
             type="button"
             variant="outline"
-            size="icon"
+            size="icon-lg"
             aria-label={t('services:picker.previousMonth')}
             disabled={month <= currentMonth}
             onClick={() => showMonth(addMonths(month, -1))}
@@ -236,7 +241,7 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange, ref }:
           <Button
             type="button"
             variant="outline"
-            size="icon"
+            size="icon-lg"
             aria-label={t('services:picker.nextMonth')}
             onClick={() => showMonth(addMonths(month, 1))}
           >
@@ -244,9 +249,13 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange, ref }:
           </Button>
         </div>
 
-        <div role="group" aria-labelledby={monthLabelId} aria-busy={current === null} className="grid grid-cols-7 gap-1">
+        <div role="group" aria-labelledby={monthLabelId} aria-busy={current === null} className="grid grid-cols-7 gap-1.5">
           {WEEKDAYS.map((weekday) => (
-            <span key={weekday} aria-hidden="true" className="text-muted-foreground pb-1 text-center text-xs">
+            <span
+              key={weekday}
+              aria-hidden="true"
+              className="text-muted-foreground pb-1 text-center font-mono text-xs tracking-wider uppercase"
+            >
               {t(`services:picker.weekdays.${weekday}`)}
             </span>
           ))}
@@ -254,6 +263,7 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange, ref }:
             if (date === null) return <span key={`blank-${index}`} aria-hidden="true" />
             const count = startsByDate.get(date)?.length ?? 0
             const isShown = date === dateShown
+            const isToday = date === today
             return (
               <button
                 key={date}
@@ -269,58 +279,94 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange, ref }:
                   setNotice(null)
                   setSelectedDate(date)
                 }}
-                // Bookable dates differ from the rest by weight and by surface, not by colour alone.
+                // Bookable dates differ from the rest by weight and by edge, not by colour alone.
                 className={cn(
-                  'focus-visible:border-ring focus-visible:ring-ring/50 h-10 rounded-lg border border-transparent text-sm tabular-nums outline-none focus-visible:ring-3 pointer-coarse:h-11 motion-safe:transition-colors motion-safe:duration-150',
+                  'flex h-11 flex-col items-center justify-center gap-1 border font-mono text-sm tabular-nums motion-safe:transition-colors motion-safe:duration-150',
                   count === 0
-                    ? 'text-muted-foreground/50 cursor-not-allowed'
-                    : 'bg-muted font-semibold hover:bg-[color-mix(in_oklch,var(--muted),black_8%)]',
-                  isShown && 'bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),black_12%)]',
+                    ? 'text-muted-foreground/60 cursor-not-allowed border-transparent'
+                    : 'hover:border-input border-border font-medium',
+                  isShown && 'bg-primary text-primary-foreground border-primary motion-safe:animate-pop',
                 )}
               >
-                {Number(date.slice(8))}
+                <span className={cn(isToday && 'decoration-ring underline decoration-2 underline-offset-[3px]')}>
+                  {Number(date.slice(8))}
+                </span>
+                {/* Open (aria-hidden pip, the word "count" already carries meaning in the label). */}
+                {count > 0 && (
+                  <span aria-hidden="true" className={cn('size-1 rounded-full', isShown ? 'bg-band-accent dark:bg-brand' : 'bg-brand')} />
+                )}
               </button>
             )
           })}
         </div>
 
+        <div className="text-muted-foreground flex flex-wrap gap-5 text-[0.8125rem]">
+          <span className="flex items-center gap-2">
+            <span aria-hidden="true" className="border-input size-3 border" />
+            {t('services:picker.legendOpen')}
+          </span>
+          <span className="flex items-center gap-2">
+            <span aria-hidden="true" className="bg-primary size-3" />
+            {t('services:picker.legendSelected')}
+          </span>
+        </div>
+
         {current === null && (
-          <p className="text-muted-foreground text-sm" role="status">
+          <p className="text-subtle-foreground text-sm" role="status">
             {t('services:picker.loading')}
           </p>
         )}
         {current !== null && days === null && (
-          <div className="flex flex-wrap items-center gap-2" role="alert">
-            <p className="text-destructive text-sm">{t('services:picker.loadFailed')}</p>
-            <Button type="button" variant="outline" size="sm" onClick={retry}>
-              {t('services:picker.retry')}
-            </Button>
-          </div>
+          <Callout
+            variant="console"
+            tone="destructive"
+            icon={CircleAlert}
+            role="alert"
+            action={
+              <Button type="button" variant="outline" size="sm" onClick={retry}>
+                {t('services:picker.retry')}
+              </Button>
+            }
+          >
+            <p>{t('services:picker.loadFailed')}</p>
+          </Callout>
         )}
         {monthIsEmpty && (
-          <p className="text-muted-foreground text-sm">{t('services:picker.noTimesThisMonth', { month: formatMonth(month) })}</p>
+          <p className="text-subtle-foreground text-sm">{t('services:picker.noTimesThisMonth', { month: formatMonth(month) })}</p>
         )}
       </div>
 
       {notice !== null && (
-        <p ref={noticeRef} tabIndex={-1} role="alert" className="text-destructive text-sm font-medium outline-none">
-          {t(notice === 'taken' ? 'services:picker.justTaken' : 'services:picker.checkFailed')}
-        </p>
+        <div ref={noticeRef} tabIndex={-1} role="alert" className="outline-none">
+          <Callout
+            variant="console"
+            tone={notice === 'taken' ? 'warning' : 'destructive'}
+            icon={notice === 'taken' ? TriangleAlert : CircleAlert}
+          >
+            <p className="font-medium">{t(notice === 'taken' ? 'services:picker.justTaken' : 'services:picker.checkFailed')}</p>
+          </Callout>
+        </div>
       )}
 
       {dateShown !== null && days !== null && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           <h3 className="font-medium">{t('services:picker.timesFor', { date: formatDate(dateShown) })}</h3>
           {startsShown.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t('services:picker.noTimesLeft')}</p>
+            <p className="text-subtle-foreground text-sm">{t('services:picker.noTimesLeft')}</p>
           ) : (
-            <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {startsShown.map((start) => (
+            <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              {startsShown.map((start, index) => (
                 <li key={start}>
                   <Button
                     type="button"
                     variant={start === value ? 'default' : 'outline'}
-                    className="h-11 w-full tabular-nums"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                    className={cn(
+                      'h-13 w-full justify-start font-mono text-base tabular-nums motion-safe:animate-rise',
+                      start === value
+                        ? 'bg-brand hover:bg-brand-hover border-brand text-brand-foreground motion-safe:animate-pop'
+                        : 'hover:border-brand hover:text-console-link',
+                    )}
                     aria-pressed={start === value}
                     // Not `disabled`: a disabled button drops keyboard focus mid-check.
                     aria-busy={start === checkingStart}
@@ -336,18 +382,21 @@ export function SlotPicker({ packageId, durationMinutes, value, onChange, ref }:
       )}
 
       {checkingStart !== null && (
-        <p className="text-muted-foreground text-sm" role="status">
+        <p className="text-subtle-foreground flex items-center gap-2 text-sm" role="status">
+          <Clock aria-hidden="true" className="size-4" />
           {t('services:picker.checking')}
         </p>
       )}
       {value !== null && checkingStart === null && (
-        <p className="text-sm font-medium" role="status">
-          {t('services:picker.selected', {
-            date: formatDate(kigaliDateOf(value)),
-            start: formatTime(value),
-            end: formatTime(new Date(Date.parse(value) + durationMinutes * MS_PER_MINUTE)),
-          })}
-        </p>
+        <Callout variant="console" tone="success" icon={Check} role="status">
+          <p className="font-medium">
+            {t('services:picker.selected', {
+              date: formatDate(kigaliDateOf(value)),
+              start: formatTime(value),
+              end: formatTime(new Date(Date.parse(value) + durationMinutes * MS_PER_MINUTE)),
+            })}
+          </p>
+        </Callout>
       )}
     </section>
   )
