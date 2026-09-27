@@ -23,6 +23,14 @@ Derived here (recorded, not asked):
 10. **The selected day in dark** is the inverted neutral fill (#FAFAFA); its pip is `#7C3AED` (5.46:1), not the board's lavender (2.08:1 on that fill).
 11. **Scoping without touching the admin.** Client-only rendering in the shared primitives is written with a `client:` Tailwind variant, `(&:where([data-theme], [data-theme] *))`, and `dark:` becomes `(&:where([data-theme=dark], [data-theme=dark] *))`. `ClientShell` sets `data-theme` on `<html>`; the admin never does, so neither variant can match on an admin page. The admin's own blocks in `index.css` are left exactly as they were (no shared primitives layer: the pixel identity is the rule, and restructuring those blocks buys nothing the client needs).
 
+Asked and answered at the checkpoint (2026-09-27):
+
+12. **The live copy stays.** The board's headlines are not adopted; Home uses the existing `landing:*` strings.
+13. **Contact details ship as placeholders.** `lib/contact.ts` holds dummy values ("Studio name", `+250 700 000 000`, `hello@example.com`), shown in the footer and the summary's "Questions?" line, to be replaced with the photographer's real details before launch. This departs from the brief's "nothing invented", at the user's request.
+14. **"My booking" is an icon below `sm`** so the theme button fits the 375px bar (its words stay its accessible name; the footer carries it in words).
+15. **The booking page's `h1` stays "Your booking"** (`client-booking.spec.ts` pins it and reads the reference once): a mono "My booking" eyebrow, the `h1`, the status badge beside it; the reference stays in the facts, in mono.
+16. **The held page shows "Held until" and the existing time**, mono 28-32px, and no countdown: none exists, and a ticking timer would be new logic.
+
 ## 1. Theme mechanics
 
 - **Shared logic** `frontend/src/lib/theme.ts`: preference parsing, guarded `localStorage`, live `matchMedia`, a synchronous first resolve, and a hook factory parameterised by storage key and root attribute. `admin/theme.ts` keeps its exact exports (`useAdminTheme`, `readThemePreference`, `writeThemePreference`, `THEME_STORAGE_KEY`, `THEME_PREFERENCES`, the types), key `bookly.admin.theme` and attribute `data-admin-theme`, as a thin wrapper; its tests are unchanged.
@@ -222,7 +230,7 @@ The admin's `StatGrid` look, re-implemented for the client (never imported from 
 
 ### 5.8 Contact details
 
-`frontend/src/lib/contact.ts` exports `PHOTOGRAPHER_CONTACT: { name, phone, whatsapp, email }`, every field `null` until the user supplies a real value. The footer's contact block and the summary's "Questions?" line render only the fields that are set (phone `tel:`, WhatsApp `https://wa.me/<digits>`, email `mailto:`), with labels from new `en.json` keys and never a value in `en.json`. With every field `null`, neither renders at all.
+`frontend/src/lib/contact.ts` exports `PHOTOGRAPHER_CONTACT: { name, phone, whatsapp, email }`; it ships with placeholder values (decision 13). The footer's contact block and the summary's "Questions?" line render only the fields that are set (phone `tel:`, WhatsApp `https://wa.me/<digits>`, email `mailto:`), with labels from new `en.json` keys and never a value in `en.json`. With every field `null`, neither renders at all.
 
 ## 6. Motion
 
@@ -288,13 +296,13 @@ Main column plus a sticky ~360px summary column from `lg` (`lg:sticky lg:top-6`,
 
 ### 8.4 Held → checkout → payment progress
 
-- **Held:** a success band with the reference in mono, underlined; the "Pay the booking fee" block with the fee in mono and the inverted Pay button. **Open (asked at the checkpoint):** the brief asks for a TIME LEFT countdown with "the existing logic untouched", but no countdown exists (`service-detail.md` ruled one out as new logic); until answered, the band shows the hold's end time from the existing sentence.
+- **Held:** a success band with the reference in mono, underlined; the "Pay the booking fee" block with the fee in mono and the inverted Pay button. A **HELD UNTIL** stat (new key `services:booking.held.heldUntil`) with the hold's end time in mono 28-32px (decision 16), beside the reference.
 - **Checkout:** `BookingFacts` as metadata rows (CSS only: mono uppercase `dt`, values beside them, `dl`/`dt`/`dd` and the row set unchanged). The method is the single radio as a selected card with a text chip ("MTN"-style chips are not drawn: a text chip with the method's existing name is enough). The phone field, the inverted full-width Pay, and the "hold ends by itself" note.
 - **Progress:** waiting = a 64px icon tile with the functional spinner (a still `Clock` under reduced motion) and the existing live text; confirmed = a success tile with a check drawn once, the `h1`, the reference in mono, and the existing links as an inverted / outline pair; failed and expired use the danger and muted callouts. Existing strings throughout.
 
 ### 8.5 Booking page and friends
 
-- **BookingPage:** a page header with a mono eyebrow, the `h1`, and the status badge (console mapping) beside it with `StageLegend`; facts as a `FactGrid`; money rows in mono; inverted primary, outline secondary, destructive kept red, the two-step cancel kept; notes and notices as console callouts; the delivery link as a success panel with an inverted "Open your photos".
+- **BookingPage:** a page header with a mono eyebrow ("My booking"), the `h1` "Your booking" (decision 15), and the status badge (console mapping) beside it with `StageLegend`; facts as a `FactGrid`; money rows in mono; inverted primary, outline secondary, destructive kept red, the two-step cancel kept; notes and notices as console callouts; the delivery link as a success panel with an inverted "Open your photos".
 - **MyBookingPage / EmailConfirmPage:** a narrow centred panel (`max-w-md`, hairline, `p-8`, `p-6` below `sm`): eyebrow, `h1`, one 48px field, an inverted submit; outcomes as success / danger callouts.
 - **NotFound:** a large mono "404" eyebrow (new key), the `h1`, the body, and an inverted "Home" (`shell:footer.home`) / outline "Browse services" (`shell:footer.services`) pair of links. No button in `main`, and nothing named "All services".
 
@@ -314,4 +322,6 @@ Main column plus a sticky ~360px summary column from `lg` (`lg:sticky lg:top-6`,
 
 ## 10. Verification record
 
-Filled in as the work ships: the phone header measurement, touch targets, the reduced-motion check, the admin pixel diff and anything deferred.
+Filled in as the work ships.
+
+- **Checkpoint (Phase 2, 2026-09-27):** admin 32/32 screenshots (8 routes × light, dark × 375, 1280) pixel-identical to the pre-change baseline. Home at 375px touch: no horizontal scroll; every header control 44px (wordmark link 44px tall, My booking 44×44, theme 44×44, Book now 44px tall). e2e 38/38, unchanged.

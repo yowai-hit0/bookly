@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { PHOTOGRAPHER_CONTACT, contactLinks } from './contact'
 
 describe('the photographer’s contact details', () => {
-  it('ship empty, so nothing is shown until real details are supplied', () => {
-    expect(PHOTOGRAPHER_CONTACT).toEqual({ name: null, phone: null, whatsapp: null, email: null })
-    expect(contactLinks()).toEqual([])
+  it('show nothing when every field is empty', () => {
+    expect(contactLinks({ name: null, phone: null, whatsapp: null, email: null })).toEqual([])
+  })
+
+  it('ship as placeholders until the photographer’s real details replace them (2026-09-27)', () => {
+    expect(contactLinks(PHOTOGRAPHER_CONTACT).map((link) => link.kind)).toEqual(['phone', 'whatsapp', 'email'])
   })
 
   it('link only the channels that are set', () => {

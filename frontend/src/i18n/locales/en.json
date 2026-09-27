@@ -106,7 +106,8 @@
         "whenValue": "{{date}}, {{start}} to {{end}}, Kigali time",
         "holdUntil": "We are holding this time for you until {{time}}, Kigali time. Pay the booking fee of {{fee}} before then to confirm your booking; after that, the time is released for others to book.",
         "holdUntilUnknown": "We are holding this time for you for a short while. Pay the booking fee of {{fee}} to confirm your booking.",
-        "pay": "Pay the booking fee"
+        "pay": "Pay the booking fee",
+        "heldUntil": "Held until"
       }
     },
     "summary": {

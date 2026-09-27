@@ -1,10 +1,12 @@
 /**
  * How a client can reach the photographer (design-system/bookly/client-front.md
- * section 5.8). None of these is in the codebase or the brief, and none may be
- * invented, so every field is `null` until the photographer supplies a real
- * value. The footer's contact block and the price summary's "Questions?" line
- * show only the fields that are set, and nothing at all while every field is
- * `null`. Labels live in `en.json` (`shell:contact.*`); values live here only.
+ * section 5.8). The footer's contact block and the price summary's "Questions?"
+ * line show only the fields that are set, and nothing at all while every field
+ * is `null`. Labels live in `en.json` (`shell:contact.*`); values live here only.
+ *
+ * PLACEHOLDERS (user decision, 2026-09-27): ship with dummy values, to be
+ * replaced with the photographer's real details before launch. Set a field to
+ * `null` to hide it.
  */
 export type PhotographerContact = {
   /** The photographer's or the studio's name, as it should appear. */
@@ -17,10 +19,10 @@ export type PhotographerContact = {
 }
 
 export const PHOTOGRAPHER_CONTACT: PhotographerContact = {
-  name: null,
-  phone: null,
-  whatsapp: null,
-  email: null,
+  name: 'Studio name',
+  phone: '+250 700 000 000',
+  whatsapp: '+250 700 000 000',
+  email: 'hello@example.com',
 }
 
 export type ContactLink = { kind: 'phone' | 'whatsapp' | 'email'; value: string; href: string }
