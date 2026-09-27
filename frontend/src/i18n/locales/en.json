@@ -10,7 +10,8 @@
   },
   "notFound": {
     "title": "Page not found",
-    "body": "That page does not exist."
+    "body": "That page does not exist.",
+    "code": "404"
   },
   "services": {
     "title": "Services",
@@ -60,7 +61,10 @@
       "checking": "Checking that time is still free…",
       "justTaken": "Sorry, that time was just taken. The calendar has been refreshed, so please choose another time.",
       "checkFailed": "Could not confirm that time is still free. Check your connection and try again.",
-      "selected": "Selected: {{date}}, {{start}} to {{end}}, Kigali time"
+      "selected": "Selected: {{date}}, {{start}} to {{end}}, Kigali time",
+      "legendOpen": "Has open times",
+      "legendSelected": "Selected",
+      "kigaliTime": "All times in Kigali time"
     },
     "booking": {
       "title": "Your details",
@@ -112,7 +116,8 @@
       "bookingFee": "Booking fee ({{percent}}%), paid now to secure your date",
       "sessionFee": "Session fee, due after the shoot",
       "nonRefundable": "The booking fee is non-refundable if you cancel."
-    }
+    },
+    "book": "Book"
   },
   "admin": {
     "skipToContent": "Skip to content",
@@ -865,7 +870,21 @@
       "label": "Footer",
       "home": "Home",
       "services": "Browse services",
-      "note": "Booking and payment for photography sessions in Kigali."
+      "note": "Booking and payment for photography sessions in Kigali.",
+      "book": "Book",
+      "about": "About"
+    },
+    "theme": {
+      "system": "Theme: System",
+      "light": "Theme: Light",
+      "dark": "Theme: Dark"
+    },
+    "contact": {
+      "label": "Contact",
+      "phone": "Phone",
+      "whatsapp": "WhatsApp",
+      "email": "Email",
+      "questions": "Questions?"
     }
   },
   "landing": {
@@ -873,11 +892,21 @@
       "title": "Book a photographer, and know the price before you do.",
       "body": "Pick a service and a package, choose a time that is actually free, and hold it with a booking fee. The rest is paid on the day.",
       "cta": "Book now",
-      "aside": "You see the full price, and what is due now, before you pay anything."
+      "aside": "You see the full price, and what is due now, before you pay anything.",
+      "eyebrow": "Photographer · Kigali, Rwanda",
+      "need": "What do you need?",
+      "factFree": "Only free times are shown",
+      "factMomo": "Pay with MTN MoMo",
+      "mockup": {
+        "timezone": "Kigali time",
+        "service": "Photo shoot",
+        "held": "Your date is held"
+      }
     },
     "preview": {
       "title": "What you can book",
-      "more": "Browse services"
+      "more": "Browse services",
+      "eyebrow": "01 — Services"
     },
     "how": {
       "title": "How booking works",
@@ -896,7 +925,8 @@
       "step4": {
         "title": "Get your link",
         "body": "We email you a private link to your booking. It is where you check the details, pay the balance and find your photos."
-      }
+      },
+      "eyebrow": "02 — How booking works"
     },
     "trust": {
       "title": "What you can count on",
@@ -915,11 +945,18 @@
       "link": {
         "title": "One private link, yours",
         "body": "Your booking lives on a link only you are emailed. You can check it, pay the balance or cancel from there."
-      }
+      },
+      "eyebrow": "03 — Good to know"
     },
     "closing": {
       "title": "Ready when you are.",
       "cta": "Book now"
+    },
+    "booked": {
+      "eyebrow": "Already booked?",
+      "title": "Find your booking any time.",
+      "body": "Lost the email? Enter the address you booked with and we will send you a fresh link to your booking page.",
+      "cta": "Find my booking"
     }
   }
 }
