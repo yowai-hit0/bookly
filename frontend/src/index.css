@@ -457,8 +457,10 @@
    one focus indicator re-scoped to client pages, a 2px violet outline offset
    2px (5.70:1 light, 9.12:1 dark on the canvas). Unlayered, so it wins over
    the primitives' `outline-none`, and it zeroes their 50% ring halo. Anything
-   focused by script (`tabindex="-1"`) is left without one. */
-:root[data-theme] :focus-visible:not([tabindex="-1"]) {
+   focused by script (`tabindex="-1"`) is left without one, and so is an
+   element that hands its outline to a parent that draws it
+   (`data-focus-ring="parent"`: a stretched card link, a hidden radio). */
+:root[data-theme] :focus-visible:not([tabindex="-1"], [data-focus-ring="parent"]) {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
     --tw-ring-shadow: 0 0 #0000;
