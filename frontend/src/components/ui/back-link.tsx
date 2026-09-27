@@ -23,7 +23,7 @@ function BackLink({
       to={to}
       data-slot="back-link"
       className={cn(
-        "inline-flex min-h-6 items-center gap-1.5 self-start rounded-sm text-sm text-muted-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:min-h-11",
+        "inline-flex min-h-6 items-center gap-1.5 self-start rounded-sm text-sm text-muted-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:min-h-11 client:gap-2 client:text-subtle-foreground client:hover:text-console-link client:hover:no-underline client:motion-safe:transition-colors",
         className
       )}
     >

@@ -31,7 +31,7 @@ function StatusIcon({
       data-slot="status-icon"
       aria-hidden="true"
       strokeWidth={1.5}
-      className={cn("mb-2 -ml-1 size-10", tones[tone], className)}
+      className={cn("mb-2 -ml-1 size-10", tones[tone], tone === "positive" && "client:text-console-success", className)}
     />
   )
 }

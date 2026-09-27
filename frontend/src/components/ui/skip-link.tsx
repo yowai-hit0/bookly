@@ -16,7 +16,7 @@ function SkipLink({ targetId, children }: { targetId: string; children: React.Re
     <a
       href={`#${targetId}`}
       data-slot="skip-link"
-      className="bg-primary text-primary-foreground focus-visible:ring-ring/50 sr-only rounded-lg px-4 py-2 text-sm font-medium focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus-visible:ring-3"
+      className="bg-primary text-primary-foreground focus-visible:ring-ring/50 sr-only rounded-lg px-4 py-2 text-sm font-medium focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus-visible:ring-3 client:rounded-xs client:border client:bg-background client:text-foreground"
     >
       {children}
     </a>

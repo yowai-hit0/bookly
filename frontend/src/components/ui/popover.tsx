@@ -29,7 +29,7 @@ function PopoverContent({
         sideOffset={sideOffset}
         collisionPadding={16}
         className={cn(
-          "bg-card text-foreground z-50 w-80 max-w-[calc(100vw-2rem)] rounded-lg border p-4 text-sm shadow-md outline-none",
+          "bg-card text-foreground z-50 w-80 max-w-[calc(100vw-2rem)] rounded-lg border p-4 text-sm shadow-md outline-none client:bg-popover",
           className
         )}
         {...props}
