@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { kigaliDateOf } from '@/admin/calendar-dates'
 import type { ClientNotice } from '@/catalogue/booking-access'
 import { Button } from '@/components/ui/button'
+import { Callout } from '@/components/ui/callout'
 import { formatDate, formatDateTime, formatMoney, formatTime } from '@/lib/format'
 import { dismissNotice, isNoticeShown, markNoticesSeen, readSeen } from '@/lib/seen-notices'
 
@@ -17,6 +18,10 @@ import { dismissNotice, isNoticeShown, markNoticesSeen, readSeen } from '@/lib/s
  * Each can be closed, and each stops showing a day after this device first
  * showed it, except money still owed, which only closing hides
  * (`lib/seen-notices.ts`). With nothing left to show, nothing renders.
+ *
+ * Restyled as console callouts (design-system/bookly/client-front.md §8.5,
+ * 2026-09-27): a tone per kind's meaning, the dismiss button kept as the
+ * callout's trailing ghost icon button.
  */
 
 const ICONS: Record<ClientNotice['kind'], LucideIcon> = {
@@ -27,6 +32,17 @@ const ICONS: Record<ClientNotice['kind'], LucideIcon> = {
   cancelled_by_photographer: Ban,
   balance_due: Wallet,
   note: MessageSquare,
+}
+
+/** The tone each notice kind reads as: a positive outcome, a caution, or a plain update. */
+const TONES: Record<ClientNotice['kind'], 'info' | 'success' | 'warning' | 'destructive'> = {
+  reschedule: 'info',
+  session_fee_request: 'warning',
+  payment_receipt: 'success',
+  photo_delivery: 'success',
+  cancelled_by_photographer: 'destructive',
+  balance_due: 'warning',
+  note: 'info',
 }
 
 export function Notices({ reference, notices }: { reference: string; notices: ClientNotice[] }) {
@@ -45,33 +61,34 @@ export function Notices({ reference, notices }: { reference: string; notices: Cl
   if (shown.length === 0) return null
 
   return (
-    <section aria-label={t('booking:notices.label')} className="flex flex-col gap-2">
-      <ul className="flex flex-col gap-2">
-        {shown.map((notice) => {
-          const Icon = ICONS[notice.kind]
-          return (
-            <li key={notice.id} className="bg-card flex items-start gap-3 rounded-lg border p-3 text-sm shadow-sm">
-              <Icon aria-hidden="true" className="text-ring mt-0.5 size-4 shrink-0" />
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <p className="wrap-anywhere">
-                  <NoticeText notice={notice} />
-                </p>
-                <p className="text-muted-foreground text-xs">{formatDateTime(notice.at)}</p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={t('booking:notices.dismiss')}
-                onClick={() => {
-                  dismissNotice(reference, notice.id, Date.now())
-                  setVersion((n) => n + 1)
-                }}
-              >
-                <X aria-hidden="true" />
-              </Button>
-            </li>
-          )
-        })}
+    <section aria-label={t('booking:notices.label')} className="flex flex-col gap-3">
+      <ul className="flex flex-col gap-3">
+        {shown.map((notice) => (
+          // The dismiss button sits in the banner's top-right corner at every
+          // width: the banner's action slot drops to a row of its own on a
+          // phone, which suits a text link but strands a lone X.
+          <li key={notice.id} className="relative">
+            <Callout variant="console" tone={TONES[notice.kind]} icon={ICONS[notice.kind]} className="pr-14">
+              <p className="wrap-anywhere">
+                <NoticeText notice={notice} />
+              </p>
+              {/* Secondary, not muted: muted grey falls under 4.5:1 on the light tints. */}
+              <p className="text-subtle-foreground font-mono text-xs">{formatDateTime(notice.at)}</p>
+            </Callout>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t('booking:notices.dismiss')}
+              className="absolute top-1.5 right-1.5 hover:bg-black/5 dark:hover:bg-white/10"
+              onClick={() => {
+                dismissNotice(reference, notice.id, Date.now())
+                setVersion((n) => n + 1)
+              }}
+            >
+              <X aria-hidden="true" />
+            </Button>
+          </li>
+        ))}
       </ul>
     </section>
   )
@@ -98,7 +115,7 @@ function NoticeText({ notice }: { notice: ClientNotice }) {
       return (
         <>
           {t('booking:notices.balanceDue', { amount: formatMoney(notice.data.amountRwf) })}{' '}
-          <a href="#pay" className="font-medium underline underline-offset-4">
+          <a href="#pay" className="text-console-link hover:text-console-link-hover font-medium underline underline-offset-4">
             {t('booking:notices.payNow')}
           </a>
         </>

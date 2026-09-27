@@ -1,5 +1,22 @@
-import { ExternalLink, Info, MailCheck, Smartphone, TriangleAlert, Undo2, Unlink } from 'lucide-react'
-import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import {
+  CalendarClock,
+  CalendarDays,
+  Camera,
+  CircleAlert,
+  ExternalLink,
+  Hash,
+  Images,
+  Info,
+  MailCheck,
+  MapPin,
+  MessageSquare,
+  Smartphone,
+  TriangleAlert,
+  Undo2,
+  Unlink,
+  Users,
+} from 'lucide-react'
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router'
 import { kigaliDateOf } from '@/admin/calendar-dates'
@@ -18,11 +35,13 @@ import { Callout } from '@/components/ui/callout'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/ui/status-badge'
-import { StatusIcon } from '@/components/ui/status-icon'
+import { StatusBadgeVariantContext } from '@/components/ui/status-badge-context'
 import { formatDate, formatMoney, formatTime } from '@/lib/format'
 import { reportError } from '@/lib/report-error'
 import { forgetBookingToken, rememberBookingToken } from '@/lib/stored-booking'
 import { cn } from '@/lib/utils'
+import { container, data, eyebrow, pageTitle, pageY, panel, panelTitle, statusTitle, textLink } from '@/pages/client/classes'
+import { FactGrid, FactTile, IconTile } from '@/pages/client/FactGrid'
 import { StageLegend } from '@/pages/StageLegend'
 import { Notices } from './Notices'
 import { PaymentFields } from '@/pages/checkout/PaymentFields'
@@ -36,6 +55,12 @@ import { PaymentFields } from '@/pages/checkout/PaymentFields'
  * sends nothing else -- no reference, no id -- and an invalid, expired or
  * replaced token gets the same "link is not valid" page as one that never
  * existed. Every amount is the API's; nothing here adds anything up.
+ *
+ * Restyled to the console language (design-system/bookly/client-front.md
+ * §8.5, decision 15, 2026-09-27): a mono eyebrow and status badge beside the
+ * fixed "Your booking" h1 (switched to the console badge mapping through
+ * `StatusBadgeVariantContext`), facts as a `FactGrid`, flat hairline panels in
+ * place of the old shadowed cards, and console callouts for every notice.
  */
 
 type Loaded =
@@ -77,51 +102,59 @@ export function BookingPage() {
   const current = loaded?.key === key ? loaded : null
 
   return (
-    // `text-pretty` is inherited, so no notice on a phone ends on a single stranded word.
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-8 text-pretty">
-      {current === null && (
-        <p className="text-muted-foreground text-sm" role="status">
-          {t('booking:loading')}
-        </p>
-      )}
-      {current?.status === 'failed' && (
-        <div className="flex flex-wrap items-center gap-2" role="alert">
-          <p className="text-destructive text-sm">{t('booking:loadFailed')}</p>
-          <Button variant="outline" size="sm" onClick={reload}>
-            {t('booking:retry')}
-          </Button>
-        </div>
-      )}
-      {current?.status === 'missing' && <InvalidLink />}
-      {current?.status === 'ok' && (
-        <BookingView
-          key={attempt}
-          token={token}
-          booking={current.booking}
-          methods={current.methods}
-          onMissing={() => {
-            forgetBookingToken(token)
-            setLoaded({ key, status: 'missing' })
-          }}
-          onReload={reload}
-        />
-      )}
-    </main>
+    // The console badge mapping (admin-console.md §5), for the pill and the
+    // stage legend's popover alike (2026-09-27). `text-pretty` is inherited,
+    // so no notice on a phone ends on a single stranded word.
+    <StatusBadgeVariantContext.Provider value="console">
+      <main className={cn(container, pageY, 'mx-auto flex max-w-3xl flex-col gap-6 text-pretty')}>
+        {current === null && (
+          <p className="text-muted-foreground text-sm" role="status">
+            {t('booking:loading')}
+          </p>
+        )}
+        {current?.status === 'failed' && (
+          <Callout
+            variant="console"
+            tone="destructive"
+            icon={CircleAlert}
+            role="alert"
+            action={
+              <Button variant="outline" size="sm" onClick={reload}>
+                {t('booking:retry')}
+              </Button>
+            }
+          >
+            <p>{t('booking:loadFailed')}</p>
+          </Callout>
+        )}
+        {current?.status === 'missing' && <InvalidLink />}
+        {current?.status === 'ok' && (
+          <BookingView
+            key={attempt}
+            token={token}
+            booking={current.booking}
+            methods={current.methods}
+            onMissing={() => {
+              forgetBookingToken(token)
+              setLoaded({ key, status: 'missing' })
+            }}
+            onReload={reload}
+          />
+        )}
+      </main>
+    </StatusBadgeVariantContext.Provider>
   )
 }
 
 function InvalidLink() {
   const { t } = useTranslation()
   return (
-    <section className="flex max-w-xl flex-col gap-3 text-pretty">
-      <StatusIcon icon={Unlink} tone="neutral" />
-      <h1 className="text-2xl font-semibold text-balance">{t('booking:invalidLink.title')}</h1>
-      <p className="text-muted-foreground text-sm">{t('booking:invalidLink.body')}</p>
+    <section className="flex flex-col items-start gap-4 text-pretty">
+      <IconTile icon={Unlink} tone="neutral" size="lg" />
+      <h1 className={statusTitle}>{t('booking:invalidLink.title')}</h1>
+      <p className="text-subtle-foreground text-base">{t('booking:invalidLink.body')}</p>
       {/* The way back in when the link is gone (2026-09-25): a link, not a button. */}
-      <Link
-        to="/my-booking"
-        className="inline-flex min-h-6 items-center self-start rounded-sm text-sm font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:min-h-11"
-      >
+      <Link to="/my-booking" className={textLink}>
         {t('booking:invalidLink.getNewLink')}
       </Link>
     </section>
@@ -159,45 +192,58 @@ function BookingView({ token, booking: loadedBooking, methods, onMissing, onRelo
 
   return (
     <>
-      <section className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <h1 className="text-3xl font-semibold">{t('booking:title')}</h1>
-          {/* The display stage (2026-09-25), and what each one means. */}
-          <span className="inline-flex items-center gap-1">
-            <StatusBadge status={booking.stage} size="md">
-              {t(`booking:stage.${booking.stage}`)}
-            </StatusBadge>
-            <StageLegend audience="client" />
-          </span>
+      <section className="flex flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          <p className={eyebrow}>
+            <CalendarDays aria-hidden="true" />
+            {t('shell:nav.myBooking')}
+          </p>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <h1 className={pageTitle}>{t('booking:title')}</h1>
+            {/* The display stage (2026-09-25), and what each one means. */}
+            <span className="inline-flex items-center gap-1">
+              <StatusBadge status={booking.stage} size="md">
+                {t(`booking:stage.${booking.stage}`)}
+              </StatusBadge>
+              <StageLegend audience="client" />
+            </span>
+          </div>
         </div>
 
         {/* What has happened since, newest first (2026-09-25). */}
         <Notices reference={booking.reference} notices={booking.notices} />
 
-        <dl className="bg-card flex flex-col gap-2 rounded-xl border p-4 text-sm shadow-sm">
-          <Line term={t('booking:labels.reference')} className="items-baseline">
-            {/* The reference is what the client quotes, so it is the largest thing in the card. */}
-            <span className="font-mono text-lg font-semibold tracking-wide">{booking.reference}</span>
-          </Line>
-          <Line term={t('booking:labels.service')}>
+        <FactGrid className={cn(panel, 'p-5 sm:p-6')}>
+          <FactTile icon={Hash} label={t('booking:labels.reference')} mono>
+            {booking.reference}
+          </FactTile>
+          <FactTile icon={Camera} label={t('booking:labels.service')}>
             {t('booking:serviceValue', { service: booking.serviceName, package: booking.packageName })}
-          </Line>
-          <Line term={t('booking:labels.when')}>
+          </FactTile>
+          <FactTile icon={CalendarClock} label={t('booking:labels.when')}>
             {t('booking:whenValue', {
               date: formatDate(kigaliDateOf(booking.startsAt)),
               start: formatTime(booking.startsAt),
               end: formatTime(booking.endsAt),
             })}
-          </Line>
-          <Line term={t('booking:labels.location')}>{booking.locationText}</Line>
-          {booking.partySize !== null && <Line term={t('booking:labels.people')}>{booking.partySize}</Line>}
-          <Line term={t('booking:labels.photos')}>{t('booking:photos', { count: booking.packagePhotoCount })}</Line>
-          {booking.specialRequests !== null && (
-            <Line term={t('booking:labels.requests')}>
-              <span className="whitespace-pre-line">{booking.specialRequests}</span>
-            </Line>
+          </FactTile>
+          <FactTile icon={MapPin} label={t('booking:labels.location')}>
+            {booking.locationText}
+          </FactTile>
+          {booking.partySize !== null && (
+            <FactTile icon={Users} label={t('booking:labels.people')}>
+              {booking.partySize}
+            </FactTile>
           )}
-        </dl>
+          <FactTile icon={Images} label={t('booking:labels.photos')}>
+            {t('booking:photos', { count: booking.packagePhotoCount })}
+          </FactTile>
+          {booking.specialRequests !== null && (
+            <FactTile icon={MessageSquare} label={t('booking:labels.requests')} className="sm:col-span-2">
+              <span className="whitespace-pre-line">{booking.specialRequests}</span>
+            </FactTile>
+          )}
+        </FactGrid>
 
         <Amounts booking={booking} />
       </section>
@@ -229,20 +275,23 @@ function BookingView({ token, booking: loadedBooking, methods, onMissing, onRelo
       )}
 
       {refused && (
-        <p className="text-destructive text-sm" role="alert">
-          {t('booking:cancel.notCancellable')}
-        </p>
+        <Callout variant="console" tone="destructive" icon={CircleAlert} role="alert">
+          <p>{t('booking:cancel.notCancellable')}</p>
+        </Callout>
       )}
 
       {booking.cancelledAt !== null && (
-        <section className="bg-card flex flex-col gap-2 rounded-xl border p-4 shadow-sm">
+        <section className={cn(panel, 'flex flex-col gap-3 p-5 sm:p-6')}>
           {/* `tabIndex={-1}` only so focus can be moved here; it stays out of the tab order. */}
-          <h2 ref={cancelledHeadingRef} tabIndex={-1} className="text-lg font-semibold outline-none">
+          <h2 ref={cancelledHeadingRef} tabIndex={-1} className={cn(panelTitle, 'outline-none')}>
             {t('booking:cancelled.title')}
           </h2>
-          {booking.cancellationReason !== null && <p className="text-sm wrap-anywhere">{booking.cancellationReason}</p>}
+          {booking.cancellationReason !== null && (
+            <p className="text-subtle-foreground text-sm wrap-anywhere">{booking.cancellationReason}</p>
+          )}
           {booking.totals.refundDueRwf > 0 && (
-            <Callout icon={Undo2}>
+            <Callout variant="console" tone="info" icon={Undo2}>
+              {/* Owed, not yet refunded: information, never the success colour (checkout.md invariant). */}
               <p>{t('booking:cancelled.refund', { amount: formatMoney(booking.totals.refundDueRwf) })}</p>
             </Callout>
           )}
@@ -315,17 +364,17 @@ function ContactEmail({
   }
 
   return (
-    <section className="bg-card flex flex-col gap-3 rounded-xl border p-4 shadow-sm">
-      <h2 className="text-lg font-semibold">{t('booking:contact.title')}</h2>
+    <section className={cn(panel, 'flex flex-col gap-4 p-5 sm:p-6')}>
+      <h2 className={panelTitle}>{t('booking:contact.title')}</h2>
       <p className="text-sm">{t('booking:contact.current', { email: booking.maskedEmail })}</p>
 
       {message?.kind === 'sent' ? (
-        <Callout icon={MailCheck} role="status">
+        <Callout variant="console" tone="info" icon={MailCheck} role="status">
           <p>{t('booking:contact.sent', { email: message.email, current: booking.maskedEmail })}</p>
         </Callout>
       ) : (
         booking.pendingMaskedEmail !== null && (
-          <Callout icon={MailCheck}>
+          <Callout variant="console" tone="info" icon={MailCheck}>
             <p>{t('booking:contact.pending', { email: booking.pendingMaskedEmail, current: booking.maskedEmail })}</p>
           </Callout>
         )
@@ -354,14 +403,15 @@ function ContactEmail({
             {t('booking:contact.hint')}
           </p>
           {status === 'invalid' && (
-            <p id={`${fieldId}-error`} className="text-destructive text-sm">
+            <p id={`${fieldId}-error`} className="text-destructive flex items-center gap-1.5 text-sm">
+              <CircleAlert aria-hidden="true" className="size-3.5 shrink-0" />
               {t('booking:contact.invalid')}
             </p>
           )}
           {(status === 'failed' || status === 'rate_limited') && (
-            <p className="text-destructive text-sm" role="alert">
-              {t(status === 'failed' ? 'booking:contact.failed' : 'booking:contact.rateLimited')}
-            </p>
+            <Callout variant="console" tone="destructive" icon={CircleAlert} role="alert">
+              <p>{t(status === 'failed' ? 'booking:contact.failed' : 'booking:contact.rateLimited')}</p>
+            </Callout>
           )}
           <div className="flex flex-wrap gap-2">
             <Button type="submit" size="sm" aria-disabled={status === 'sending'}>
@@ -401,35 +451,35 @@ function ContactEmail({
 function Amounts({ booking }: { booking: ClientBooking }) {
   const { t } = useTranslation()
   return (
-    <dl className="bg-card flex flex-col gap-2 rounded-xl border p-4 text-sm shadow-sm">
+    <dl className={cn(panel, 'flex flex-col gap-2 p-5 text-sm sm:p-6')}>
       <div className="flex justify-between gap-4">
         <dt className="min-w-0 wrap-anywhere">{booking.packageName}</dt>
-        <dd className="shrink-0 tabular-nums">{formatMoney(booking.packagePriceRwf)}</dd>
+        <dd className={cn(data, 'shrink-0')}>{formatMoney(booking.packagePriceRwf)}</dd>
       </div>
       {booking.addons.map((addon, index) => (
         // Two add-ons may share a name; their order is the booking's own.
         <div key={index} className="flex justify-between gap-4">
           <dt className="min-w-0 wrap-anywhere">{addon.name}</dt>
-          <dd className="shrink-0 tabular-nums">{formatMoney(addon.priceRwf)}</dd>
+          <dd className={cn(data, 'shrink-0')}>{formatMoney(addon.priceRwf)}</dd>
         </div>
       ))}
       <div className="mt-1 flex justify-between gap-4 border-t pt-2 font-semibold">
         <dt>{t('booking:labels.total')}</dt>
-        <dd className="shrink-0 tabular-nums">{formatMoney(booking.totals.grandTotalRwf)}</dd>
+        <dd className={cn(data, 'shrink-0 text-base')}>{formatMoney(booking.totals.grandTotalRwf)}</dd>
       </div>
       <div className="flex justify-between gap-4">
         <dt>{t('booking:labels.paid')}</dt>
-        <dd className="shrink-0 tabular-nums">{formatMoney(booking.totals.collectedRwf)}</dd>
+        <dd className={cn(data, 'shrink-0')}>{formatMoney(booking.totals.collectedRwf)}</dd>
       </div>
       {/* What is still to pay is the number the client can act on, so it is a step heavier while it is above zero. */}
       <div className={cn('flex justify-between gap-4', booking.totals.outstandingRwf > 0 && 'font-semibold')}>
         <dt>{t('booking:labels.outstanding')}</dt>
-        <dd className="shrink-0 tabular-nums">{formatMoney(booking.totals.outstandingRwf)}</dd>
+        <dd className={cn(data, 'shrink-0')}>{formatMoney(booking.totals.outstandingRwf)}</dd>
       </div>
       {booking.totals.refundDueRwf > 0 && (
         <div className="text-destructive flex justify-between gap-4 font-medium">
           <dt>{t('booking:labels.refundDue')}</dt>
-          <dd className="shrink-0 tabular-nums">{formatMoney(booking.totals.refundDueRwf)}</dd>
+          <dd className={cn(data, 'shrink-0')}>{formatMoney(booking.totals.refundDueRwf)}</dd>
         </div>
       )}
     </dl>
@@ -438,29 +488,36 @@ function Amounts({ booking }: { booking: ClientBooking }) {
 
 function Delivery({ delivery }: { delivery: NonNullable<ClientBooking['delivery']> }) {
   const { t } = useTranslation()
+  const ready = !delivery.expired && delivery.url !== null
+
   return (
-    <section className="bg-card flex flex-col gap-2 rounded-xl border p-4 shadow-sm">
-      <h2 className="text-lg font-semibold">{t('booking:delivery.title')}</h2>
+    <section
+      className={cn(
+        panel,
+        'flex flex-col gap-3 p-5 sm:p-6',
+        // The photos are ready: the whole panel takes the success tint (client-front.md 8.5).
+        ready && 'border-console-success/30 bg-console-success-tint',
+      )}
+    >
+      <h2 className={panelTitle}>{t('booking:delivery.title')}</h2>
       {delivery.note !== null && <p className="text-sm wrap-anywhere">{delivery.note}</p>}
-      {delivery.expired || delivery.url === null ? (
-        <Callout icon={Info}>
-          <p>{t('booking:delivery.expired')}</p>
-        </Callout>
-      ) : (
+      {ready ? (
         <>
           <Button asChild className="self-start">
-            <a href={delivery.url} rel="noreferrer noopener" target="_blank">
+            <a href={delivery.url ?? undefined} rel="noreferrer noopener" target="_blank">
               {t('booking:delivery.open')}
               {/* It opens a new tab, so the arrow says so; the words already name the destination. */}
               <ExternalLink aria-hidden="true" data-icon="inline-end" />
             </a>
           </Button>
           {delivery.expiresOn !== null && (
-            <p className="text-muted-foreground text-sm">
-              {t('booking:delivery.expires', { date: formatDate(delivery.expiresOn) })}
-            </p>
+            <p className="text-console-success text-sm">{t('booking:delivery.expires', { date: formatDate(delivery.expiresOn) })}</p>
           )}
         </>
+      ) : (
+        <Callout variant="console" tone="warning" icon={Info}>
+          <p>{t('booking:delivery.expired')}</p>
+        </Callout>
       )}
     </section>
   )
@@ -539,19 +596,19 @@ function SessionFee({ token, booking, methods, onMissing, onReload }: SessionFee
 
   return (
     // `#pay`: where a "still to pay" notice leads (2026-09-25).
-    <section id="pay" className="bg-card flex scroll-mt-4 flex-col gap-4 rounded-xl border p-4 shadow-sm">
+    <section id="pay" className={cn(panel, 'flex scroll-mt-4 flex-col gap-4 p-5 sm:p-6')}>
       <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold">{t('booking:sessionFee.title')}</h2>
+        <h2 className={panelTitle}>{t('booking:sessionFee.title')}</h2>
         <p className="text-sm">{t('booking:sessionFee.intro', { amount })}</p>
       </div>
 
       {waiting !== null && (
-        <Callout icon={Smartphone}>
+        <Callout variant="console" tone="info" icon={Smartphone}>
           <p>
             {t('checkout:waiting.text')}{' '}
             <Link
               to={bookingPaymentPath(token, waiting.ourRef)}
-              className="text-primary rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="text-console-link hover:text-console-link-hover rounded-xs underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               {t('checkout:waiting.link')}
             </Link>
@@ -560,9 +617,9 @@ function SessionFee({ token, booking, methods, onMissing, onReload }: SessionFee
       )}
 
       {methods.length === 0 ? (
-        <p className="text-destructive text-sm" role="alert">
-          {t('checkout:errors.noMethods')}
-        </p>
+        <Callout variant="console" tone="destructive" icon={CircleAlert} role="alert">
+          <p>{t('checkout:errors.noMethods')}</p>
+        </Callout>
       ) : (
         // The card's own h2 is the heading here, so the method legend sits one step below it (it is 18px on the pay page, where it is the first heading).
         <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-4 [&_legend]:text-base">
@@ -585,9 +642,9 @@ function SessionFee({ token, booking, methods, onMissing, onReload }: SessionFee
             {submitting ? t('checkout:paying') : t('booking:sessionFee.pay', { amount })}
           </Button>
           {error !== null && (
-            <p className="text-destructive text-sm" role="alert">
-              {t(`checkout:errors.${error}`)}
-            </p>
+            <Callout variant="console" tone="destructive" icon={CircleAlert} role="alert">
+              <p>{t(`checkout:errors.${error}`)}</p>
+            </Callout>
           )}
         </form>
       )}
@@ -643,11 +700,11 @@ function Cancel({ token, booking, onCancelled, onRefused, onMissing }: CancelPro
   }
 
   return (
-    <section className="bg-card flex flex-col gap-3 rounded-xl border p-4 shadow-sm">
-      <h2 className="text-lg font-semibold">{t('booking:cancel.title')}</h2>
+    <section className={cn(panel, 'flex flex-col gap-3 p-5 sm:p-6')}>
+      <h2 className={panelTitle}>{t('booking:cancel.title')}</h2>
       {confirming ? (
         <>
-          <Callout tone="destructive" icon={TriangleAlert}>
+          <Callout variant="console" tone="destructive" icon={TriangleAlert}>
             <p className="font-medium">{t('booking:cancel.warning', { fee: formatMoney(booking.bookingFeeRwf) })}</p>
           </Callout>
           {/* Stacked and full width on a phone, like the pay button: equal targets whose edges line up with the notice above. */}
@@ -673,20 +730,10 @@ function Cancel({ token, booking, onCancelled, onRefused, onMissing }: CancelPro
         </Button>
       )}
       {error !== null && (
-        <p className="text-destructive text-sm" role="alert">
-          {t(`booking:cancel.${error}`)}
-        </p>
+        <Callout variant="console" tone="destructive" icon={CircleAlert} role="alert">
+          <p>{t(`booking:cancel.${error}`)}</p>
+        </Callout>
       )}
     </section>
-  )
-}
-
-function Line({ term, children, className }: { term: string; children: ReactNode; className?: string }) {
-  return (
-    <div className={cn('flex flex-wrap justify-between gap-x-4', className)}>
-      <dt className="text-muted-foreground">{term}</dt>
-      {/* Location, requests and names are typed by people, so they wrap anywhere rather than stretch the card. */}
-      <dd className="min-w-0 wrap-anywhere">{children}</dd>
-    </div>
   )
 }
