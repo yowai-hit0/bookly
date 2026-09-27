@@ -58,7 +58,8 @@ export function MyBookingPage() {
 
         {status === 'sent' ? (
           <div className="mt-6 flex flex-col items-start gap-4">
-            <Callout variant="console" tone="success" icon={MailCheck} role="status">
+            {/* Info, not success: the message deliberately does not say whether a booking was found. */}
+            <Callout variant="console" tone="info" icon={MailCheck} role="status">
               <p className="font-medium">{t('myBooking:sent.title')}</p>
               <p>{t('myBooking:sent.body')}</p>
             </Callout>

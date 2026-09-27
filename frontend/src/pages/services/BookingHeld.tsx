@@ -1,4 +1,4 @@
-import { Clock, Lock, TriangleAlert } from 'lucide-react'
+import { Clock, Hourglass, TriangleAlert } from 'lucide-react'
 import { type ReactNode, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
@@ -41,12 +41,14 @@ export function BookingHeld({ booking }: { booking: HeldBooking }) {
 
   return (
     <section className="flex max-w-2xl flex-col gap-5">
-      {/* The success band: a 44px icon tile, the title, the reference in mono
-          underlined, and -- beside it -- the hold's end time. */}
-      <div className="bg-console-success-tint flex flex-wrap items-center justify-between gap-x-8 gap-y-5 rounded-xs px-5 py-5 sm:px-6">
+      {/* The held band, in the accent tint as on the board ("Your date is
+          held"): a hold is not a confirmed booking, so it never takes the
+          success colour (finish review, 2026-09-27). A 44px icon tile, the
+          title, the reference in mono underlined, and the hold's end time. */}
+      <div className="bg-console-accent flex flex-wrap items-center justify-between gap-x-8 gap-y-5 rounded-xs px-5 py-5 sm:px-6">
         <div className="flex items-center gap-4">
-          <div aria-hidden="true" className="bg-background text-console-success flex size-11 shrink-0 items-center justify-center rounded-xs">
-            <Lock className="size-5" />
+          <div aria-hidden="true" className="bg-background text-console-accent-foreground flex size-11 shrink-0 items-center justify-center rounded-xs">
+            <Hourglass className="size-5" />
           </div>
           <div className="flex flex-col gap-1">
             <h1 ref={headingRef} tabIndex={-1} className="text-xl font-semibold tracking-[-0.01em] outline-none">
@@ -63,7 +65,7 @@ export function BookingHeld({ booking }: { booking: HeldBooking }) {
         {/* No expiry, no stat: a ticking countdown would be new logic (decision 16). */}
         {booking.holdExpiresAt !== null && (
           <div className="flex flex-col items-end gap-1">
-            <span className="text-console-success font-mono text-xs font-medium tracking-[0.1em] uppercase">
+            <span className="text-console-accent-foreground font-mono text-xs font-medium tracking-[0.1em] uppercase">
               {t('services:booking.held.heldUntil')}
             </span>
             <span className="font-mono text-[1.75rem] leading-none font-semibold tabular-nums">
