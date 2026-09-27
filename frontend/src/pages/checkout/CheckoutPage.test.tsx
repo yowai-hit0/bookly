@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { RouterProvider, createMemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -442,7 +442,9 @@ describe('a booking that cannot be paid', () => {
     renderAt()
 
     const heading = await screen.findByRole('heading', { level: 1, name: title })
-    expect(heading).toHaveFocus()
+    // The heading is focused in an effect after it renders; under a loaded full run the
+    // lookup can win that race, so wait for the focus (2026-09-27, flaky, not a behaviour change).
+    await waitFor(() => expect(heading).toHaveFocus())
     expect(screen.getByText(body)).toBeInTheDocument()
     expect(screen.queryByRole('radio')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Pay / })).not.toBeInTheDocument()
