@@ -1,296 +1,299 @@
 ---
 name: Bookly
-description: A calm, plain-spoken booking front desk for one photographer in Kigali. A sky-tinted page, white cards, one green for the next step and one blue held back for focus.
+description: A plain, developer-console-styled front desk for one photographer in Kigali. A flat white/near-black page, one violet accent, inverted-neutral primary actions, and a matching dark theme.
 colors:
-  available-green: "oklch(0.5081 0.1049 165.61)"
-  available-green-pressed: "oklch(0.4471 0.0923 165.61)"
-  calendar-blue: "oklch(0.5876 0.1389 241.97)"
-  cancel-red: "oklch(0.5054 0.1905 27.52)"
-  cancel-red-tint: "oklch(0.5054 0.1905 27.52 / 10%)"
-  morning-sky: "oklch(0.9771 0.0125 236.62)"
-  studio-white: "oklch(1 0 0)"
-  ink-navy: "oklch(0.2077 0.0398 265.75)"
-  slate-text: "oklch(0.4455 0.0374 257.28)"
-  powder-blue: "oklch(0.9514 0.0250 236.82)"
-  hairline-blue: "oklch(0.9456 0.0201 229.04)"
-  field-slate: "oklch(0.6305 0.0374 253.82)"
+  brand: "oklch(0.5413 0.2466 293.01)"
+  brand-hover: "oklch(0.4907 0.2412 292.58)"
+  brand-foreground: "oklch(1 0 0)"
+  background-light: "oklch(1 0 0)"
+  background-dark: "oklch(0.1452 0.0021 286.13)"
+  foreground-light: "oklch(0.2103 0.0059 285.89)"
+  foreground-dark: "oklch(0.9674 0.0013 286.38)"
+  primary-light: "oklch(0.2103 0.0059 285.89)"
+  primary-dark: "oklch(0.9851 0 0)"
+  muted-foreground-light: "oklch(0.5517 0.0138 285.94)"
+  muted-foreground-dark: "oklch(0.7118 0.0129 286.07)"
+  destructive-light: "oklch(0.5054 0.1905 27.52)"
+  destructive-dark: "oklch(0.7106 0.1661 22.22)"
+  border-light: "oklch(0.9197 0.004 286.32)"
+  border-dark: "oklch(0.2739 0.0055 286.03)"
+  input-light: "oklch(0.6493 0.0118 286.07)"
+  input-dark: "oklch(0.5025 0.0126 285.94)"
+  console-success-light: "oklch(0.5273 0.1371 150.07)"
+  console-success-dark: "oklch(0.8003 0.1821 151.71)"
+  band-light: "oklch(0.1452 0.0021 286.13)"
+  band-dark: "oklch(0.1876 0.004 286.01)"
 typography:
-  headline:
-    fontFamily: "Poppins, sans-serif"
-    fontSize: "1.875rem"
+  heroHeadline:
+    fontFamily: "'Geist Variable', sans-serif"
+    fontSize: "3.5rem"
     fontWeight: 600
-    lineHeight: 1.2
-    letterSpacing: "normal"
-  title:
-    fontFamily: "Poppins, sans-serif"
-    fontSize: "1.5rem"
+    lineHeight: 1.05
+    letterSpacing: "-0.035em"
+  sectionHeadline:
+    fontFamily: "'Geist Variable', sans-serif"
+    fontSize: "2.75rem"
     fontWeight: 600
-    lineHeight: 1.3333
-    letterSpacing: "normal"
-  section:
-    fontFamily: "Poppins, sans-serif"
-    fontSize: "1.125rem"
+    lineHeight: 1.1
+    letterSpacing: "-0.03em"
+  pageTitle:
+    fontFamily: "'Geist Variable', sans-serif"
+    fontSize: "2.25rem"
     fontWeight: 600
-    lineHeight: 1.5556
+    lineHeight: 1.15
+    letterSpacing: "-0.02em"
+  cardTitle:
+    fontFamily: "'Geist Variable', sans-serif"
+    fontSize: "1.25rem"
+    fontWeight: 500
+    lineHeight: 1.3
     letterSpacing: "normal"
   body:
-    fontFamily: "'Open Sans Variable', sans-serif"
-    fontSize: "0.875rem"
+    fontFamily: "'Geist Variable', sans-serif"
+    fontSize: "1rem"
     fontWeight: 400
-    lineHeight: 1.4286
+    lineHeight: 1.5
     letterSpacing: "normal"
   label:
-    fontFamily: "'Open Sans Variable', sans-serif"
+    fontFamily: "'Geist Variable', sans-serif"
     fontSize: "0.875rem"
     fontWeight: 500
     lineHeight: 1.4286
     letterSpacing: "normal"
-  caption:
-    fontFamily: "'Open Sans Variable', sans-serif"
+  eyebrow:
+    fontFamily: "'Geist Mono Variable', monospace"
     fontSize: "0.75rem"
     fontWeight: 500
     lineHeight: 1.3333
+    letterSpacing: "0.1em"
+  data:
+    fontFamily: "'Geist Mono Variable', monospace"
+    fontSize: "0.9375rem"
+    fontWeight: 400
+    lineHeight: 1.4
     letterSpacing: "normal"
-  reference:
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-    fontSize: "1.125rem"
-    fontWeight: 600
-    lineHeight: 1.5556
-    letterSpacing: "0.025em"
 rounded:
-  sm: "4.8px"
-  md: "6.4px"
-  lg: "8px"
-  xl: "11.2px"
-  4xl: "20.8px"
+  all: "2px"
 spacing:
   "1": "4px"
   "2": "8px"
-  "3": "12px"
   "4": "16px"
   "6": "24px"
   "8": "32px"
+  "12": "48px"
+  "16": "64px"
 components:
   button-primary:
-    backgroundColor: "{colors.available-green}"
-    textColor: "{colors.studio-white}"
+    backgroundColor: "{colors.primary-light}"
+    textColor: "{colors.background-light}"
     typography: "{typography.label}"
-    rounded: "{rounded.lg}"
-    height: "32px"
-    padding: "0 10px"
-  button-primary-hover:
-    backgroundColor: "{colors.available-green-pressed}"
+    rounded: "{rounded.all}"
+    height: "44px"
+    padding: "0 20px"
+  button-brand:
+    backgroundColor: "{colors.brand}"
+    textColor: "{colors.brand-foreground}"
+    typography: "{typography.label}"
+    rounded: "{rounded.all}"
+    height: "44px"
+    padding: "0 20px"
   button-outline:
-    backgroundColor: "{colors.studio-white}"
-    textColor: "{colors.ink-navy}"
+    backgroundColor: "transparent"
+    textColor: "{colors.foreground-light}"
     typography: "{typography.label}"
-    rounded: "{rounded.lg}"
-    height: "32px"
-    padding: "0 10px"
-  button-outline-hover:
-    backgroundColor: "{colors.powder-blue}"
-  button-destructive:
-    backgroundColor: "{colors.cancel-red-tint}"
-    textColor: "{colors.cancel-red}"
-    typography: "{typography.label}"
-    rounded: "{rounded.lg}"
-    height: "32px"
-    padding: "0 10px"
+    rounded: "{rounded.all}"
+    height: "44px"
+    padding: "0 20px"
   input:
-    backgroundColor: "{colors.studio-white}"
-    textColor: "{colors.ink-navy}"
+    backgroundColor: "transparent"
+    textColor: "{colors.foreground-light}"
     typography: "{typography.body}"
-    rounded: "{rounded.lg}"
-    height: "32px"
-    padding: "4px 10px"
+    rounded: "{rounded.all}"
+    height: "44px"
+    padding: "0 12px"
   card:
-    backgroundColor: "{colors.studio-white}"
-    textColor: "{colors.ink-navy}"
-    rounded: "{rounded.xl}"
+    backgroundColor: "{colors.background-light}"
+    textColor: "{colors.foreground-light}"
+    rounded: "{rounded.all}"
     padding: "16px"
-  badge-active:
-    backgroundColor: "{colors.available-green}"
-    textColor: "{colors.studio-white}"
-    typography: "{typography.caption}"
-    rounded: "{rounded.4xl}"
+  badge:
+    textColor: "{colors.foreground-light}"
+    typography: "{typography.eyebrow}"
+    rounded: "{rounded.all}"
     height: "20px"
     padding: "2px 8px"
-  badge-outline:
-    textColor: "{colors.ink-navy}"
-    typography: "{typography.caption}"
-    rounded: "{rounded.4xl}"
-    height: "20px"
-    padding: "2px 8px"
-  link-text:
-    textColor: "{colors.slate-text}"
-    typography: "{typography.body}"
-    height: "24px"
 ---
 
 # Design System: Bookly
 
 ## Overview
 
-**Creative North Star: "The Front Desk"**
+**Creative North Star: "The Console, in Public"**
 
-Bookly should feel like the front desk of a well-run studio: someone calm at the counter who tells you plainly what is free, what you owe and when, and never oversells. The surfaces stay quiet (a sky-tinted page, white cards with a hairline edge and a whisper of shadow) so that the things that matter, a time, an amount, a status word, are the loudest thing on the screen. Colour appears only when it means something, and it is never the only carrier of meaning.
+Since the 2026-09-27 redesign, the client side no longer looks like a separate, softer product from the admin: it speaks the same developer-console language the photographer already uses to run the business (flat planes, hairlines, 2px corners, Geist and Geist Mono, one violet accent) restyled for a visitor who is booking a session, not managing one. The surfaces are flat and quiet (white or near-black canvas, hairline borders, no shadows anywhere) so the things that matter — a time, a price, a status word — carry the page. Colour still means something specific: violet marks the one action the page wants you to take, links and selected state; green appears only for a confirmed or successful outcome.
 
-Two people use Bookly. Clients book on a phone or a laptop, with no account, usually once. The photographer runs the business from the admin. Since 2026-09-26 the two sides look like different products on purpose: the client side is everything below, and the admin is a developer-style console with its own tokens, type and themes (see **Admin console** at the end). They still share the primitives in `components/ui`, which the admin restyles only through opt-in variants. The feel is calm and exact: precise numbers, plain labels, no flourish. Decoration is non-textual (an icon or a dot beside words that already say the thing) and stays small.
+Two people use Bookly. Clients book on a phone or a laptop, with no account, usually once. The photographer runs the business from the admin. The two sides now share one visual language (Geist, violet, 2px, flat) but remain two scopes: the client's tokens live under `:root, :root[data-theme="light"]` and `:root[data-theme="dark"]` in `frontend/src/index.css`, set by `ClientShell` on `<html data-theme>`; the admin's live under `:root[data-admin-theme="light"|"dark"]`, set by `src/admin/theme.ts` on `<html data-admin-theme>`. A `client:` Tailwind variant (`&:where([data-theme], [data-theme] *)`) scopes shared-component defaults to client pages only, and `dark:` is rescoped to `&:where([data-theme=dark], [data-theme=dark] *)` so it means the client's dark theme, not the admin's. Both sides still share the primitives in `components/ui`, which the admin restyles only through its own opt-in `console-*` variants — the same variants the client also uses for status badges, callouts and badges, since `client-front.md` §5.2 puts the client on the console's status mapping.
 
-Visual rejections recorded in the design system (`design-system/bookly/MASTER.md` section 2; the first three are also enforced by Impeccable's design hook): no gradient text, no glow shadows, no coloured left-edge stripes, no modals, no 3D, parallax or scroll-driven effects, no emoji as icons. The client side is light only; the `.dark` block in `index.css` is unreachable and undesigned. The admin has both a light and a dark theme of its own.
+Visual rejections recorded in the design system (`design-system/bookly/MASTER.md` section 2; the first three are also enforced by Impeccable's design hook): no gradient text, no glow shadows, no coloured left-edge stripes, no modals, no 3D, parallax or scroll-driven effects, no emoji as icons. The client now ships **both a light and a dark theme**, following `prefers-color-scheme` live by default with a per-device System/Light/Dark override in the header; this replaces the earlier "light only" state, which is obsolete.
 
-The palette and the type pairing were chosen by a design tool and accepted by the user. The client has supplied no logo or brand colours yet, so nothing here is brand-derived. If brand colours arrive, they replace Available Green and Calendar Blue in `frontend/src/index.css` and nothing else changes.
+The palette, the Geist pairing and the violet accent are the admin's own shipped tokens, carried over to the client; light success, muted-on-chip and other fixes are the same measured corrections recorded in `design-system/bookly/admin-console.md` and reused here rather than re-derived. Contact details shown in the footer and the summary are **placeholders** (`frontend/src/lib/contact.ts`: "Studio name", `+250 700 000 000`, `hello@example.com`) to be replaced with the photographer's real details before launch — a deliberate, recorded exception to "nothing invented."
 
 **Key Characteristics:**
-- Sky-tinted page, white cards, one green for the next step, one blue for focus.
-- Poppins for headings, Open Sans for everything else, both self-hosted.
-- 32px controls on a mouse, 44px on touch.
-- Hairline borders plus `shadow-sm`; no heavy shadows.
-- Every status and every amount is written in words; colour and icons only repeat them.
+- Flat white (light) or near-black (dark) canvas, 2px corners, 1px hairlines, no shadows anywhere on the client.
+- Geist for everything, Geist Mono for labels, eyebrows and every data value (prices, times, references, step numerals).
+- One violet accent (`--brand` / `--ring` / `--console-link`) for the hero CTA, links, selected state and focus; the primary action itself is inverted neutral (near-black on white in light, near-white on black in dark), never violet.
+- 44px controls (48px fields from `md`, 52px large buttons; small buttons 40px on a mouse), and never under 44px on a coarse pointer — there is no 32px desktop size on the client.
+- Every status and every amount is written in words; colour, icons and shape (four status glyphs, reused from the admin) only repeat them.
 
-**State of the build (snapshot, 2026-09-22).** Every page of the app now has its redesigned layout. Tokens, fonts and the shadcn primitives apply app-wide; the whole client journey (the landing page, the service list, the service page with its calendar and times, the details form, the price summary, the held booking, the checkout and its payment-progress page, and the client booking page) and the whole admin (the shell, login, reset password, calendar, bookings, booking detail, catalogue, availability and settings) are done.
-
-Two things changed the shape of the system after the 2026-09-20 snapshot. **Public pages now carry a shared header and footer** (`pages/ClientShell.tsx`), which the earlier snapshot listed as a rejection: a client arriving on `/checkout/...` or `/booking/...` from an email had no route to anything else, and `/` was an API-status stub with no link at all. **`/` is now a real landing page**, built from facts the code enforces and from services fetched from the API; nothing about a photographer, a portfolio or a price is written into it. What is designed but not built is listed at the end of Components.
+**State of the build.** The whole client journey — the landing page, the service list, the service page with its calendar and times, the details form, the price summary, the held booking, checkout and its payment-progress page, and the client booking page — shipped the console-styled redesign on branch `redesign/client-front` (`docs/prompts/client-front-redesign.md`; full token and decision record in `design-system/bookly/client-front.md`). The admin was verified pixel-identical before and after (32/32 screenshots, 8 routes × two themes × two widths).
 
 ## Colors
 
-A cool sky-and-slate ground with one confident green for action and one blue held back for focus. Values are `oklch()` because `frontend/src/index.css` is the source of truth; the sRGB equivalents in parentheses are for reference and were checked to convert with zero error.
+A flat white-or-near-black ground with one violet accent held for location and one action. Values are `oklch()` because `frontend/src/index.css` is the source of truth; hex is given for reference.
 
-### Primary
-- **Available Green** (`oklch(0.5081 0.1049 165.61)`, #047857): the next step and the confirmed state. The default Button fill, the active Badge, selected and checked controls, `text-primary` links. White text on it is 5.48:1. It is the CTA green from the generated palette, one Tailwind step darker so a white label passes AA (the generated #059669 gave 3.77:1).
-- **Available Green, pressed** (`oklch(0.4471 0.0923 165.61)`): what the default Button turns on hover. The code mixes 12% black into Available Green; this is that result. Hover darkens, because lightening dropped the white label to 3.75:1.
+### Brand / accent
+- **Brand violet** (`oklch(0.5413 0.2466 293.01)`, #7C3AED in both themes): the hero CTA fill, selected time slots, checked boxes, day pips, links (`--console-link`), and the focus ring (`--ring`; `#B9A2FF` in dark). White label on it is 5.70:1 (7.10:1 on hover, `#6D28D9`).
+- **Primary — inverted neutral** (light `#18181B` on white; dark `#FAFAFA` on `#0A0A0B`): the main action button in both themes. Never violet; violet is reserved for location and linkage, per the same rule the admin already names.
 
-### Secondary
-- **Calendar Blue** (`oklch(0.5876 0.1389 241.97)`, #0284C7): where the user is looking or the system is informing. It is the focus ring on every control and the outline on focused text links (3.84:1 on the page). It is never a button fill. The shadcn `--secondary` token (a lighter sky, `oklch(0.6847 0.1479 237.32)`) is defined and used by no page.
-
-### Tertiary
-- **Cancel Red** (`oklch(0.5054 0.1905 27.52)`, #B91C1C): cancel actions, errors and refund-due amounts. Text on the page is 6.07:1; on its own 10% tint it is above 5:1. It is a darker red than the generated #DC2626, whose tinted text failed AA (4.13:1).
+### Status
+- **Console success** (light `#15803D`, dark `#4ADE80`): a confirmed booking, a successful payment, the delivered-photos link. The same darkened value the admin uses, reused because the generic tint failed AA the same way here.
+- **Console danger** (light `#B91C1C` text / `#B91C1C` solid confirm; dark `#F87171` text / `#DC2626` solid confirm): cancel, failure and refund-due. The dark solid confirm uses `#DC2626` rather than the dark `#F87171` text colour, because `#F87171` cannot carry a white label at 4.5:1 (client-front.md decision 9).
+- **Console warning** (light `#B45309`, dark `#FBBF24`): "just taken" and slot-check-failed banners.
 
 ### Neutral
-- **Morning Sky** (`oklch(0.9771 0.0125 236.62)`, #F0F9FF): the page background. Ink on it is 16.75:1.
-- **Studio White** (`oklch(1 0 0)`, #FFFFFF): cards, popovers and the fill of every text field, so a field reads as a field on the tinted page.
-- **Ink Navy** (`oklch(0.2077 0.0398 265.75)`, #0F172A): all primary text.
-- **Slate Text** (`oklch(0.4455 0.0374 257.28)`, #475569): secondary text, hints and back links. 7.11:1 on the page.
-- **Powder Blue** (`oklch(0.9514 0.0250 236.82)`, #E0F2FE): the hover and muted surface (ghost and outline hover, table-row hover, banners, disabled fields). It sits only 1.08:1 from the page: a hint, never the sole divider.
-- **Hairline Blue** (`oklch(0.9456 0.0201 229.04)`, #E0F0F8): decorative dividers and card edges only. It is far too faint to bound a control.
-- **Field Slate** (`oklch(0.6305 0.0374 253.82)`, #7A8BA0): the edge of every input, checkbox and other control (3.48:1 on white, 3.27:1 on the page), so a control's boundary passes the 3:1 non-text rule.
+- **Background / canvas** (`#FFFFFF` light, `#0A0A0B` dark): the page. `--card` equals canvas in both themes — panels are flat, a hairline sets them apart, not a fill change.
+- **Foreground** (`#18181B` light, `#F4F4F5` dark): primary text, 17.7:1+ on canvas in both themes.
+- **Muted foreground / subtle foreground** (`#71717A` / `#52525B` light, `#A1A1AA` dark): captions, eyebrows, secondary body copy. Muted text never sits on the chip surface in light (4.40:1, below AA); it stays on canvas or the flat surface instead (client-front.md decision 8).
+- **Border / input** (border `#E4E4E7` light / `#27272A` dark for hairlines; input `#8E8E96` light / `#63636B` dark for field edges, ~3.25:1): the board's own field-edge colour failed at 1.48:1, so fields, checkboxes and the resting edge of day/slot cells use the stronger `--input` value instead (decision 6). Outline buttons keep the weaker `--console-border-strong` edge, since their label already identifies them.
+- **Band** (`#0A0A0B` light, `#131315` dark, with `#F4F4F5` text): the "Already booked?" band on Home, inverted from the page in both themes.
 
 ### Named Rules
-**The One Green Rule.** Available Green marks the next step and the confirmed state, and nothing else. It is never decoration, and never the fill of a status that is not confirmed.
+**The Violet Is For Where You Are Rule.** Violet marks location and linkage: the hero CTA, links, selected controls (day pips, checked boxes, selected time and package edges), and the focus ring. The primary action button is never violet; it is the inverted-neutral fill, one per view — the same rule the admin already runs, now shared by the client.
 
-**The Blue Is For Looking Rule.** Calendar Blue is focus and information. As text on white it is only 4.10:1, so blue text uses #0369A1 (5.93:1); the plain brand blue is for outlines and rings.
+**Green Only For Confirmed Rule.** Success green marks only an outcome the API has actually confirmed: a confirmed booking, a received payment, delivered photos. A payment that is pending, received-but-unconfirmed, refunded or duplicated is never green and never ticked; it is blue-gray/neutral or the waiting spinner instead.
 
-**The Words Come First Rule.** Colour never carries a meaning alone. A status dot, a tint or an icon always sits beside the words that state the same thing.
+**The Words Come First Rule.** Colour, an icon or a shape never carries a meaning alone. A status badge shows the word every time; a dot, tint or glyph only repeats it.
 
 ## Typography
 
-**Display Font:** Poppins (with sans-serif), weights 400, 500 and 600.
-**Body Font:** Open Sans Variable (with sans-serif), the variable font.
-**Label/Mono Font:** the Tailwind default monospace stack, for booking and payment references only.
+**Font:** Geist Variable for all text; Geist Mono Variable for labels, eyebrows and every data value. Poppins and Open Sans have left the bundle entirely (`deps: remove Poppins and Open Sans, which nothing imports any more`).
 
-**Character:** Poppins is round and confident, so titles feel friendly; Open Sans is open and very legible at 14px, which is where most of the app's text lives. Together they read professional but approachable. Both load from the app's own bundle, not from a third party.
+**Character:** one typeface family in two optical roles — Geist for reading, Geist Mono (uppercase, tracked) for anything mechanical: an eyebrow, a price, a time, a reference, a step numeral. This is the same pairing convention the admin already used; the client now speaks it too.
 
 ### Hierarchy
-- **Headline** (600, 1.875rem, 1.2): the title of a client page (Home wordmark, services, service detail, booking, checkout, held).
-- **Title** (600, 1.5rem, 1.333): the title of an error, invalid-link or payment-progress state, and of every page inside the admin shell. Settled 2026-09-22: calendar, catalogue, availability and settings used to title at 1.25rem with a 0.75rem intro; all four now match bookings at 1.5rem with a 0.875rem intro. Login and reset password, which sit outside the shell on a card, stay at 1.25rem.
-- **Section** (600, 1.125rem, 1.556): every `h2` and card section title ("Price summary"). Fieldset legends ("Choose a package") are the same size and weight and take the heading font by hand (`font-heading`), because only `h1`-`h3` get it from the base layer; inside a card that has its own `h2` (the session-fee card on the client booking page) a legend drops to 1rem so the two do not compete.
-- **Body** (400, 0.875rem, 1.429): almost all text. Inputs are 1rem on phones (so iOS does not zoom) and 0.875rem from `md`.
-- **Label** (500, 0.875rem): buttons and form labels.
-- **Caption** (500, 0.75rem, 1.333): badges, hints and small print.
-- **Reference** (mono, 600, 1.125rem, +0.025em): booking and payment reference numbers on the client pages, always monospace and semibold so they can be read out or copied without doubt.
+- **Hero headline** (56px/600/-0.035em, 1.05 line-height; 40px `md`, 34px `sm`): Home's `h1` only.
+- **Section headline** (44px/600/-0.03em; 32px `md`): Home's `h2`s ("What you can book", "How booking works", "What you can count on"); the band's own `h2` is 40px (30px `md`).
+- **Page title** (36px `md` / 30px below, 600, -0.02em, 1.15): every other page's `h1` (services list, service detail, checkout, booking, the status views).
+- **Card/step title** (20-22px/500): in-page `h2`s (price summary, "Your email", cancel), card and step `h3`s.
+- **Body** (16px): the main reading size; secondary/subtle colour under a heading, lead copy 17-18px.
+- **Label** (14px/500 above fields; nav links 15px; hints and errors 13px).
+- **Eyebrow** (Geist Mono, 12px/500, uppercase, +0.1em, muted, with a 14px icon): every section and card header ("01 — Services", "MY BOOKING").
+- **Data** (Geist Mono, `tabular-nums`): prices, times, references, step numerals `01`-`04`, calendar day numbers, weekday heads.
 
 ### Named Rules
-**The Two Voices Rule.** Poppins speaks only in `h1`, `h2`, `h3`, card titles and fieldset legends: the headings get it once from the base layer of `index.css`, and a legend, which is a heading inside a form, adds `font-heading` itself. Everything else is Open Sans.
+**The Two Voices Rule (client version).** Geist Mono is reserved for anything mechanical — an eyebrow, a label, a number that must be read exactly. Everything a person reads as prose stays in Geist. A mono value interpolated inside one translated sentence stays in Geist rather than splitting the sentence, to protect the translation.
 
-**The Numbers Stay Put Rule.** Amounts, times and counts use tabular figures so columns and totals do not shift as digits change.
+**The Numbers Stay Put Rule.** Amounts, times, references and counts use tabular figures so columns and totals do not shift as digits change.
 
 ## Layout
 
-Mobile first, designed at 375px. Public pages sit inside a shared shell: a static `bg-card` header with the wordmark and one "Book now" link, the page's own `main`, and a footer. The header and footer are **siblings** of that `main`, never a wrapper around it, so there is exactly one `main` per page. Each page still keeps its own maximum width: `max-w-6xl` for the landing sections, `max-w-md` for NotFound, `max-w-2xl` for the flows (pay, progress, my booking), `max-w-5xl` for the service list and detail. Admin pages are denser and each centres in its own width (`3xl` booking detail, `5xl` catalogue, `6xl` bookings, `7xl` calendar).
+Mobile first, designed at 375px, container `max-w-6xl` (1152px) centred: 16px gutter on phones, 32px at `md`, 48px at `lg` (`container` in `pages/client/classes.ts`). Section rhythm is 48px vertical padding on phones, 64px at `md`, 104px at `lg`. Public pages sit inside `ClientShell`: a skip link, then `header`, `div#main-content` and `footer` as **siblings** (never a wrapper around `main`), so there is exactly one main-content region per page. The header is 72px (64px below `md`), canvas-coloured with a bottom hairline, static (no sticky anything). The footer is three columns from `md` (wordmark + contact block; Book; About), stacked on phones.
 
-Spacing follows Tailwind's 4px scale: 8px inside a group (`gap-2`, the most common), 12px (`gap-3`) and 16px (`gap-4`) between related blocks, 16px inside cards (`p-4`), 24px between sections (`gap-6`), 32px of vertical page padding (`py-8`). Breakpoints are Tailwind's (`sm` 40rem, `md` 48rem, `lg` 64rem) and are used lightly; input modality matters more than width, so controls grow to 44px under `pointer-coarse:` and stay 32px otherwise. Stub pages centre vertically with `min-h-svh`. Long unpredictable text (an API error, a name) sits in a shrinkable child with `min-w-0 wrap-anywhere` so it can never force horizontal scroll. Status pages (the notices and the payment outcomes) limit their words to 36rem, about 72ch, and balance their headings, so a phone never strands one word on a last line.
+Admin pages are unchanged: each still centres in its own width and is denser than the client.
 
 ## Elevation & Depth
 
-Tonal layering with a hairline: white cards sit on a sky-tinted page, a Powder Blue surface marks hover, and a 1px border plus one soft shadow lifts the card. There is no scale of large shadows, no blur and no glow; there are no modals to need one.
-
-### Shadow Vocabulary
-- **Card lift** (`box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)`): the resting shadow of every card, together with a 1px `border` in Hairline Blue.
-- **Focus ring** (`box-shadow: 0 0 0 3px` Calendar Blue at 50%): keyboard focus on buttons, inputs, checkboxes and badges, paired with the control's border turning full Calendar Blue.
+Flat. There are no shadows anywhere on the client — the old card `shadow-sm` is gone. Panels (cards, the summary, the callouts) sit on the same canvas colour as the page and are set apart only by a 1px hairline border. Hover and selected state are carried by an edge-colour change (hairline → muted-foreground on hover, hairline → brand-violet when selected/focused) and, on cards that move, a small lift, never a bigger shadow.
 
 ### Named Rules
-**The Hairline Rule.** A card's edge is a 1px border plus `shadow-sm` and nothing heavier. The one clickable card, a service on the list, lifts to `shadow-md` on hover as its affordance. Extra separation comes from tone (white on sky), never from a bigger shadow.
+**The Flat-Panel Rule.** A card, the summary and a callout are the canvas colour plus a 1px border; nothing is elevated with a shadow. The one exception recorded for a device, not a rule: a faint shadow on the admin's light popover, which the client does not use.
 
 ## Shapes
 
-Everything derives from one `--radius` of 0.5rem: controls are 8px (`rounded-lg`), cards 11.2px (`rounded-xl`), the small button sizes 6.4px, badges fully round pills (`rounded-4xl`), and the checkbox 4px. Edges are 1px: Hairline Blue for decoration, Field Slate for controls. A focus indicator on a text link is a 2px outline offset 2px. Dashed and dotted edges are reserved to mean something (an unpaid hold is dashed, a lapsed one dotted; see Status badges); they are never decorative. Icons are lucide, outline style, 16px beside text (plus one 40px page-level mark on NotFound), and `aria-hidden` whenever they are decorative.
+Everything derives from a single `--radius: 0.125rem` (2px), used on every control, card, badge and callout on the client — round shapes are reserved for status dots, pips, the round step/confirm icons and the hero's decorative dot grid. Edges are 1px: hairline (`--border`) for structure, `--input` for field edges, `--console-border-strong` for outline-button edges. Focus is one 2px `--ring` (violet) outline offset 2px on every interactive element in both themes — the admin's own focus rule, re-scoped to `:root[data-theme]`, which also zeroes the shadcn 50% ring the earlier client system used. Icons are lucide, 1.5px stroke, square caps (matching the admin), 16-20px beside text, `aria-hidden` when decorative. Dashed and dotted edges are reserved to mean something (a hold is dashed, a lapsed hold dotted, carried over from the console status mapping); they are never decorative.
 
 ## Components
 
 ### Buttons
-- **Shape:** 8px radius (`rounded-lg`), 1px transparent border, label in Open Sans medium 14px.
-- **Primary (default):** Available Green fill, white label, 10px side padding. Hover darkens to Available Green, pressed. Pressing nudges down 1px.
-- **Outline:** white fill and a Field Slate edge (3.27:1 on the page, the same as a text field), Ink Navy label; hover fills Powder Blue. It used to draw a Hairline Blue edge, about 1.1:1, which made every outline button read as floating text; the variant itself was fixed. **Ghost:** no fill, Powder Blue on hover. **Destructive:** a tinted button (Cancel Red at 10% fill, Cancel Red label), used for cancel actions; the irreversible confirmation is a solid Cancel Red fill with a white label (6.47:1). Since 2026-09-22 that is a real variant, `destructive-solid`, and the three places that confirm something irreversible use it: the client's "Yes, cancel my booking", the admin's booking cancel, and "Block anyway" on an overlap warning. It keeps the neutral focus ring, since the button is already red. The tinted `destructive` opens the question; the solid one answers it. **Secondary and link** variants exist and no page uses `secondary`.
-- **Size:** 32px high on a mouse, 44px under `pointer-coarse:` (icon buttons 32px and 44px). The small size also grows to 44px on touch; the extra-small size grows to 36px. A submit button (Pay) and the two-button cancel confirmation are full width on a phone and hug their labels from `sm`; a standalone button always hugs its label.
-- **Busy and disabled:** pages set `aria-disabled` (not `disabled`) while a request runs, which fades the button to 50% opacity with a not-allowed cursor and keeps it focusable. Native `disabled` fades to 50% and drops pointer events.
-- **Focus:** the border turns Calendar Blue with a 3px ring at 50%.
+- **Shape:** 2px radius, 1px edge where the variant has one, label in Geist medium 15px, `gap-2`.
+- **Default (primary):** inverted-neutral fill (near-black on white / near-white on black), hover to `--primary-hover`. This is the main action on every non-Home page.
+- **Brand:** the violet fill, white label, hover to a darker violet (`#6D28D9`) — reserved for the one hero CTA on Home ("Browse services →") and nothing else, per the Violet Is For Where You Are rule.
+- **Outline:** transparent fill, `--console-border-strong` edge, hover fills `bg-muted`.
+- **Ghost, destructive (tint), destructive-solid, link:** carried over; the dark theme's solid destructive confirm uses `#DC2626` rather than the dark destructive text colour (decision 9), used for the client's "Yes, cancel my booking."
+- **Size:** 44px by default on the client (52px `lg`, 40px `sm` on a mouse only) — there is no separate 32px desktop size any more; every control stays at least 44px on a coarse pointer.
+- **Motion:** a 1px hover lift (`motion-safe:hover:-translate-y-px`), 150ms colour transitions; no press nudge.
 
 ### Inputs / Fields
-- **Style:** 8px radius, Field Slate 1px edge, Studio White fill, 32px high (44px on touch), 16px text on phones and 14px from `md`. Textareas match.
-- **Focus:** border to Calendar Blue plus a 3px ring at 50%.
-- **Error / Disabled:** `aria-invalid` turns the border Cancel Red with a 20% ring; the error text sits below the field in Cancel Red, linked with `aria-describedby`. Disabled fills Powder Blue at 50% opacity.
-- **Label and hint:** the label sits above, the hint below; a visible label is never replaced by a placeholder.
+- **Style:** 2px radius, `--input` 1px edge, transparent fill, 16px text; 48px tall from `md`, 44px below and on touch. Label above (14px/500), hint below (13px muted), error below in danger (13px) with a `CircleAlert` icon, linked with `aria-describedby`.
+- **Focus:** a `--ring` edge plus the 2px violet outline.
+- **Checkbox:** a 20px square, 1.5px `--input` edge, fills brand violet with a white tick when checked.
 
 ### Cards / Containers
-- **Corner Style:** 11.2px (`rounded-xl`).
-- **Background:** Studio White, with Ink Navy text.
-- **Shadow Strategy:** Card lift plus a 1px Hairline Blue border (see Elevation & Depth).
-- **Internal Padding:** 16px (`p-4`); a `sm` size uses 12px. Every hand-rolled card, client and admin alike, carries the border and `shadow-sm`, so there is one card look across the app (the admin's booking-detail sections gained it in Section 7).
+- **Corner style:** 2px radius, flat canvas fill, 1px hairline edge, no shadow.
+- **Selectable card** (packages, add-ons, the payment method): resting is hairline + canvas; hover thickens the edge to muted-foreground with a 2px lift; checked switches to a violet edge and a tinted fill (`--selected`), with a 24px violet square and a white check that scales in (`tick`), the whole card playing one `pop`. The native input is visually hidden; focus draws the outline on the card via `has-focus-visible:`.
 
-### Badges
-- **Style:** a pill, 20px high, caption text, 8px side padding. The active badge is Available Green with white text; the outline badge is a Hairline Blue edge with Ink Navy text; a destructive badge is Cancel Red at 10% with Cancel Red text. A booking status is not one of these: it uses the status badge below.
+### Badges and status
+- Rectangles, 2px radius, 13-14px/500. The client now uses the **console status mapping**, the same one the admin runs: four shapes carry the seven-to-however-many booking states — a filled check for a current success, an outlined check for an earlier one, a clock for waiting, a cross for failed/cancelled — with dashed and dotted edges keeping a hold and a lapsed hold apart in greyscale. The word is always shown; the shape and edge style only repeat it. `BookingPage` supplies the console variant through `StatusBadgeVariantContext` so the page pill and the `StageLegend` popover switch together.
 
-### Status badges (shipped: the client booking page's pill)
-- **Style:** the seven booking statuses in one shared look, built on the outline badge as the `StatusBadge` component. The label is always shown; a 16px lucide icon repeats it. The page pill is 28px high with 14px text (`md`); the 20px badge (`sm`) is for tables.
-- **The seven:** confirmed is a mint fill (Available Green at 10% mixed into the white) with a 30% green edge, green text and a circle-check; pending payment is a dashed Slate edge with no fill and a clock; completed is a Powder Blue fill with no edge and a double check; no-show is a red tint (10%) with no edge, red text and a crossed-out person; expired is a dotted Slate edge with muted text and an hourglass; cancelled by the client is a 40% Cancel Red edge, red text and a circled cross; cancelled by the photographer is a solid Field Slate edge with muted text and a ban sign.
-- **Rules:** the seven stay apart in greyscale (edge style, fill and icon each differ), text on its own fill is at least 4.5:1, and green appears only for a confirmed booking. No status uses a heavy red edge. The tints are opaque mixes into the card's white, never a translucent fill laid over the page. An unknown status falls back to a plain outline.
+### Callout
+The console banner, full width, 2px radius, 18px icon, optional underlined trailing link. Tones: info (violet-tinted), success, warning, destructive. Used for the non-refundable notice, hold-expiry, "already waiting on your phone," the just-taken/check-failed slot messages, and the irreversible-cancel warning.
 
-### Text link (shipped: the shared `BackLink`, on NotFound and the service page)
-- **Style:** a standalone link, not one inside a sentence: Slate Text, 14px, underlined on hover only (4px offset, the same as the Button's link variant), with a leading lucide arrow when it means "back". At least 24px high, 44px on touch.
-- **Focus:** a full-strength 2px Calendar Blue outline offset 2px. The Button's 50% ring is not used here because it measures about 1.9:1 on the page.
+### Metadata tiles (FactGrid)
+The admin's `StatGrid` look, re-implemented for the client (not imported from the admin): two columns from `sm`, a 64px (48px below `sm`) chip-coloured icon tile with a 20px icon, a mono label above the value. Status tiles take the status tint and icon. Used for booking facts, checkout facts and the held page's stats.
 
-### Status line (shipped on Home)
-- **Style:** a small round dot before the words, in Available Green when it worked, Cancel Red when it failed and Slate Text while pending; the text turns Cancel Red on failure and wraps anywhere. The dot repeats what the words say and fades between colours in 200ms, with no transition under reduced motion.
+### Month grid and time slots (service page)
+- **Days:** 44px square cells; open = hairline edge (strengthens on hover) with a 4px brand pip under the number; unavailable = faint disabled number, no edge; selected = inverted-neutral fill with the pip and a `pop`; today additionally gets a 2px violet underline offset 3px. A legend row states "Has open times" / "Selected" in words beside `aria-hidden` swatches.
+- **Times:** 52px rows, two columns from `sm`, mono 16px time; hover takes a violet edge and violet text; selected is the brand fill with white text and a `pop`. Rows stagger in (`rise`) when a day is chosen.
 
-### Callouts (shipped on the service page, the held page, the pay page and the client booking page)
-- **Style:** a Calendar Blue tint (5%) with a full 1px Calendar Blue edge (30%), 8px radius and 12px padding; a 16px lucide icon in Calendar Blue beside 14px Ink Navy text. Never a stripe down one side. The icon is decoration and the words carry the meaning. It holds the non-refundable notice, the hold expiry, the "payment request already waiting on your phone" banner, the expired photo link and the refund note.
-- **Destructive tone:** the same shape in Cancel Red (a 5% tint, a 30% edge and a red icon), used for the warning before an irreversible cancel. The text stays Ink Navy, so the icon carries the tone and the words carry the meaning. Shared as the `Callout` component, with `info` as its default tone.
+### Money rows / step numerals
+- Money rows: label left, mono amount right, tabular figures; the total is 500-weight mono 20px above a hairline. Step numerals are CSS-counter-generated mono `01`-`04` in a 48px bordered square, brand edge and numeral on hover.
 
-### Selectable cards (shipped: packages and add-ons)
-- **Style:** a white card with a hairline edge and `shadow-sm` around a native radio or checkbox; the whole card is the label. Hover fills a pale blue (Powder Blue at 60% mixed into the white; not on the selected card). Selected is a faint mint (Available Green at 5% mixed into the white) and a 2px green edge (the 1px border plus a 1px ring) on top of the native mark. Both fills are mixed into the card's own white, never laid over the page, so a selected card stays a white card and never looks like the blue hover. Keyboard focus turns the border Calendar Blue with the 3px ring, replacing the green ring while focused; the native input's own outline is hidden so there is one indicator. Shared as the `SelectableCard` component.
+### Status views (NotFound, pay notices, payment progress, invalid-link)
+A 64px icon tile (or 40px bare icon on some status views) above the page title and body, then the booking facts. Tone: violet for waiting/information, danger for failure, muted for neutral, success only for an API-confirmed outcome. The waiting state's spinner is the one `animate-spin`, `infinite` motion on the client; it becomes a still `Clock` under reduced motion. The confirmed check draws once (`draw`, 600ms, one-time).
 
-### Calendar days and times (shipped in the slot picker)
-- **Days:** a 7-column grid. A bookable day is semibold on Powder Blue (hover 8% darker); an unavailable day is disabled at 50% text with no surface; the selected day is Available Green with white text. 40px tall, 44px on touch, and they take the same focus edge as controls.
-- **Times:** outline buttons 44px tall in 4 columns (3 on phones); the chosen one is the default green button. The previous and next month buttons are outline buttons too.
+### Contact block (footer, summary "Questions?")
+Renders only the fields set in `frontend/src/lib/contact.ts` (phone `tel:`, WhatsApp `wa.me`, email `mailto:`); with every field `null` neither renders at all. **The shipped values are placeholders** ("Studio name", `+250 700 000 000`, `hello@example.com`) to be replaced with the photographer's real contact details before launch — a recorded, deliberate exception to "nothing invented," not a design-system rule for other surfaces.
 
-### Money rows (shipped on the price summary and the held page)
-- **Style:** label left, amount right in tabular figures. The total is semibold above a hairline; the booking-fee row, which is due now, is medium weight as a whole; the session fee is regular. A booking reference is monospace semibold at 18px, on the same baseline as its label.
+### Shell — header and footer
+Public pages carry a shared header (wordmark, Services, How booking works, My booking, Admin login, the theme button, Book now) and a three-column footer (wordmark + contact block; Book; About), as siblings of `main`. Below `sm`, "My booking" collapses to its icon only (44px square, its words kept as the accessible name). **There is no Privacy link in the footer**: no privacy page exists in this build, so none is linked.
 
-### Step numerals (shipped on the service page)
-- **Style:** the three funnel groups (choose, pick a time, your details) each start with a 24px Powder Blue disc holding a CSS-counter numeral in the heading font. It is generated content, so no text was added; add-ons are not numbered.
+### Theme control
+One button (not radios) in the header's right cluster, cycling System → Light → Dark → System, 44px square, ghost. Its accessible name and `title` state the current setting ("Theme: System" / "Theme: Light" / "Theme: Dark"); the icon shows the setting (`Monitor`/`Sun`/`Moon`). First paint is always light (`:root` default) before the layout effect resolves the real preference, so there is no flash and no dark-theme assumption at first render.
 
-### Status views (shipped: NotFound, the pay page's notices, the payment-progress page and the client booking page's invalid link)
-- **Style:** a 40px lucide icon with a light stroke, always `aria-hidden`, above a `2xl` heading and its body, then the booking card. The icon's tone says what kind of news it is: **Calendar Blue** for information and waiting, **Cancel Red** for a failure, **Slate Text** for neutral, and **Available Green** only for a booking the API has confirmed (and the already-paid notice). Waiting is a spinner, the one moving element on the page; a visitor who asks for less motion gets a still phone icon instead of a frozen spinner.
-- **The invariant:** the design never implies success while the outcome is unknown. A payment that is pending, received but not confirmed, refunded or duplicated is never green and never ticked. Shared as the `StatusIcon` component; the reference, service and time card is shared as `BookingFacts`.
+### Home — sections and the decorative mock-up
+Hero (on a violet-hairline dot grid) → Services preview → How booking works → Good to know → Already booked? (an inverted band, merging the old closing section) → footer. The hero's mock-up is `aria-hidden`, pure HTML/CSS, and data-true, not invented: a month card built from the current Kigali month and real weekday/day math, with a small "held" preview card using the first real fetched service's name (or a generic fallback string) and today's date — not a fabricated photographer, portfolio or price. It plays one `fade-up` on load and otherwise never moves.
 
-### Designed, not built yet
-Nothing on the client side. The admin items once listed here (status treatments on the admin badges and calendar events, the sidebar, the calendar styling) shipped with the admin console; see below.
+### Motion
+Kept, behind `prefers-reduced-motion: no-preference` only: `fade-up` on hero/page-head load (600ms, staggered), a hover lift on cards and buttons, an arrow nudge on "Book" links, `pop` on selecting a package/day/time, `tick` on a chosen card's check square, staggered `rise` on time slots, a one-time `draw` on the confirmed check, and the single `animate-spin` waiting spinner (which itself falls back to a still `Clock` under reduced motion — the one animation not fully gated by the media query, by design, since it is the only functional one). Dropped entirely, not carried into the redesign: any looping/ambient motion — a marquee, floating hero cards, a pinging selected day, a blinking "live" dot, a shutter/flash, a draining bar, a phone "buzz," payment "wave" rings, a sliding toast, a step progress bar, and an error shake. Under `prefers-reduced-motion: reduce`, nothing moves; only colour changes remain.
+
+## Do's and Don'ts
+
+### Do:
+- **Do** write every status, amount and time in words; let a badge shape, dot, tint or icon only repeat them.
+- **Do** keep every client control at least 44px, on a mouse and on touch alike (48px fields from `md`).
+- **Do** put keyboard focus in one 2px violet (`--ring`) outline offset 2px, on every interactive element in both themes.
+- **Do** use tabular figures for amounts and times, and Geist Mono for eyebrows, labels-that-are-data, and references.
+- **Do** reserve the brand-violet button fill for the one hero CTA; use the inverted-neutral fill for every other primary action.
+- **Do** show green only for an outcome the API has actually confirmed.
+- **Do** honour `prefers-reduced-motion: reduce` — no motion but colour change, except the one functional waiting spinner, which itself falls back to a still icon.
+- **Do** keep icons lucide, 1.5px stroke, square caps, `aria-hidden="true"` when decorative.
+
+### Don't:
+- **Don't** use gradient text, glow shadows, a one-sided coloured stripe, modals, 3D/parallax/scroll-driven effects, or emoji icons — ruled out in `MASTER.md` section 2 and flagged by Impeccable's design hook.
+- **Don't** add a shadow anywhere on the client; separation comes from a hairline edge, never elevation.
+- **Don't** fill a primary action button with brand violet outside the one hero CTA.
+- **Don't** show a green icon, tick or tint for a pending, received-but-unconfirmed, refunded or duplicated payment.
+- **Don't** use the weak `--console-border-strong` edge on a field, checkbox or day/slot cell that must read at 3:1 unlabelled; use `--input`.
+- **Don't** put muted text on the chip surface in light theme (4.40:1, below AA); keep it on canvas or the flat surface.
+- **Don't** add a Privacy footer link until a privacy page exists (it is specified, not built).
+- **Don't** treat the contact details in `lib/contact.ts` as final; they are placeholders and must be replaced before launch.
+- **Don't** hard-code a colour, radius or font in a component; use the tokens in `index.css`.
 
 ## Admin console
 
-Everything under `/admin`, sign in and reset password included, is a quiet developer console: flat planes split by 1px hairlines, 2px corners, no shadows or gradients, one violet accent and monospace for labels and machine values. It was built from the user's style guide and two reference screenshots (`docs/prompts/admin-console-redesign.md`). The full spec, with every token's oklch value and measured contrast, is `design-system/bookly/admin-console.md`; this section summarises what shipped.
+Everything under `/admin`, sign in and reset password included, is a quiet developer console: flat planes split by 1px hairlines, 2px corners, no shadows or gradients, one violet accent and monospace for labels and machine values. It was built from the user's style guide and two reference screenshots (`docs/prompts/admin-console-redesign.md`). The full spec, with every token's oklch value and measured contrast, is `design-system/bookly/admin-console.md`; this section summarises what shipped. The 2026-09-27 client redesign adopted this same visual language for the public side (see the sections above) but the admin's own tokens, scope and behaviour below are unchanged and were verified pixel-identical across the change.
 
-**How it is scoped.** While an admin page is mounted, `src/admin/theme.ts` sets `<html data-admin-theme="light|dark">`, and it removes the attribute when the page unmounts. Every admin token is declared under `:root[data-admin-theme=...]` in `index.css`, on the root rather than a wrapper, so Radix popovers portalled into `body` get them too. A client page never carries the attribute, and its screenshots were checked pixel-identical before and after the redesign. The `dark:` variant is never used for admin theming: in this codebase `.dark` holds the client's light palette.
+**How it is scoped.** While an admin page is mounted, `src/admin/theme.ts` sets `<html data-admin-theme="light|dark">`, and it removes the attribute when the page unmounts. Every admin token is declared under `:root[data-admin-theme=...]` in `index.css`, on the root rather than a wrapper, so Radix popovers portalled into `body` get them too. A client page never carries the attribute, and its screenshots were checked pixel-identical before and after the redesign. The `dark:` variant is scoped to the client's own `data-theme="dark"` and is never used for admin theming; the codebase's earlier `.dark` class block, which nothing applied, has been removed entirely (both palettes now live under explicit `data-theme`/`data-admin-theme` attributes, not `.dark`).
 
 **Themes.** Light and dark follow the OS setting by default and change with it live. A System / Light / Dark control in the top bar overrides that per device (`localStorage`, key `bookly.admin.theme`). Blocked storage falls back to the OS setting without failing. The theme is applied before first paint.
 
@@ -326,12 +329,12 @@ Geist and Geist Mono, self-hosted with `@fontsource-variable`. The page title is
 ### Admin components
 - **Shell and breadcrumb** (`src/admin/AdminLayout.tsx`, `breadcrumbs.tsx`): the breadcrumb reads Admin › section › booking reference. The booking page reports its reference through `useBreadcrumbTail`, so nothing is fetched twice.
 - **Shared compositions** (`src/pages/admin/console/`): `PageHeader` (a mono eyebrow, the one `h1`, badges, a meta row and actions), `StatGrid` (square icon tiles, mono labels over values), `Toolbar` (filters joined into one bordered strip), `AuthFrame` (the sign-in and reset-password panel) and `classes.ts` (shared class strings for fields, links, table cells and type roles).
-- **Opt-in variants in `components/ui`** that the client side never uses:
+- **Opt-in variants in `components/ui`**, now shared with the client for status, badges and callouts:
   - Button: `console-outline` and `console-destructive-solid`, in sizes `console`, `console-sm` and `console-icon`.
   - Badge: `console`, `console-accent`, `console-success` and `console-count`.
   - `Callout variant="console"`: info, success, warning and destructive banners.
   - `Card variant="console"`: a flat panel.
-- **Status** (`StatusBadge`, `StatusGlyph`, `StatusShapeGlyph`): the admin layout switches every badge under it, the legend popover included, to four shapes. A filled check is current, an outlined check an earlier success, a clock waiting, a cross failed or cancelled. Dashed and dotted edges keep a hold and a lapsed hold apart in greyscale, and the word is always there.
+- **Status** (`StatusBadge`, `StatusGlyph`, `StatusShapeGlyph`): the admin layout switches every badge under it, the legend popover included, to four shapes. A filled check is current, an outlined check an earlier success, a clock waiting, a cross failed or cancelled. Dashed and dotted edges keep a hold and a lapsed hold apart in greyscale, and the word is always there. The client now renders bookings through this same mapping.
 - **Calendar** (the FullCalendar block in `index.css`):
   - A hairline grid, mono hours and dates, and a violet chip for today.
   - Square events on the raised surface with a 3px status edge. A hold has a dashed edge, a block keeps its hatch, and a conflict is a 2px danger line inside the event.
@@ -342,25 +345,3 @@ Every admin page was checked at 320 and 375px in both themes: no horizontal scro
 - **Bookings:** the table stacks each booking into one block whenever its own container is under 56rem, by container query. That covers phones, tablets and the narrow column beside the sidebar.
 - **Forms and actions:** form button rows and page actions go full width on a phone.
 - **Calendar:** month events shrink to the time and status glyph, with the status word kept for screen readers.
-
-## Do's and Don'ts
-
-### Do:
-- **Do** write every status, amount and time in words; let a dot, tint or icon only repeat them.
-- **Do** keep controls 32px on a mouse and 44px under `pointer-coarse:`.
-- **Do** put keyboard focus in Calendar Blue: a 3px ring at 50% plus a full-strength border on controls, and a 2px full-strength outline offset 2px on text links and on a bare native checkbox.
-- **Do** set `aria-disabled` on a busy control instead of `disabled`, and fade it to 50%.
-- **Do** put unpredictable text (errors, names, references) in a shrinkable child with `min-w-0 wrap-anywhere`.
-- **Do** use tabular figures for amounts and times, and monospace semibold for references.
-- **Do** reuse existing strings; new decoration is an icon, a dot or a border, not new copy.
-- **Do** keep icons to lucide, outline style, with `aria-hidden="true"` when they sit beside words.
-
-### Don't:
-- **Don't** use gradient text, glow shadows or a one-sided coloured stripe on a card or callout; they are ruled out in `MASTER.md` section 2 and flagged by Impeccable's design hook.
-- **Don't** add modals, 3D, parallax, scroll-driven effects, a site header or footer on public pages, or emoji icons.
-- **Don't** use white text on the lighter #059669 green (3.77:1), and don't let a hover state lighten the default Button.
-- **Don't** set text in the plain Calendar Blue on white (4.10:1); use #0369A1.
-- **Don't** use Hairline Blue or Powder Blue as the only boundary of a control or as the only signal of state.
-- **Don't** show a green icon, tick or tint for anything the API has not confirmed: waiting, received-but-unconfirmed and refund views are blue.
-- **Don't** hard-code a colour, radius or font in a component; use the tokens in `index.css`.
-- **Don't** use `bg-input/…` for a disabled fill (the input token is now a mid slate); use Powder Blue.
