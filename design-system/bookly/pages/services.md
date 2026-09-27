@@ -4,6 +4,7 @@
 > Generator template: UI UX Pro Max, 2026-09-19 (1200px width replaced by the shipped `max-w-5xl`).
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
 > **Applied 2026-09-20 (Phase 3 section 2).** The choices made beyond this file are in `MASTER.md` section 11.
+> **Overridden 2026-09-27 by `design-system/bookly/client-front.md`** (the client front redesign, light and dark): the card becomes the board's lift card: 4:3 image or icon block, 22px `h3`, a mono "From" and "Book →" row, and a -6px lift on hover and focus (client-front.md §8.2), which lifts this file's "no translate lift" rule except under reduced motion.
 
 ## Layout
 

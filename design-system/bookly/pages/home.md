@@ -5,6 +5,7 @@
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
 > **Superseded 2026-09-21.** The 2026-09-20 decision recorded here was "restyle the stub only", because a landing page needed copy that did not exist. The user has now asked for the landing page and authorised new `en.json` keys under a new namespace, so the stub is replaced. Section 1's applied styling (the type scale, the button that hugs its label) carries forward; this is not a restart.
 > **Applied 2026-09-20 (Phase 3 section 1)** to the stub. What was chosen beyond this file is in `MASTER.md` section 11.
+> **Overridden 2026-09-27 by `design-system/bookly/client-front.md`** (the client front redesign, light and dark): the hero with its decorative calendar mock-up and service chips, section eyebrows, "How booking works" as a numbered strip, "Good to know" fact rows and the "Already booked?" band that absorbs the closing section (client-front.md §8.1). "No illustration" is lifted for the data-true mock-up only; entrance fade-ups are allowed on the hero.
 
 ## What this page is now
 

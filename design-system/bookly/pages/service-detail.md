@@ -5,6 +5,7 @@
 > Generator template: UI UX Pro Max, 2026-09-19. Its "Product Detail" text recommended WebGL/Three.js 3D, physics lighting and parallax. That is wrong for a booking funnel and contradicts MASTER's own "avoid 3D effects"; it has been removed.
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
 > **Applied 2026-09-20 (Phase 3 section 2)** to all five files. The choices made beyond this file (the shared `BackLink` and `Callout`, the selectable-card and step-numeral recipes) are in `MASTER.md` section 11.
+> **Overridden 2026-09-27 by `design-system/bookly/client-front.md`** (the client front redesign, light and dark): the board's selectable cards with tick and pop, a month grid with pips, a today mark and a legend, 52px time rows, callout messages, 48px fields in two columns from `md`, and the console-look summary (client-front.md §8.3). The "no today marker" rule is lifted (a derived date, no new logic). The one-page structure, DOM order and every rule under "Do not" still hold.
 
 ## The funnel on one page
 

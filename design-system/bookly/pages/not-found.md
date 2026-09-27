@@ -5,6 +5,7 @@
 > Generator template: UI UX Pro Max, 2026-09-19. Its recommendations ("padding-top for the nav", "AAA focus criterion", "word-break") were unrelated boilerplate; this page has no nav. Replaced below.
 > This file overrides `design-system/bookly/MASTER.md` for this page.
 > **Applied 2026-09-20 (Phase 3 section 1),** with the icon `FileQuestionMark` and the "All services" link. The link's focus and target-size treatment is in `MASTER.md` section 11.
+> **Overridden 2026-09-27 by `design-system/bookly/client-front.md`** (the client front redesign, light and dark): a mono "404" eyebrow (new key) and a Home / Browse services pair of links replace the icon and the "All services" link (client-front.md §8.5).
 
 ## Layout
 

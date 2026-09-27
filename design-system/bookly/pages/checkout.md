@@ -6,6 +6,7 @@
 > Generator template: UI UX Pro Max, 2026-09-19 (1200px width replaced by the shipped `max-w-2xl`; the "admin feedback" effect note was boilerplate).
 > This file overrides `design-system/bookly/MASTER.md` for these pages. Read MASTER's "Hand-review addendum" first.
 > **Applied 2026-09-20 (Phase 3 section 3).** Two things the file left open were decided while applying it: the icon and tone of each view, and the reduced-motion fallback for the spinner. Both are in `MASTER.md` section 11.
+> **Overridden 2026-09-27 by `design-system/bookly/client-front.md`** (the client front redesign, light and dark): facts as metadata rows, the method as a selected card with a text chip, icon-tile status views and a one-time check draw on confirmed (client-front.md §8.4), which lifts "no animated checkmarks" for that single draw only.
 
 ## Shared shell
 

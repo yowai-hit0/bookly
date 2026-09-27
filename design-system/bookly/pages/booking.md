@@ -6,6 +6,7 @@
 > Generator template: UI UX Pro Max, 2026-09-19 ("General", 1200px grid). Replaced: this is a single narrow account-style page.
 > This file overrides `design-system/bookly/MASTER.md` for this page. Read MASTER's "Hand-review addendum" first.
 > **Applied 2026-09-20 (Phase 3 section 4).** The status pill is the shared `StatusBadge`; the choices made beyond this file (the destructive `Callout` tone, the solid confirm button, the refund and expired-link notes) are in `MASTER.md` section 11.
+> **Overridden 2026-09-27 by `design-system/bookly/client-front.md`** (the client front redesign, light and dark): a page header with the console status badge, facts as metadata tiles, console callouts and inverted / outline actions (client-front.md §8.5).
 
 ## Who and how
 

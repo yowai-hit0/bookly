@@ -2,6 +2,7 @@
 
 > **Route:** `/email-confirm/:token`, inside the client shell · **File:** `frontend/src/pages/booking/EmailConfirmPage.tsx`
 > **Added 2026-09-25** (user decision; `docs/prompts/client-access-and-admin-polish.md`, item 6).
+> **Overridden 2026-09-27 by `design-system/bookly/client-front.md`** (the client front redesign, light and dark): the narrow centred panel and success / danger callouts (client-front.md §8.5).
 
 Where the link in a contact-email confirmation lands. The client asked, on their booking page, to use a new address; this link went to that address, and following it is the proof it is theirs.
 

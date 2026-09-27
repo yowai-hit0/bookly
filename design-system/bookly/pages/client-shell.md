@@ -5,6 +5,7 @@
 > **File:** `frontend/src/pages/ClientShell.tsx` (new), wired in `frontend/src/routes.tsx`. It sits in `pages/` rather than `components/` to stay inside the plan's allowed paths; `components/` holds only the shadcn `ui/` primitives.
 > **Added by the discovery rule (2026-09-21):** no client layout existed — every client page rendered alone, with no way to reach any other page except the service links inside it.
 > This file overrides `design-system/bookly/MASTER.md` for these pages. Read MASTER's "Hand-review addendum" first.
+> **Overridden 2026-09-27 by `design-system/bookly/client-front.md`** (the client front redesign, light and dark): the 72px canvas bar with a mark, Services / How booking works links, the theme button, "My booking" as an icon below `sm`, and a three-column footer with a contact block (client-front.md §7). The structural rules below (siblings, skip link, static, no radios, no `dl`, button-free footer) still hold.
 
 The admin has a shell (`pages/admin-shell.md`); the client had none. A client who lands on `/checkout/...` or `/booking/...` from an email has, today, no route to anything else. This adds the header and footer, and nothing more.
 

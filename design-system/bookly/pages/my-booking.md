@@ -2,6 +2,7 @@
 
 > **Route:** `/my-booking`, inside the client shell · **File:** `frontend/src/pages/booking/MyBookingPage.tsx`
 > **Added 2026-09-25** (user decision; `docs/prompts/client-access-and-admin-polish.md`, item 4). Reverses the 2026-09-21 "no public resend" in `client-shell.md`.
+> **Overridden 2026-09-27 by `design-system/bookly/client-front.md`** (the client front redesign, light and dark): the narrow centred panel, a 48px field, an inverted submit and a success callout (client-front.md §8.5).
 
 A client who lost their booking link types the email they booked with and gets one email listing each current booking with a fresh link: confirmed bookings still ahead, and completed ones that still owe money or whose photos are still downloadable.
 
