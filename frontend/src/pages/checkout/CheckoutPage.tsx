@@ -1,4 +1,4 @@
-import { CircleCheck, Clock, Hourglass, Info, Lock, Smartphone, Unlink, type LucideIcon } from 'lucide-react'
+import { CircleCheck, Clock, Hourglass, Lock, Smartphone, TriangleAlert, Unlink, type LucideIcon } from 'lucide-react'
 import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -16,6 +16,8 @@ import { Button } from '@/components/ui/button'
 import { Callout } from '@/components/ui/callout'
 import { StatusIcon } from '@/components/ui/status-icon'
 import { formatMoney, formatTime } from '@/lib/format'
+import { cn } from '@/lib/utils'
+import { pageTitle, pageY, statusTitle } from '@/pages/client/classes'
 import { BookingFacts } from './BookingFacts'
 import { PaymentFields } from './PaymentFields'
 
@@ -30,6 +32,10 @@ import { PaymentFields } from './PaymentFields'
  *
  * Addressed by the booking's reference and checkout token, so a reload lands
  * back here with nothing lost.
+ *
+ * Restyled per design-system/bookly/client-front.md §8.4: the facts as
+ * metadata rows, the notices as console callouts before the form, and the
+ * "paid / closed / expired / invalid" outcomes as status views (`statusTitle`).
  */
 
 type Loaded = { key: string } & (
@@ -67,19 +73,21 @@ export function CheckoutPage() {
   const current = loaded?.key === key ? loaded : null
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 px-4 py-8">
+    <main className={cn('mx-auto flex w-full max-w-2xl flex-col gap-6 px-4', pageY)}>
       {current === null && (
         <p className="text-muted-foreground text-sm" role="status">
           {t('checkout:loading')}
         </p>
       )}
       {current?.status === 'failed' && (
-        <div className="flex flex-wrap items-center gap-2" role="alert">
-          <p className="text-destructive text-sm">{t('checkout:loadFailed')}</p>
-          <Button variant="outline" size="sm" onClick={reload}>
-            {t('checkout:retry')}
-          </Button>
-        </div>
+        <Callout variant="console" tone="destructive" icon={TriangleAlert} role="alert">
+          <div className="flex flex-wrap items-center gap-3">
+            <p>{t('checkout:loadFailed')}</p>
+            <Button variant="outline" size="sm" onClick={reload}>
+              {t('checkout:retry')}
+            </Button>
+          </div>
+        </Callout>
       )}
       {current?.status === 'missing' && (
         <Notice icon={Unlink} tone="neutral" title={t('checkout:invalidLink.title')} body={t('checkout:invalidLink.body')} />
@@ -187,8 +195,8 @@ function CheckoutView({ reference, token, checkout, methods, onStale, onMissing 
   }
 
   return (
-    <section className="flex flex-col gap-4">
-      <h1 className="text-3xl font-semibold">{t('checkout:title')}</h1>
+    <section className="flex flex-col gap-5">
+      <h1 className={pageTitle}>{t('checkout:title')}</h1>
 
       <BookingFacts
         reference={checkout.reference}
@@ -198,34 +206,38 @@ function CheckoutView({ reference, token, checkout, methods, onStale, onMissing 
         endsAt={checkout.endsAt}
       >
         {/* The fee is what the client is about to pay, so it is the emphasised number on the page. */}
-        <div className="mt-1 flex items-baseline justify-between gap-4 border-t pt-2 text-lg font-semibold">
+        <div className="mt-1 flex items-baseline justify-between gap-4 border-t pt-3 text-base font-semibold">
           <dt>{t('checkout:summary.fee')}</dt>
-          <dd className="tabular-nums">{fee}</dd>
+          <dd className="font-mono tabular-nums">{fee}</dd>
         </div>
       </BookingFacts>
 
       {/* The notices are one group of related notes, so they sit closer to each other than to the form. */}
       <div className="flex flex-col gap-2">
         {checkout.holdExpiresAt !== null && (
-          <Callout icon={Clock}>
+          <Callout variant="console" tone="info" icon={Clock}>
             <p>{t('checkout:holdUntil', { time: formatTime(checkout.holdExpiresAt) })}</p>
           </Callout>
         )}
-        <Callout icon={Info}>
+        <Callout variant="console" tone="warning" icon={TriangleAlert}>
           <p className="font-medium">{t('checkout:nonRefundable')}</p>
         </Callout>
 
         {checkout.waitingPayment !== null && (
-          <Callout icon={Smartphone}>
-            <p>
-              {t('checkout:waiting.text')}{' '}
+          <Callout
+            variant="console"
+            tone="info"
+            icon={Smartphone}
+            action={
               <Link
                 to={paymentPath(reference, token, checkout.waitingPayment.ourRef)}
-                className="text-primary rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                className="text-console-link hover:text-console-link-hover rounded-sm underline-offset-4 hover:underline"
               >
                 {t('checkout:waiting.link')}
               </Link>
-            </p>
+            }
+          >
+            <p>{t('checkout:waiting.text')}</p>
           </Callout>
         )}
       </div>
@@ -235,7 +247,7 @@ function CheckoutView({ reference, token, checkout, methods, onStale, onMissing 
           {t('checkout:errors.noMethods')}
         </p>
       ) : (
-        <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
+        <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-5">
           <PaymentFields
             methods={methods}
             method={method}
@@ -247,8 +259,7 @@ function CheckoutView({ reference, token, checkout, methods, onStale, onMissing 
 
           <Button
             type="submit"
-            size="lg"
-            className="w-full sm:w-auto sm:self-start"
+            className="h-12 w-full sm:w-auto sm:self-start"
             // Not `disabled`: that would drop keyboard focus mid-submit.
             aria-disabled={submitting}
             aria-busy={submitting}
@@ -283,7 +294,7 @@ function Notice({ icon, tone, title, body, children }: NoticeProps) {
   return (
     <section className="flex max-w-xl flex-col gap-3 text-pretty">
       <StatusIcon icon={icon} tone={tone} />
-      <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold text-balance outline-none">
+      <h1 ref={headingRef} tabIndex={-1} className={cn(statusTitle, 'outline-none')}>
         {title}
       </h1>
       <p className="text-muted-foreground text-sm">{body}</p>

@@ -621,8 +621,8 @@ function SessionFee({ token, booking, methods, onMissing, onReload }: SessionFee
           <p>{t('checkout:errors.noMethods')}</p>
         </Callout>
       ) : (
-        // The card's own h2 is the heading here, so the method legend sits one step below it (it is 18px on the pay page, where it is the first heading).
-        <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-4 [&_legend]:text-base">
+        // The method legend is the 12px mono label here and on the pay page (client-front.md 8.4), so it no longer needs sizing down under the card's h2.
+        <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
           <PaymentFields
             methods={methods}
             method={method}
