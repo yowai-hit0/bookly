@@ -1,21 +1,93 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource/poppins/400.css";
-@import "@fontsource/poppins/500.css";
-@import "@fontsource/poppins/600.css";
-@import "@fontsource-variable/open-sans";
-/* The admin console's faces (design-system/bookly/admin-console.md). Only
-   rules under `:root[data-admin-theme]` name them, so a client page never
-   downloads either file. */
+/* Geist and Geist Mono: the admin console's faces (admin-console.md) and,
+   since the client front redesign (client-front.md), the client's too. */
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 
-@custom-variant dark (&:is(.dark *));
+/* `dark:` means the client's dark theme, and `client:` anything on a client
+   page (design-system/bookly/client-front.md decision 11). `ClientShell` sets
+   `<html data-theme>`; the admin never does, so neither variant can match on
+   an admin page, and the shared primitives can carry client-only rendering
+   without changing the admin by a pixel. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+@custom-variant client (&:where([data-theme], [data-theme] *));
+
+@theme {
+    /* Client motion (client-front.md section 6). Used only behind
+       `motion-safe:`, so nothing moves under reduced motion. */
+    --animate-fade-up: client-fade-up 600ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    --animate-pop: client-pop 300ms ease;
+    --animate-tick: client-tick 250ms cubic-bezier(0.2, 0.7, 0.2, 1.4) both;
+    --animate-rise: client-rise 350ms ease both;
+    --animate-draw: client-draw 600ms ease-out 350ms forwards;
+
+    @keyframes client-fade-up {
+        from {
+            opacity: 0;
+            transform: translateY(16px);
+        }
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+    @keyframes client-pop {
+        0% {
+            transform: scale(1);
+        }
+        40% {
+            transform: scale(1.04);
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+    @keyframes client-tick {
+        from {
+            opacity: 0;
+            transform: scale(0.4);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+    @keyframes client-rise {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+        to {
+            opacity: 1;
+            transform: none;
+        }
+    }
+    @keyframes client-draw {
+        to {
+            stroke-dashoffset: 0;
+        }
+    }
+}
 
 @theme inline {
-    --font-heading: 'Poppins', sans-serif;
-    --font-sans: 'Open Sans Variable', sans-serif;
+    --font-heading: 'Geist Variable', system-ui, sans-serif;
+    --font-sans: 'Geist Variable', system-ui, sans-serif;
+    /* Client colours (client-front.md section 2.3). */
+    --color-primary-hover: var(--primary-hover);
+    --color-brand: var(--brand);
+    --color-brand-hover: var(--brand-hover);
+    --color-brand-foreground: var(--brand-foreground);
+    --color-subtle-foreground: var(--subtle-foreground);
+    --color-selected: var(--selected);
+    --color-selected-edge: var(--selected-edge);
+    --color-band: var(--band);
+    --color-band-foreground: var(--band-foreground);
+    --color-band-muted: var(--band-muted);
+    --color-band-accent: var(--band-accent);
+    --color-band-edge: var(--band-edge);
+    --color-dot: var(--dot);
     /* Admin console colours: defined only under `:root[data-admin-theme]`
        below, so these utilities resolve to nothing outside the admin. */
     --color-console-surface: var(--console-surface);
@@ -74,81 +146,148 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-.dark {
-    --background: oklch(0.9771 0.0125 236.62);
-    --foreground: oklch(0.2077 0.0398 265.75);
+/* The client's tokens (design-system/bookly/client-front.md section 2), in
+   light and dark. `ClientShell` sets `<html data-theme>` to the resolved
+   theme while a client page is mounted. Plain `:root` carries the light
+   values too, so the first paint and jsdom tests have sane tokens.
+
+   Until 2026-09-27 this file held a swapped pair here (commit dc69157): the
+   old sky palette sat under `.dark`, which nothing applied, and `:root` held
+   shadcn's stock neutral dark, which is why the client rendered dark.
+
+   The `--console-*` names are the admin's family tokens, defined here too so
+   the shared console variants (status badge, banner, badges) render on client
+   pages. The admin's own blocks below come later at equal or higher
+   specificity, so on an admin page they win. */
+:root,
+:root[data-theme="light"] {
+    color-scheme: light;
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.2103 0.0059 285.89);
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.2077 0.0398 265.75);
+    --card-foreground: oklch(0.2103 0.0059 285.89);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.2077 0.0398 265.75);
-    --primary: oklch(0.5081 0.1049 165.61);
+    --popover-foreground: oklch(0.2103 0.0059 285.89);
+    --primary: oklch(0.2103 0.0059 285.89);
     --primary-foreground: oklch(1 0 0);
-    --secondary: oklch(0.6847 0.1479 237.32);
-    --secondary-foreground: oklch(0 0 0);
-    --muted: oklch(0.9514 0.0250 236.82);
-    --muted-foreground: oklch(0.4455 0.0374 257.28);
-    --accent: oklch(0.9514 0.0250 236.82);
-    --accent-foreground: oklch(0.2077 0.0398 265.75);
+    --primary-hover: oklch(0.3703 0.0119 285.81);
+    --secondary: oklch(0.9674 0.0013 286.38);
+    --secondary-foreground: oklch(0.2103 0.0059 285.89);
+    --muted: oklch(0.9674 0.0013 286.38);
+    --muted-foreground: oklch(0.5517 0.0138 285.94);
+    --accent: oklch(0.9851 0 0);
+    --accent-foreground: oklch(0.2103 0.0059 285.89);
     --destructive: oklch(0.5054 0.1905 27.52);
-    --border: oklch(0.9456 0.0201 229.04);
-    --input: oklch(0.6305 0.0374 253.82);
-    --ring: oklch(0.5876 0.1389 241.97);
+    --border: oklch(0.9197 0.004 286.32);
+    --input: oklch(0.6493 0.0118 286.07);
+    --ring: oklch(0.5413 0.2466 293.01);
+    --radius: 0.125rem;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);
     --chart-4: oklch(0.371 0 0);
     --chart-5: oklch(0.269 0 0);
-    --radius: 0.5rem;
-    --sidebar: oklch(1 0 0);
-    --sidebar-foreground: oklch(0.2077 0.0398 265.75);
-    --sidebar-primary: oklch(0.5081 0.1049 165.61);
-    --sidebar-primary-foreground: oklch(1 0 0);
-    --sidebar-accent: oklch(0.9514 0.0250 236.82);
-    --sidebar-accent-foreground: oklch(0.2077 0.0398 265.75);
-    --sidebar-border: oklch(0.9456 0.0201 229.04);
-    --sidebar-ring: oklch(0.5876 0.1389 241.97);
+    --sidebar: oklch(0.9851 0 0);
+    --sidebar-foreground: oklch(0.2103 0.0059 285.89);
+    --sidebar-primary: oklch(0.9522 0.0245 298.61);
+    --sidebar-primary-foreground: oklch(0.4907 0.2412 292.58);
+    --sidebar-accent: oklch(0.9674 0.0013 286.38);
+    --sidebar-accent-foreground: oklch(0.2103 0.0059 285.89);
+    --sidebar-border: oklch(0.9197 0.004 286.32);
+    --sidebar-ring: oklch(0.5413 0.2466 293.01);
+
+    --console-surface: oklch(0.9851 0 0);
+    --console-chip: oklch(0.9674 0.0013 286.38);
+    --console-border-strong: oklch(0.8711 0.0055 286.29);
+    --console-link: oklch(0.4907 0.2412 292.58);
+    --console-link-hover: oklch(0.3796 0.1783 293.74);
+    --console-accent: oklch(0.9522 0.0245 298.61);
+    --console-accent-foreground: oklch(0.4907 0.2412 292.58);
+    --console-info-foreground: oklch(0.2103 0.0059 285.89);
+    --console-info-icon: oklch(0.5413 0.2466 293.01);
+    --console-accent-strong: oklch(0.5413 0.2466 293.01);
+    --console-success: oklch(0.5273 0.1371 150.07);
+    --console-success-tint: oklch(0.9662 0.0189 157.88);
+    --console-warning: oklch(0.5553 0.1455 49);
+    --console-warning-tint: oklch(0.9869 0.0214 95.28);
+    --console-danger-tint: oklch(0.9705 0.0129 17.38);
+    --console-danger-solid: oklch(0.5054 0.1905 27.52);
+
+    --brand: oklch(0.5413 0.2466 293.01);
+    --brand-hover: oklch(0.4907 0.2412 292.58);
+    --brand-foreground: oklch(1 0 0);
+    --subtle-foreground: oklch(0.4419 0.0146 285.79);
+    --selected: oklch(0.9707 0.0164 301.22);
+    --selected-edge: oklch(0.5413 0.2466 293.01);
+    --band: oklch(0.1452 0.0021 286.13);
+    --band-foreground: oklch(0.9674 0.0013 286.38);
+    --band-muted: oklch(0.7118 0.0129 286.07);
+    --band-accent: oklch(0.7679 0.1322 294.45);
+    --band-edge: oklch(0.3703 0.0119 285.81);
+    --dot: oklch(0.9197 0.004 286.32);
+
+    --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-:root {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --background: oklch(0.1452 0.0021 286.13);
+    --foreground: oklch(0.9674 0.0013 286.38);
+    --card: oklch(0.1452 0.0021 286.13);
+    --card-foreground: oklch(0.9674 0.0013 286.38);
+    --popover: oklch(0.1876 0.004 286.01);
+    --popover-foreground: oklch(0.9674 0.0013 286.38);
+    --primary: oklch(0.9851 0 0);
+    --primary-foreground: oklch(0.1452 0.0021 286.13);
+    --primary-hover: oklch(0.9197 0.004 286.32);
+    --secondary: oklch(0.2739 0.0055 286.03);
+    --secondary-foreground: oklch(0.9674 0.0013 286.38);
+    --muted: oklch(0.2739 0.0055 286.03);
+    --muted-foreground: oklch(0.7118 0.0129 286.07);
+    --accent: oklch(0.1876 0.004 286.01);
+    --accent-foreground: oklch(0.9674 0.0013 286.38);
+    --destructive: oklch(0.7106 0.1661 22.22);
+    --border: oklch(0.2739 0.0055 286.03);
+    --input: oklch(0.5025 0.0126 285.94);
+    --ring: oklch(0.7679 0.1322 294.45);
+    --sidebar: oklch(0.1452 0.0021 286.13);
+    --sidebar-foreground: oklch(0.9674 0.0013 286.38);
+    --sidebar-primary: oklch(0.3364 0.1647 288.7);
+    --sidebar-primary-foreground: oklch(0.857 0.0795 295.94);
+    --sidebar-accent: oklch(0.1876 0.004 286.01);
+    --sidebar-accent-foreground: oklch(0.9674 0.0013 286.38);
+    --sidebar-border: oklch(0.2739 0.0055 286.03);
+    --sidebar-ring: oklch(0.7679 0.1322 294.45);
+
+    --console-surface: oklch(0.1876 0.004 286.01);
+    --console-chip: oklch(0.2739 0.0055 286.03);
+    --console-border-strong: oklch(0.3703 0.0119 285.81);
+    --console-link: oklch(0.7679 0.1322 294.45);
+    --console-link-hover: oklch(0.857 0.0795 295.94);
+    --console-accent: oklch(0.3364 0.1647 288.7);
+    --console-accent-foreground: oklch(0.857 0.0795 295.94);
+    --console-info-foreground: oklch(0.9674 0.0013 286.38);
+    --console-info-icon: oklch(0.9674 0.0013 286.38);
+    --console-accent-strong: oklch(0.432 0.2106 292.76);
+    --console-success: oklch(0.8003 0.1821 151.71);
+    --console-success-tint: oklch(0.2718 0.0501 155.43);
+    --console-warning: oklch(0.8369 0.1644 84.43);
+    --console-warning-tint: oklch(0.2535 0.0317 82.37);
+    --console-danger-tint: oklch(0.2189 0.0398 12.97);
+    --console-danger-solid: oklch(0.5771 0.2152 27.33);
+
+    --subtle-foreground: oklch(0.7118 0.0129 286.07);
+    --selected: oklch(0.2107 0.0575 293.11);
+    --selected-edge: oklch(0.7679 0.1322 294.45);
+    --band: oklch(0.1876 0.004 286.01);
+    --dot: oklch(0.2739 0.0055 286.03);
 }
 
 /* The admin console (design-system/bookly/admin-console.md section 2).
    `src/admin/theme.ts` sets `data-admin-theme` on <html> only while an admin
    route is mounted, and removes it on the way out, so nothing below reaches a
-   client page. The selectors above (`.dark`, `:root`) and the `dark:` variant
-   are the client's and are left alone: in this file `.dark` holds the client's
-   light palette (commit dc69157), so `dark:` never means "dark theme" here. */
+   client page. The client's blocks above and the `dark:` variant are keyed on
+   `data-theme`, which an admin page never sets (client-front.md decision 11). */
 :root[data-admin-theme="dark"] {
     color-scheme: dark;
     --background: oklch(0.1452 0.0021 286.13);
@@ -312,6 +451,37 @@
   h3 {
     @apply font-heading;
     }
+}
+
+/* The client (design-system/bookly/client-front.md section 4): the admin's
+   one focus indicator re-scoped to client pages, a 2px violet outline offset
+   2px (5.70:1 light, 9.12:1 dark on the canvas). Unlayered, so it wins over
+   the primitives' `outline-none`, and it zeroes their 50% ring halo. Anything
+   focused by script (`tabindex="-1"`) is left without one. */
+:root[data-theme] :focus-visible:not([tabindex="-1"]) {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    --tw-ring-shadow: 0 0 #0000;
+}
+
+@layer base {
+  /* Outline icons at 1.5px with square caps, as on the boards. */
+  :root[data-theme] svg.lucide {
+    stroke-width: 1.5;
+    stroke-linecap: square;
+  }
+  /* Tabular figures wherever the mono face sets data. */
+  :root[data-theme] .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  /* Popovers (the stage legend) are a raised surface with a hairline: flat. */
+  :root[data-theme] [data-slot="popover-content"] {
+    background-color: var(--popover);
+    box-shadow: none;
+  }
 }
 /* FullCalendar (admin calendar, Task 9), in the admin console's look
    (design-system/bookly/admin-console.md 6.9, pages/admin-calendar.md). The
