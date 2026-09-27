@@ -486,7 +486,8 @@ describe('a link that is not valid', () => {
     expect(screen.queryByText(REFERENCE)).not.toBeInTheDocument()
     expect(screen.queryByText('Your booking')).not.toBeInTheDocument()
     expect(document.body.textContent).not.toMatch(/Portraits|Kigali Heights|Aline|RWF|Confirmed|Cancel/)
-    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    // Scoped to the page, as client-booking.spec.ts is: the shell's theme button (2026-09-27) is chrome.
+    expect(within(screen.getByRole('main')).queryByRole('button')).not.toBeInTheDocument()
   })
 
   it('offers a way to get a new link by email, as a link (2026-09-25)', async () => {

@@ -30,6 +30,7 @@ function renderShell(path = '/') {
 
 afterEach(() => {
   localStorage.clear()
+  delete document.documentElement.dataset.theme
   vi.restoreAllMocks()
 })
 
@@ -59,7 +60,7 @@ describe('the client shell', () => {
     expect(target).toHaveAttribute('tabindex', '-1')
   })
 
-  it('carries My booking, the admin login and the service list, and nothing else', () => {
+  it('carries the service list, how booking works, My booking and the admin login, and nothing else', () => {
     renderShell()
 
     const banner = screen.getByRole('banner')
@@ -69,14 +70,17 @@ describe('the client shell', () => {
     expect(within(banner).getByRole('link', { name: 'Admin login' })).toHaveAttribute('href', '/admin/login')
     // Added 2026-09-25, now that a public resend exists (item 4).
     expect(within(banner).getByRole('link', { name: 'My booking' })).toBeInTheDocument()
-    expect(within(banner).getAllByRole('link')).toHaveLength(4)
+    // Added 2026-09-27 (client front redesign): the two page links of the board.
+    expect(within(banner).getByRole('link', { name: 'Services' })).toHaveAttribute('href', '/services')
+    expect(within(banner).getByRole('link', { name: 'How booking works' })).toHaveAttribute('href', '/#how')
+    expect(within(banner).getAllByRole('link')).toHaveLength(6)
   })
 
   it('keeps "Book now" last in the bar, the primary action after the quieter links', () => {
     renderShell()
 
     const links = within(screen.getByRole('banner')).getAllByRole('link').map((link) => link.textContent)
-    expect(links).toEqual(['Bookly', 'My booking', 'Admin login', 'Book now'])
+    expect(links).toEqual(['Bookly', 'Services', 'How booking works', 'My booking', 'Admin login', 'Book now'])
   })
 
   it('moves the admin login to the footer below sm, where the bar has no room for it (2026-09-25)', () => {
@@ -88,10 +92,13 @@ describe('the client shell', () => {
     expect(footerLink.closest('li')).toHaveClass('sm:hidden')
   })
 
-  it('adds no button and no form control anywhere: the e2e suite counts these page-wide', () => {
+  it('adds no form control, and no button but the theme’s: the e2e suite counts these page-wide', () => {
     const { container } = renderShell()
 
-    expect(screen.queryAllByRole('button')).toHaveLength(0)
+    // The theme control (2026-09-27) is one button, never radios: checkout.spec.ts
+    // counts radios page-wide. The specs count buttons inside `main` only.
+    expect(screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Theme: System'])
+    expect(within(screen.getByRole('contentinfo')).queryAllByRole('button')).toHaveLength(0)
     expect(screen.queryAllByRole('radio')).toHaveLength(0)
     // checkout.spec.ts counts `input:disabled, [aria-disabled="true"]`; that
     // assertion is scoped to `main`, so the chrome's side of it is proved here.
@@ -162,5 +169,22 @@ describe('the client shell', () => {
     expect(screen.getByRole('banner')).toBeInTheDocument()
     expect(screen.getByRole('contentinfo')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'Services' })).toBeInTheDocument()
+  })
+})
+
+describe('the client theme in the shell', () => {
+  it('sets data-theme on <html> while mounted, cycles with its button, and removes it on the way out', async () => {
+    const { unmount } = renderShell()
+    expect(document.documentElement.dataset.theme).toBe('light')
+
+    const button = screen.getByRole('button', { name: 'Theme: System' })
+    act(() => button.click())
+    expect(screen.getByRole('button', { name: 'Theme: Light' })).toBeInTheDocument()
+    act(() => screen.getByRole('button', { name: 'Theme: Light' }).click())
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    expect(localStorage.getItem('bookly.theme')).toBe('dark')
+
+    unmount()
+    expect(document.documentElement).not.toHaveAttribute('data-theme')
   })
 })
