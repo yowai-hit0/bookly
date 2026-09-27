@@ -441,7 +441,7 @@ export function AdminBookingDetail() {
                   </span>
                   <span
                     className={cn(
-                      'ml-auto flex min-w-0 items-start gap-2',
+                      'flex min-w-0 items-start gap-2 sm:ml-auto',
                       message.status === 'failed' ? 'text-destructive' : 'text-muted-foreground',
                     )}
                   >
@@ -725,6 +725,21 @@ function Glyph({ shape, className }: { shape: Shape | undefined; className?: str
   return <StatusShapeGlyph shape={shape} className={className} />
 }
 
+/**
+ * A "·"-separated history line that wraps between its pairs ("our ref a1b2c3d4")
+ * rather than inside one. A pair wider than the column still breaks, so nothing
+ * overflows. The text is unchanged.
+ */
+function wholePairs(line: string) {
+  const parts = line.split(' · ')
+  return parts.map((part, index) => (
+    <span key={index}>
+      <span className="inline-block max-w-full wrap-anywhere">{part}</span>
+      {index < parts.length - 1 && ' · '}
+    </span>
+  ))
+}
+
 function Payments({
   booking,
   busy,
@@ -750,7 +765,7 @@ function Payments({
                     {t(`admin:booking.paymentKinds.${payment.kind}`, { defaultValue: payment.kind })} ·{' '}
                     <span className={cn(DATA, 'whitespace-nowrap')}>{formatMoney(payment.amountRwf)}</span>
                   </span>
-                  <span className={cn('ml-auto flex min-w-0 items-center gap-2 text-sm', owing ? 'text-destructive' : 'text-muted-foreground')}>
+                  <span className={cn('flex min-w-0 items-center gap-2 text-sm sm:ml-auto', owing ? 'text-destructive' : 'text-muted-foreground')}>
                     <Glyph shape={PAYMENT_SHAPES[payment.status]} className={payment.status === 'refund_due' ? 'text-destructive' : undefined} />
                     <span className="min-w-0">
                       <span className={owing ? 'font-medium' : undefined}>
@@ -762,13 +777,14 @@ function Payments({
                     </span>
                   </span>
                 </div>
-                <p className={cn(LOG, 'text-muted-foreground wrap-anywhere')}>
-                  {t('admin:booking.paymentRefs', {
-                    provider: payment.provider,
-                    ourRef: payment.ourRef,
-                    providerRef: payment.providerRef ?? '—',
-                  })}
-                  {payment.refundReference !== null && ` · ${t('admin:booking.refundReference', { reference: payment.refundReference })}`}
+                <p className={cn(LOG, 'text-muted-foreground')}>
+                  {wholePairs(
+                    `${t('admin:booking.paymentRefs', {
+                      provider: payment.provider,
+                      ourRef: payment.ourRef,
+                      providerRef: payment.providerRef ?? '—',
+                    })}${payment.refundReference !== null ? ` · ${t('admin:booking.refundReference', { reference: payment.refundReference })}` : ''}`,
+                  )}
                 </p>
                 {payment.canRecordRefund && <RefundForm payment={payment} busy={busy} onSubmit={onRefund} />}
               </li>

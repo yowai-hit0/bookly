@@ -28,8 +28,17 @@ import { Toolbar, ToolbarCell } from './console/Toolbar'
 
 const LOAD_MORE_KEY = 'more'
 
-/** A cell stacked on a phone: no cell padding, and indented past the row's status glyph. */
-const CELL = 'max-md:block max-md:p-0 max-md:pl-9'
+/**
+ * The table stacks by its own width, not the viewport's: with the sidebar, the
+ * column between `lg` and about 1150px is narrower than a tablet's. Below 56rem
+ * of room each booking is one block; from 56rem the six columns fit (they need
+ * about 55rem at the tightest). A cell, when stacked, drops its padding and is
+ * indented past the row's status glyph.
+ */
+const CELL = '@max-[56rem]:block @max-[56rem]:p-0 @max-[56rem]:pl-9'
+
+/** Table cells here are a step tighter than the shared `px-4`, so six columns fit a 1280px screen. */
+const TIGHT = 'px-3 first:pl-0 last:pr-0'
 
 export function AdminBookings() {
   const { t } = useTranslation()
@@ -224,17 +233,23 @@ export function AdminBookings() {
         // for assistive tech after `display` changes (Safari drops table
         // semantics without them). On a phone only the Status header stays in
         // view, because it carries the legend.
-        <div className="md:overflow-x-auto">
-          <table role="table" className="w-full border-collapse text-[0.9375rem] md:min-w-[52rem]">
+        <div className="@container overflow-x-auto">
+          <table role="table" className="w-full border-collapse text-[0.9375rem]">
             <caption className="sr-only">{t('admin:bookings.title')}</caption>
-            <thead role="rowgroup" className="max-md:block">
-              <tr role="row" className="border-b max-md:flex max-md:justify-end">
+            <thead role="rowgroup" className="@max-[56rem]:block">
+              <tr role="row" className="border-b @max-[56rem]:flex">
                 {(['when', 'reference', 'client', 'service', 'status', 'money'] as const).map((column) => (
                   <th
                     key={column}
                     role="columnheader"
                     scope="col"
-                    className={cn(TH, column === 'money' && 'text-right', column !== 'status' && 'max-md:hidden', 'max-md:px-0')}
+                    className={cn(
+                      TH,
+                      TIGHT,
+                      column === 'money' && 'text-right',
+                      column !== 'status' && '@max-[56rem]:hidden',
+                      '@max-[56rem]:px-0',
+                    )}
                   >
                     {column === 'status' ? (
                       // What each stage means, beside the column that shows them (2026-09-25).
@@ -249,10 +264,14 @@ export function AdminBookings() {
                 ))}
               </tr>
             </thead>
-            <tbody role="rowgroup" className="max-md:block">
+            <tbody role="rowgroup" className="@max-[56rem]:block">
               {rows.map((booking) => (
-                <tr key={booking.id} role="row" className={cn(TR, 'max-md:flex max-md:flex-col max-md:gap-2 max-md:py-4')}>
-                  <td role="cell" className={cn(TD, CELL, 'max-md:pl-0 md:whitespace-nowrap')}>
+                <tr
+                  key={booking.id}
+                  role="row"
+                  className={cn(TR, '@max-[56rem]:flex @max-[56rem]:flex-col @max-[56rem]:gap-2 @max-[56rem]:py-4')}
+                >
+                  <td role="cell" className={cn(TD, TIGHT, CELL, '@max-[56rem]:pl-0 @min-[56rem]:whitespace-nowrap')}>
                     <div className="flex items-start gap-3.5">
                       <StatusGlyph status={booking.stage} className="mt-px" />
                       <div className="flex flex-col gap-1">
@@ -263,7 +282,7 @@ export function AdminBookings() {
                       </div>
                     </div>
                   </td>
-                  <td role="cell" className={cn(TD, CELL, 'whitespace-nowrap')}>
+                  <td role="cell" className={cn(TD, TIGHT, CELL, 'whitespace-nowrap')}>
                     <Link
                       to={`/admin/bookings/${booking.id}`}
                       // 44px to a thumb below `lg`. In the table row (from `md`) a
@@ -271,38 +290,44 @@ export function AdminBookings() {
                       // phone it takes its full height so it never overlaps a neighbour.
                       className={cn(
                         REF_LINK,
-                        'inline-flex items-center max-lg:min-h-11 pointer-coarse:min-h-11 md:max-lg:-my-3 md:pointer-coarse:-my-3',
+                        'inline-flex items-center max-lg:min-h-11 pointer-coarse:min-h-11 @min-[56rem]:max-lg:-my-3 @min-[56rem]:pointer-coarse:-my-3',
                       )}
                     >
                       {booking.reference}
                     </Link>
                   </td>
-                  <td role="cell" className={cn(TD, CELL)}>
+                  <td role="cell" className={cn(TD, TIGHT, CELL)}>
                     <div className="flex flex-col gap-1">
                       <span>{booking.contactName}</span>
                       <span className={cn(META, 'wrap-break-word')}>{breakableEmail(booking.contactEmail)}</span>
                     </div>
                   </td>
-                  <td role="cell" className={cn(TD, CELL)}>
+                  <td role="cell" className={cn(TD, TIGHT, CELL)}>
                     <div className="flex flex-col gap-1">
                       <span>{booking.serviceName}</span>
                       <span className={META}>{booking.packageName}</span>
                     </div>
                   </td>
-                  <td role="cell" className={cn(TD, CELL)}>
+                  <td role="cell" className={cn(TD, TIGHT, CELL)}>
                     <StatusBadge status={booking.stage}>{t(`admin:bookings.stage.${booking.stage}`)}</StatusBadge>
                   </td>
-                  <td role="cell" className={cn(TD, CELL, 'whitespace-nowrap md:text-right')}>
-                    <div className="flex flex-col gap-1 md:items-end">
-                      <span className={DATA}>{formatMoney(booking.grandTotalRwf)}</span>
+                  <td role="cell" className={cn(TD, TIGHT, CELL, '@min-[56rem]:text-right')}>
+                    <div className="flex flex-col gap-1 @min-[56rem]:items-end">
+                      <span className={cn(DATA, 'whitespace-nowrap')}>{formatMoney(booking.grandTotalRwf)}</span>
                       {booking.outstandingRwf > 0 && (
                         <span className={META}>
-                          {t('admin:bookings.outstanding', { amount: formatMoney(booking.outstandingRwf) })}
+                          {keepAmountWhole(
+                            t('admin:bookings.outstanding', { amount: formatMoney(booking.outstandingRwf) }),
+                            formatMoney(booking.outstandingRwf),
+                          )}
                         </span>
                       )}
                       {booking.hasRefundDue && (
                         <span className="text-destructive text-sm">
-                          {t('admin:bookings.refundDue', { amount: formatMoney(booking.refundDueRwf) })}
+                          {keepAmountWhole(
+                            t('admin:bookings.refundDue', { amount: formatMoney(booking.refundDueRwf) }),
+                            formatMoney(booking.refundDueRwf),
+                          )}
                         </span>
                       )}
                     </div>
@@ -327,6 +352,22 @@ export function AdminBookings() {
         </Button>
       )}
     </main>
+  )
+}
+
+/**
+ * A sentence with an amount in it ("30,000 RWF still to pay") that may wrap
+ * between its words but never inside the amount. The text is unchanged.
+ */
+function keepAmountWhole(sentence: string, amount: string) {
+  const at = sentence.indexOf(amount)
+  if (at < 0) return sentence
+  return (
+    <>
+      {sentence.slice(0, at)}
+      <span className="whitespace-nowrap">{amount}</span>
+      {sentence.slice(at + amount.length)}
+    </>
   )
 }
 
