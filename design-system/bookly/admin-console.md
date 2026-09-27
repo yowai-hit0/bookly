@@ -202,7 +202,7 @@ The contract in `pages/admin-shell.md` holds: one `nav[aria-label="Admin"]` that
 
 - **Top bar (from `lg`):** full width, sticky, 56px, `border-b`. Three cells separated by vertical hairlines: the **mark cell** (56px square, a decorative Bookly monogram, `aria-hidden`; never a second "Bookly" text node, because a test finds the wordmark by that text), the **breadcrumb cell** (`flex-1`, `px-6`) and the **theme cell** (the toggle, `px-3`). Nothing else.
 - **Sidebar (from `lg`):** 260px, `border-r`, `bg-sidebar`, sticky below the top bar, full remaining height, own scroll. Top: the wordmark span "Bookly" at 20px/500 with a `CalendarCheck` icon (20px). Then the five links, in their current order: 44px tall, 16px text, 18px icon, `px-3.5`, square, full width, `gap-1` between rows. **Active:** `bg-sidebar-primary text-sidebar-primary-foreground font-medium` (violet fill, not colour alone: fill + weight + `aria-current`). **Inactive:** text colour, `hover:bg-sidebar-accent`. **Sign out** pinned to the bottom above a hairline, ghost weight, `text-destructive`, `hover:bg-destructive/10`, 44px, full width.
-- **Below `lg`:** row 1 the wordmark, then (right) the theme toggle and Sign out; row 2 the five links wrapping; row 3 a slim breadcrumb bar (`border-t`, 40px) showing only the **last two** segments, the last truncating with an ellipsis. All touch targets 44px. DOM order is unchanged by the toggle: it sits inside the aside after the nav and before Sign out, and `order-*` utilities place it.
+- **Below `lg` (as shipped, 2026-09-26):** row 1 is the top bar itself: the breadcrumb (the last two segments, the last truncating; the Admin crumb is icon-only below `sm`, still named "Admin", and a 44px square) and the theme toggle. Row 2 is the wordmark with Sign out on the right (icon-only below `sm`, as `admin-shell.md` already had it); row 3 the five links wrapping. The brief suggested the breadcrumb as a row *under* the nav; moving it there with `order-*` would make Tab visit it before the links it sits below, so DOM order and reading order were kept equal instead (raised at the checkpoint; see §9). All touch targets 44px.
 - **Content:** `#admin-content` stays the focusable wrapper; the page's `main` gets `px-4 lg:px-12` and `py-8 lg:py-12`.
 
 ### 6.2 Breadcrumbs (new)
@@ -232,7 +232,7 @@ A new opt-in `variant="console"` (the default rendering is untouched): full widt
 - **Header row:** mono uppercase 12px muted labels, optional count chip (mono 12px on `--console-chip`, square), hairline below, no fill.
 - **Rows:** hairline between rows, no zebra, whole-row hover `bg-accent`. First column: status icon (filled, §5) then two lines: primary (16px) and meta (14px muted: the **reference as an underlined mono link**, `·`, the date). Other columns secondary text, mono for times and money.
 - No row actions are added: the bookings list has none today.
-- Tables keep their semantics and scroll sideways inside `overflow-x-auto` on narrow screens (`pages/admin-bookings.md`).
+- **Narrow widths (user request, 2026-09-26: mobile-friendly):** the bookings table stacks each row into one block when *its own container* is under 56rem (a container query, not a viewport breakpoint: with the sidebar, the column between `lg` and about 1150px is narrower than a tablet's). Stacked, only the Status header stays visible (it carries the legend), and cells are indented past the status glyph. Explicit `role="table"`/`row`/`cell` keep the table semantics after the `display` change. Cells are `px-3` so the six columns fit a 1280px screen; amounts never break inside themselves, the words beside them may. This replaces the sideways scroll of `pages/admin-bookings.md`.
 
 ### 6.6 Stat grid (`StatGrid.tsx`)
 
@@ -244,7 +244,7 @@ Label above (14px Geist medium); inputs square, 1px `--input` edge, **no fill** 
 
 ### 6.8 Login and reset password
 
-A centred 400px panel on the canvas, `border`, 2px radius, `p-8`: the Bookly monogram, a mono eyebrow `ADMIN` (`admin:nav.label`), the `h1`, the fields; the primary button inverted neutral and full width; the "Forgot your password?" / "Back to sign in" links muted, underlined on hover. No client header (decision 6). The theme applies; no toggle.
+A centred 400px panel on the canvas, `border`, 2px radius, `p-8` (`p-6` below `sm`): the Bookly monogram with the word "Bookly" as a **real link to `/`** (with the client header gone it is the only way back to the site), a mono eyebrow `ADMIN` (`admin:nav.label`), the `h1` at **24px**/600 (the page title's 30px wraps "Choose a new password" to three lines in a 288px phone panel), the fields; the primary button inverted neutral and full width; the "Forgot your password?" / "Back to sign in" links muted, underlined on hover, 44px below `lg`. No client header and so no skip link (decision 6). The theme applies; no toggle. Both pages share `pages/admin/console/AuthFrame.tsx`.
 
 ### 6.9 Calendar
 
@@ -252,8 +252,8 @@ Square cells, hairline grid, mono hour labels and date numbers, today marked by 
 
 ### 6.10 Buttons (`button.tsx`, opt-in `size="console"` and `variant` additions)
 
-- Default (inverted neutral), outline (`--console-border-strong` edge, transparent, hover `bg-muted`), ghost, destructive (tint + red text), `destructive-solid` (in the admin scope it reads `--console-danger-solid`).
-- `size="console"`: 40px (`lg`), 44px below `lg` and on coarse pointers, `px-4`, 15px/500, `gap-2`, 16px icons. `size="console-sm"`: 32px from `lg`, 44px below. No press nudge.
+- Default (inverted neutral), `console-outline` (`--console-border-strong` edge, transparent, hover `bg-muted`), ghost, destructive (tint + red text), and `console-destructive-solid` (`--console-danger-solid` fill, white label) for the irreversible confirm. The client's `destructive-solid` is never used in admin: the dark `--destructive` is a text colour.
+- `size="console"`: 40px (`lg`), 44px below `lg` and on coarse pointers, `px-4`, 15px/500, `gap-2`, 16px icons. `size="console-sm"`: 32px from `lg`, 44px below. `console-icon`: 40px / 44px. No press nudge; colour-only transitions behind `motion-safe`.
 
 ## 7. Overrides recorded in the page files (2026-09-26)
 
@@ -275,3 +275,18 @@ Square cells, hairline grid, mono hour labels and date numbers, today marked by 
 - Client routes render pixel-identical before and after (byte/pixel diff at 375px and 1280px).
 - Protected files never appear in a diff (brief §2). Only `index.css`, `components/ui/*` (opt-in variants only), `pages/admin/*`, `admin/AdminLayout.tsx`, new files under `admin/`, `en.json` (additive), `design-system/`, `DESIGN.md`, and the font dependencies change.
 - Behaviour and accessible names are preserved (brief §2).
+
+## 9. Accepted adaptations (finish review, 2026-09-27)
+
+A fresh reviewer compared the shipped admin with the brief, this spec, the style guide and the references. What it found was fixed, except these, which are kept on purpose:
+
+| Where | What differs from the letter of this spec | Why it stays |
+|---|---|---|
+| Shell below `lg` | Breadcrumb and toggle on the first row, above the wordmark (§6.1) | Tab order equals reading order; raised with the user at the Phase 2 checkpoint, who approved continuing. |
+| Calendar on a phone | Month events show the time and status glyph, week events the glyph only; the status word is `sr-only` there (visible in day view and from `sm`) | A 48px month cell cannot hold "Confirmed" legibly, and a truncated "Con…" says less than the glyph. The four glyph shapes differ per status, the word stays in the accessible name, and a tap opens the booking. The 3px status edge is kept. |
+| Booking detail status band | The band holds the reference chip, start and duration, not the status badge (§6.3) | The badge sits beside the `h1`; a second copy made the e2e's `getByText('Cancelled by you')` ambiguous, and e2e files are outside this redesign. |
+| Section page eyebrows | "ADMIN" on calendar, bookings, catalogue, availability and settings; "BOOKINGS" on booking detail | No existing string names a category above a section, the nav label would repeat the `h1`, and new copy was not warranted. |
+| Narrow pages | Settings (`max-w-3xl`) and booking detail centre in the content column, so their `h1` starts right of the wide pages' | `pages/admin-shell.md`: each page keeps its own width and centres in the column. |
+| Mono data values | A time or amount that is interpolated inside one translated sentence ("30,000 RWF still to pay", a block's "…, 09:30 to 11:00", "Live until …") stays in Geist | Splitting a translated sentence to style part of it risks the translation; where the value could be isolated without changing text (catalogue meta, money columns) it is mono. |
+| Auth panel title | 24px, not 30px (§6.8) | See §6.8. |
+| Catalogue "Active" badge | A plain `Check` beside the word, on the success tint | It is not one of the four status shapes (§5 uses `CircleCheck`), so it does not borrow booking-status meaning; the word carries it. |
