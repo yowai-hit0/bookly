@@ -135,9 +135,9 @@ components:
 
 Bookly should feel like the front desk of a well-run studio: someone calm at the counter who tells you plainly what is free, what you owe and when, and never oversells. The surfaces stay quiet (a sky-tinted page, white cards with a hairline edge and a whisper of shadow) so that the things that matter, a time, an amount, a status word, are the loudest thing on the screen. Colour appears only when it means something, and it is never the only carrier of meaning.
 
-One system serves two people. Clients book on a phone or a laptop, with no account, usually once. The photographer runs the business from the admin on a desktop. Both get the same tokens and the same primitives; the admin is denser (the low end of the spacing scale), never different in kind. The feel is calm and exact: precise numbers, plain labels, no flourish. Decoration is non-textual (an icon or a dot beside words that already say the thing) and stays small.
+Two people use Bookly. Clients book on a phone or a laptop, with no account, usually once. The photographer runs the business from the admin. Since 2026-09-26 the two sides look like different products on purpose: the client side is everything below, and the admin is a developer-style console with its own tokens, type and themes (see **Admin console** at the end). They still share the primitives in `components/ui`, which the admin restyles only through opt-in variants. The feel is calm and exact: precise numbers, plain labels, no flourish. Decoration is non-textual (an icon or a dot beside words that already say the thing) and stays small.
 
-Visual rejections recorded in the design system (`design-system/bookly/MASTER.md` section 2; the first three are also enforced by Impeccable's design hook): no gradient text, no glow shadows, no coloured left-edge stripes, no modals, no 3D, parallax or scroll-driven effects, no emoji as icons. The theme is light only; the `.dark` block in `index.css` is unreachable and undesigned.
+Visual rejections recorded in the design system (`design-system/bookly/MASTER.md` section 2; the first three are also enforced by Impeccable's design hook): no gradient text, no glow shadows, no coloured left-edge stripes, no modals, no 3D, parallax or scroll-driven effects, no emoji as icons. The client side is light only; the `.dark` block in `index.css` is unreachable and undesigned. The admin has both a light and a dark theme of its own.
 
 The palette and the type pairing were chosen by a design tool and accepted by the user. The client has supplied no logo or brand colours yet, so nothing here is brand-derived. If brand colours arrive, they replace Available Green and Calendar Blue in `frontend/src/index.css` and nothing else changes.
 
@@ -284,10 +284,64 @@ Everything derives from one `--radius` of 0.5rem: controls are 8px (`rounded-lg`
 - **The invariant:** the design never implies success while the outcome is unknown. A payment that is pending, received but not confirmed, refunded or duplicated is never green and never ticked. Shared as the `StatusIcon` component; the reference, service and time card is shared as `BookingFacts`.
 
 ### Designed, not built yet
-These are decided in `design-system/bookly/MASTER.md` (sections 7 and 8) and `design-system/bookly/pages/*.md`, and nothing in the app implements them yet:
-- **Booking-status treatments on the admin badges and the calendar events:** the client pill already uses the shared `StatusBadge`; the admin list and detail badges and the calendar events still show the old plain badge and identical blue events.
-- **Admin sidebar:** 15rem and sticky from `lg`, reflowing to a top bar below it, plus a skip-to-content link. `AdminLayout.tsx` is still the pre-redesign layout.
-- **Calendar:** the FullCalendar styling in `index.css` is untouched and still uses the old mapping.
+Nothing on the client side. The admin items once listed here (status treatments on the admin badges and calendar events, the sidebar, the calendar styling) shipped with the admin console; see below.
+
+## Admin console
+
+Everything under `/admin`, sign in and reset password included, is a quiet developer console: flat planes split by 1px hairlines, 2px corners, no shadows or gradients, one violet accent and monospace for labels and machine values. It was built from the user's style guide and two reference screenshots (`docs/prompts/admin-console-redesign.md`). The full spec, with every token's oklch value and measured contrast, is `design-system/bookly/admin-console.md`; this section summarises what shipped.
+
+**How it is scoped.** While an admin page is mounted, `src/admin/theme.ts` sets `<html data-admin-theme="light|dark">`, and it removes the attribute when the page unmounts. Every admin token is declared under `:root[data-admin-theme=...]` in `index.css`, on the root rather than a wrapper, so Radix popovers portalled into `body` get them too. A client page never carries the attribute, and its screenshots were checked pixel-identical before and after the redesign. The `dark:` variant is never used for admin theming: in this codebase `.dark` holds the client's light palette.
+
+**Themes.** Light and dark follow the OS setting by default and change with it live. A System / Light / Dark control in the top bar overrides that per device (`localStorage`, key `bookly.admin.theme`). Blocked storage falls back to the OS setting without failing. The theme is applied before first paint.
+
+### Admin colours
+| Role | Dark | Light |
+|---|---|---|
+| Canvas | #0A0A0B | #FFFFFF |
+| Raised surface (row hover, popover, status band) | #131315 | #FAFAFA |
+| Chip / icon tile | #27272A | #F4F4F5 |
+| Hairline | #27272A | #E4E4E7 |
+| Field edge (3:1) | #63636B | #8E8E96 |
+| Outline-button edge | #3F3F46 | #D4D4D8 |
+| Text / muted | #F4F4F5 / #A1A1AA | #18181B / #71717A |
+| Link and focus (violet) | #B9A2FF | #7C3AED |
+| Active nav fill / text | #3A1784 / #D4C6FF | #F1ECFE / #7C3AED |
+| Main action (inverted neutral) | #FAFAFA on #0A0A0B | #18181B on #FFFFFF |
+| Success | #4ADE80 on #0F2E1C | #15803D on #EAF8EF |
+| Danger text / solid confirm | #F87171 / #DC2626 | #B91C1C / #B91C1C |
+
+**The Violet Is For Where You Are Rule.** Violet marks location and linkage: the active nav item, links, selected controls, info banners, the focus outline, and at most one headline badge on a page. The main action is never violet; it is the inverted neutral button, one per view. Green appears only for success and status.
+
+### Admin type
+Geist and Geist Mono, self-hosted with `@fontsource-variable`. The page title is 30px/600 at -0.02em (24px in the sign-in panel), a section heading 20px/500, body and nav 16px, and meta 14px muted. Eyebrows, table headers and tile labels are Geist Mono 12px/500, uppercase, at +0.1em, muted. Data values (references, times, durations, money) are Geist Mono 15px with tabular figures; history lines are 13px mono. Links are violet with no underline, except references, which are underlined mono.
+
+### Admin shape, space and focus
+- **Shape and depth:** 2px radius everywhere, with round shapes only for status icons. No shadows, except a faint one on the light popover.
+- **Grid:** a 4px grid, sections 48px apart on desktop and 32px on a phone, panels padded 24px (16px on a phone).
+- **Shell:** a 56px top bar of bordered cells (the mark, the breadcrumb, the theme toggle) over a 260px sidebar from `lg`. Below `lg` the same navigation reflows into rows. Content gutters are 48px on desktop and 16px on a phone.
+- **Control sizes:** buttons and fields are 40px from `lg`, and 44px below it and on touch.
+- **Focus:** one 2px violet outline, offset 2px, on every control in both themes. It is set once in `index.css`, where it beats the primitives' `outline-none`.
+- **Icons:** lucide, drawn with a 1.5px stroke and square caps.
+
+### Admin components
+- **Shell and breadcrumb** (`src/admin/AdminLayout.tsx`, `breadcrumbs.tsx`): the breadcrumb reads Admin › section › booking reference. The booking page reports its reference through `useBreadcrumbTail`, so nothing is fetched twice.
+- **Shared compositions** (`src/pages/admin/console/`): `PageHeader` (a mono eyebrow, the one `h1`, badges, a meta row and actions), `StatGrid` (square icon tiles, mono labels over values), `Toolbar` (filters joined into one bordered strip), `AuthFrame` (the sign-in and reset-password panel) and `classes.ts` (shared class strings for fields, links, table cells and type roles).
+- **Opt-in variants in `components/ui`** that the client side never uses:
+  - Button: `console-outline` and `console-destructive-solid`, in sizes `console`, `console-sm` and `console-icon`.
+  - Badge: `console`, `console-accent`, `console-success` and `console-count`.
+  - `Callout variant="console"`: info, success, warning and destructive banners.
+  - `Card variant="console"`: a flat panel.
+- **Status** (`StatusBadge`, `StatusGlyph`, `StatusShapeGlyph`): the admin layout switches every badge under it, the legend popover included, to four shapes. A filled check is current, an outlined check an earlier success, a clock waiting, a cross failed or cancelled. Dashed and dotted edges keep a hold and a lapsed hold apart in greyscale, and the word is always there.
+- **Calendar** (the FullCalendar block in `index.css`):
+  - A hairline grid, mono hours and dates, and a violet chip for today.
+  - Square events on the raised surface with a 3px status edge. A hold has a dashed edge, a block keeps its hatch, and a conflict is a 2px danger line inside the event.
+  - A joined toolbar with a segmented view switch.
+
+### Admin on a phone
+Every admin page was checked at 320 and 375px in both themes: no horizontal scroll, every target at least 44px, and focus visible on every stop.
+- **Bookings:** the table stacks each booking into one block whenever its own container is under 56rem, by container query. That covers phones, tablets and the narrow column beside the sidebar.
+- **Forms and actions:** form button rows and page actions go full width on a phone.
+- **Calendar:** month events shrink to the time and status glyph, with the status word kept for screen readers.
 
 ## Do's and Don'ts
 
