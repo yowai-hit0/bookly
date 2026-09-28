@@ -100,14 +100,17 @@ export function AdminSettings() {
   const values = loaded?.values ?? null
 
   return (
-    <main className={cn(PAGE, 'max-w-3xl')}>
+    // At 1280x720 and up the whole page fits without scrolling (item 3,
+    // 2026-09-27): the five fields sit three to a row from `lg`, in a wider
+    // column, so they take two rows instead of three.
+    <main className={cn(PAGE, 'max-w-5xl lg:gap-8 lg:py-8')}>
       <PageHeader eyebrow={t('admin:nav.label')} eyebrowIcon={SettingsIcon} title={t('admin:settings.title')}>
         <p className={cn(META, 'max-w-prose text-pretty')}>{t('admin:settings.intro')}</p>
       </PageHeader>
 
       {loaded === null && (
         <LoadingRegion label={t('admin:settings.loading')} className="flex flex-col gap-6 rounded-xs border p-4 sm:p-6">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
             {SETTINGS_FIELDS.map((field) => (
               <div key={field} className="flex flex-col gap-2">
                 <SkeletonLine w="w-44" />
@@ -142,7 +145,7 @@ export function AdminSettings() {
               noValidate
               onSubmit={(event) => void onSubmit(event)}
             >
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
                 {SETTINGS_FIELDS.map((field) => (
                   <AdminField
                     key={field}

@@ -18,6 +18,8 @@ Five numbers that change what every future booking costs and when it can be made
 - Fields: `grid gap-3 sm:grid-cols-2`. Five fields means the last one sits alone on the second column's row — that is fine and better than a single 3xl-wide column of short number inputs. Do not stretch any field to full width to "balance" the grid.
 - Below the grid, in this order: the saved confirmation, the form error, the submit button (`self-start`).
 
+**Changed 2026-09-27 (admin console fixes, item 3, user decision):** on screens of at least 1280x720 the whole page shows without page scroll, idle or just saved. The column is `max-w-5xl` (was `3xl`), the five fields sit three to a row from `lg` (two from `sm`, one below), and the page's vertical rhythm is tighter from `lg` (32px padding and section gap instead of 48px). No field, hint or behaviour changed; smaller screens scroll as before.
+
 ## Fields
 
 Every field goes through `AdminField` — label above, **hint below the input**, error under the hint. The hints are the whole reason this page is usable; they are not optional chrome.
