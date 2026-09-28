@@ -228,15 +228,27 @@ async function close(
   if (booking === null) return { status: 'not_found' };
   // Only a confirmed booking whose shoot has begun can be closed either way.
   if (booking.status !== 'confirmed' || booking.startsAt > deps.now()) return { status: 'not_allowed' };
-  if (status === 'completed' && bookingTotals(booking, booking.addons, booking.payments).outstandingRwf > 0) {
-    return { status: 'balance_due' };
-  }
 
-  const { count } = await deps.prisma.booking.updateMany({
-    where: { id: booking.id, status: 'confirmed' },
-    data: { status, ...extra },
+  const closed = await deps.prisma.$transaction(async (tx): Promise<'ok' | 'not_allowed' | 'balance_due'> => {
+    // The lock every money edit takes (add-ons, payments, auto-complete): an
+    // add-on landing while this runs waits, so the balance read here is the
+    // one the booking completes with.
+    await tx.$queryRaw`SELECT 1 FROM booking WHERE id = ${booking.id}::uuid FOR UPDATE`;
+    if (status === 'completed') {
+      const [addons, payments] = await Promise.all([
+        tx.bookingAddon.findMany({ where: { bookingId: booking.id }, select: { stage: true, amountRwf: true } }),
+        tx.payment.findMany({ where: { bookingId: booking.id }, select: { status: true, amountRwf: true } }),
+      ]);
+      const totals = bookingTotals({ status: booking.status, packagePriceRwf: booking.packagePriceRwf }, addons, payments);
+      if (totals.outstandingRwf > 0) return 'balance_due';
+    }
+    const { count } = await tx.booking.updateMany({
+      where: { id: booking.id, status: 'confirmed' },
+      data: { status, ...extra },
+    });
+    return count === 0 ? 'not_allowed' : 'ok';
   });
-  if (count === 0) return { status: 'not_allowed' };
+  if (closed !== 'ok') return { status: closed };
   return reload(deps, booking.id);
 }
 

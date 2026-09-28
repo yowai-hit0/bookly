@@ -659,6 +659,32 @@ describe('marking a booking completed', () => {
     expect(bookingTotals(full, full.addons, full.payments)).toMatchObject({ grandTotalRwf: 50_000, outstandingRwf: 0 });
   });
 
+  it('reads the balance under the booking lock: an add-on committed while it waits is owed, not skipped', async () => {
+    const booking = await insertBooking(prisma, world, { status: 'confirmed', startsAt: WEDNESDAY_0900 });
+    await insertPayment(prisma, booking.id, { status: 'succeeded', amountRwf: 50_000 });
+
+    // Another writer holds the lock, as an add-on edit does, and adds 15,000.
+    await raw.query('BEGIN');
+    let completing: ReturnType<typeof markCompleted>;
+    try {
+      await raw.query('SELECT 1 FROM booking WHERE id = $1 FOR UPDATE', [booking.id]);
+      completing = markCompleted(deps(AFTER_THE_SHOOT), booking.id);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await raw.query(
+        `INSERT INTO booking_addon (booking_id, addon_id, name_snapshot, unit_price_rwf, quantity, amount_rwf, stage)
+         VALUES ($1, $2, 'Extra hour', 15000, 1, 15000, 'post_shoot')`,
+        [booking.id, world.ownAddonId],
+      );
+      await raw.query('COMMIT');
+    } catch (error) {
+      await raw.query('ROLLBACK');
+      throw error;
+    }
+
+    expect(await completing).toStrictEqual({ status: 'balance_due' });
+    expect((await bookingRow(booking.id)).status).toBe('confirmed');
+  });
+
   it.each(['pending_payment', 'completed', 'no_show', 'expired', 'cancelled_by_client', 'cancelled_by_admin'] as const)(
     'refuses a %s booking',
     async (status) => {
