@@ -38,6 +38,8 @@ import { FormDialog } from './console/FormDialog'
 import { cn } from '@/lib/utils'
 import { StageLegend } from '@/pages/StageLegend'
 import { CHECKBOX, DATA, FIELD, META, PAGE, SECTION_TITLE, SUBPANEL, TEXTAREA } from './console/classes'
+import { Skeleton } from '@/components/ui/skeleton'
+import { LoadingRegion, Line as SkeletonLine } from './console/Skeletons'
 import { MetaItem, PageHeader } from './console/PageHeader'
 import { StatGrid, StatTile } from './console/StatGrid'
 
@@ -155,13 +157,46 @@ export function AdminBookingDetail() {
 
   if (state === 'loading') {
     return (
-      <Shell
-        head={
-          <p className={META} role="status">
-            {t('admin:booking.loading')}
-          </p>
-        }
-      />
+      <Shell head={null}>
+        <LoadingRegion label={t('admin:booking.loading')} className="flex flex-col gap-8 lg:gap-12">
+          {/* The header: eyebrow, the reference and its badge. */}
+          <div className="flex flex-col gap-3.5">
+            <SkeletonLine w="w-24" className="h-3" />
+            <div className="flex flex-wrap items-center gap-3.5">
+              <Skeleton className="h-9 w-64 max-w-full rounded-xs" />
+              <Skeleton className="h-7 w-28 rounded-xs" />
+            </div>
+          </div>
+          {/* The status band, full width like the real one. */}
+          <Skeleton className="-mx-4 h-14 rounded-none lg:-mx-12" />
+          {/* The shoot's tiles, then the sections below it. */}
+          <div className="flex flex-col gap-6">
+            <SkeletonLine w="w-32" className="h-6" />
+            <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
+              {[0, 1, 2, 3].map((tile) => (
+                <div key={tile} className="flex items-center gap-4 sm:gap-5">
+                  <Skeleton className="size-12 shrink-0 rounded-xs sm:size-16" />
+                  <div className="flex flex-1 flex-col gap-2">
+                    <SkeletonLine w="w-20" className="h-3" />
+                    <SkeletonLine w="w-40 max-w-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {[0, 1].map((section) => (
+            <div key={section} className="flex flex-col gap-4 border-t pt-8">
+              <SkeletonLine w="w-28" className="h-6" />
+              {[0, 1, 2].map((line) => (
+                <div key={line} className="flex justify-between gap-6">
+                  <SkeletonLine w="w-28" />
+                  <SkeletonLine w="w-32" />
+                </div>
+              ))}
+            </div>
+          ))}
+        </LoadingRegion>
+      </Shell>
     )
   }
   // A load that failed leaves no booking either, so it is answered first:

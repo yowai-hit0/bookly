@@ -18,6 +18,8 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { AdminField } from './AdminField'
 import { FIELD, META, PAGE } from './console/classes'
+import { Skeleton } from '@/components/ui/skeleton'
+import { LoadingRegion, Line as SkeletonLine } from './console/Skeletons'
 import { PageHeader } from './console/PageHeader'
 
 /**
@@ -104,9 +106,20 @@ export function AdminSettings() {
       </PageHeader>
 
       {loaded === null && (
-        <p className={META} role="status">
-          {t('admin:settings.loading')}
-        </p>
+        <LoadingRegion label={t('admin:settings.loading')} className="flex flex-col gap-6 rounded-xs border p-4 sm:p-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {SETTINGS_FIELDS.map((field) => (
+              <div key={field} className="flex flex-col gap-2">
+                <SkeletonLine w="w-44" />
+                <Skeleton className="h-11 w-full max-w-40 rounded-xs lg:h-10" />
+                <SkeletonLine w="w-56 max-w-full" className="h-3" />
+              </div>
+            ))}
+          </div>
+          <div className="-mx-4 border-t px-4 pt-4 sm:-mx-6 sm:px-6 sm:pt-6">
+            <Skeleton className="h-11 w-full rounded-xs sm:w-36 lg:h-10" />
+          </div>
+        </LoadingRegion>
       )}
       {loaded !== null && values === null && (
         <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4" role="alert">

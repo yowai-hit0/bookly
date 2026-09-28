@@ -13,6 +13,8 @@ import { formatDate, formatMoney, formatTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { StageLegend } from '@/pages/StageLegend'
 import { DATA, EYEBROW, FIELD, META, PAGE, REF_LINK, TD, TH, TR } from './console/classes'
+import { Skeleton } from '@/components/ui/skeleton'
+import { LoadingRegion, Line as SkeletonLine } from './console/Skeletons'
 import { PageHeader } from './console/PageHeader'
 import { Toolbar, ToolbarCell } from './console/Toolbar'
 
@@ -219,10 +221,33 @@ export function AdminBookings() {
         </p>
       )}
 
+      {/* While a page of bookings loads, only the rows are placeholders: the
+          filters above stay as they are (item 2, 2026-09-27). */}
       {showing === null && loading && (
-        <p className="text-muted-foreground text-sm" role="status">
-          {t('admin:bookings.loading')}
-        </p>
+        <LoadingRegion label={t('admin:bookings.loading')} className="@container flex flex-col">
+          <div className="border-b py-3">
+            <SkeletonLine w="w-full max-w-md" className="h-3" />
+          </div>
+          {Array.from({ length: 8 }, (_, row) => (
+            <div key={row} className="flex items-start gap-3.5 border-b py-4 last:border-b-0">
+              <Skeleton className="size-5.5 shrink-0 rounded-full" />
+              <div className="grid flex-1 gap-2 @min-[56rem]:grid-cols-[2fr_1.2fr_1.5fr_1fr_1.3fr_1fr] @min-[56rem]:gap-6">
+                <div className="flex flex-col gap-2">
+                  <SkeletonLine w="w-44 max-w-full" />
+                  <SkeletonLine w="w-24" className="h-3" />
+                </div>
+                <SkeletonLine w="w-32" />
+                <div className="flex flex-col gap-2">
+                  <SkeletonLine w="w-28" />
+                  <SkeletonLine w="w-36 max-w-full" className="h-3" />
+                </div>
+                <SkeletonLine w="w-20" />
+                <Skeleton className="h-6 w-28 rounded-xs" />
+                <SkeletonLine w="w-24 @min-[56rem]:ml-auto" />
+              </div>
+            </div>
+          ))}
+        </LoadingRegion>
       )}
 
       {showing !== null && rows.length === 0 && <p className="text-muted-foreground text-sm">{t('admin:bookings.empty')}</p>}

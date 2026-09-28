@@ -259,6 +259,16 @@ User decision: every create and edit form in the admin opens in a modal dialog, 
 - Closing without saving discards what was typed; a successful save closes the dialog and the page shows what the API answered. A refused save keeps the dialog open and shows the refusal inside it, where the eye is.
 - The shared forms (EntityForm, BlockForm, WorkingHoursForm) drop their own heading and panel frame inside a dialog (`InDialogContext`), since the dialog titles them.
 
+### 6.12 Loading (2026-09-27)
+
+User decision (admin console fixes, item 2): while an admin page loads, the shell (nav, top bar, breadcrumb) and the page header stay real, and the page's own layout is drawn with placeholder blocks where its data will be (`components/ui/skeleton.tsx`), each the size and grid of what replaces it, so nothing jumps when the data arrives. Shared pieces are in `pages/admin/console/Skeletons.tsx`: `LoadingRegion` (`aria-busy`, blocks `aria-hidden`, the page's existing loading sentence announced once in a visually hidden `role="status"`), `Line` and `PanelSkeleton`. The pulse stops under reduced motion.
+
+- Bookings: only the rows are placeholders; the filters stay.
+- Booking detail: header, status band, the shoot's tiles and two sections.
+- Catalogue and availability: their panels with hairline rows.
+- Settings: its panel of fields.
+- Calendar: FullCalendar's grid is the real layout from the first paint, so the wait for events is announced (`aria-busy` on the region), not drawn; the old visible line pushed the grid down on every range load.
+
 ### 6.10 Buttons (`button.tsx`, opt-in `size="console"` and `variant` additions)
 
 - Default (inverted neutral), `console-outline` (`--console-border-strong` edge, transparent, hover `bg-muted`), ghost, destructive (tint + red text), and `console-destructive-solid` (`--console-danger-solid` fill, white label) for the irreversible confirm. The client's `destructive-solid` is never used in admin: the dark `--destructive` is a text colour.

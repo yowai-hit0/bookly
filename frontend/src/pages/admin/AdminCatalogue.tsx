@@ -25,6 +25,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { formatMoney } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { EYEBROW, META, PAGE, SECTION_TITLE } from './console/classes'
+import { LoadingRegion, PanelSkeleton } from './console/Skeletons'
 import { PageHeader } from './console/PageHeader'
 import { EntityForm, type FieldSpec } from './EntityForm'
 import { FormDialog } from './console/FormDialog'
@@ -488,9 +489,10 @@ export function AdminCatalogue() {
       )}
 
       {loaded === null && (
-        <p className={META} role="status">
-          {t('admin:catalogue.loading')}
-        </p>
+        <LoadingRegion label={t('admin:catalogue.loading')} className="flex flex-col gap-4 lg:gap-6">
+          <PanelSkeleton rows={3} />
+          <PanelSkeleton rows={2} />
+        </LoadingRegion>
       )}
       {loaded !== null && loaded.data === null && (
         <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-4" role="alert">

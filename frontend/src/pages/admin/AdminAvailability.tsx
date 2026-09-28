@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { BlockForm } from './BlockForm'
 import { META, PAGE, SECTION_TITLE } from './console/classes'
 import { FormDialog } from './console/FormDialog'
+import { LoadingRegion, PanelSkeleton } from './console/Skeletons'
 import { PageHeader } from './console/PageHeader'
 import { WorkingHoursForm } from './WorkingHoursForm'
 
@@ -287,9 +288,10 @@ export function AdminAvailability() {
       )}
 
       {loaded === null && (
-        <p className={META} role="status">
-          {t('admin:availability.loading')}
-        </p>
+        <LoadingRegion label={t('admin:availability.loading')} className="flex flex-col gap-8 lg:gap-12">
+          <PanelSkeleton rows={5} />
+          <PanelSkeleton rows={2} />
+        </LoadingRegion>
       )}
       {loaded !== null && data === null && (
         <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4" role="alert">

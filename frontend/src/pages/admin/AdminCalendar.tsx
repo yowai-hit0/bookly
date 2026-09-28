@@ -25,7 +25,7 @@ import { StatusGlyph } from '@/components/ui/status-badge'
 import { TIME_ZONE } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { BlockForm } from './BlockForm'
-import { META, PAGE } from './console/classes'
+import { PAGE } from './console/classes'
 import { FormDialog } from './console/FormDialog'
 import { MetaItem, PageHeader } from './console/PageHeader'
 
@@ -219,9 +219,12 @@ export function AdminCalendar() {
 
       {/* The loading line and the failure sit close above the calendar they
           are about, not a section's gap away from it. */}
-      <div className="flex min-w-0 flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4" aria-busy={loading}>
+        {/* The grid is the real layout from the first paint; only the events
+            are awaited. A visible line here pushed the grid down on every range
+            load, so the wait is announced, not shown (item 2, 2026-09-27). */}
         {loading && (
-          <p className={META} role="status">
+          <p className="sr-only" role="status">
             {t('admin:calendar.loading')}
           </p>
         )}
