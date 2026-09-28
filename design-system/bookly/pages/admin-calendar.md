@@ -55,6 +55,10 @@ Booking events will open the booking (`/admin/bookings/:id`). The behaviour is b
 - ~~Block events are not clickable: default cursor, no hover state.~~ **Superseded** — see the correction above. Blocks are clickable and look it.
 - In month view the events stay small; the hit area is the event box, as large as the row allows.
 
+## Block time (2026-09-27)
+
+**Changed 2026-09-27 (admin console fixes, item 1, user decision):** "Block time" opens `BlockForm` in a dialog (`admin-console.md` §6.11); the button stays in the header while it is open.
+
 ## States
 
 loading, load failed (alert + retry), month / week / day views, all-day blocks, overlapping events, empty range.

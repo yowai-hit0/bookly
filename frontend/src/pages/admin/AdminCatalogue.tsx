@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils'
 import { EYEBROW, META, PAGE, SECTION_TITLE } from './console/classes'
 import { PageHeader } from './console/PageHeader'
 import { EntityForm, type FieldSpec } from './EntityForm'
+import { FormDialog } from './console/FormDialog'
 
 /**
  * The catalogue CMS (plan.md Task 10, spec §3.4, §6.8, §6.14): services, their
@@ -229,23 +230,20 @@ export function AdminCatalogue() {
     )
   }
 
+  /**
+   * Every create and edit form opens in a dialog (2026-09-27). One form is open
+   * at a time, as before; closing the dialog by any route discards the form.
+   */
+  function formDialog(open: boolean, title: string, form: ReactNode) {
+    return (
+      <FormDialog open={open} onClose={() => setEditing(null)} title={title} wide>
+        {form}
+      </FormDialog>
+    )
+  }
+
   function packageRow(pkg: AdminPackage) {
     const key = `package:${pkg.id}`
-    if (editing === key) {
-      return (
-        <li key={pkg.id} className={LIST_ROW}>
-          <EntityForm
-            title={t('admin:catalogue.editPackage')}
-            submitLabel={t('admin:catalogue.save')}
-            fields={PACKAGE_FIELDS}
-            values={packageFormValues(pkg)}
-            schema={packageFormSchema}
-            onSave={(payload) => saved(catalogueApi.updatePackage(pkg.id, payload).then(rememberWarning))}
-            onCancel={() => setEditing(null)}
-          />
-        </li>
-      )
-    }
     const warning = warnings[pkg.id]
     return (
       <li key={pkg.id} className={LIST_ROW}>
@@ -282,27 +280,25 @@ export function AdminCatalogue() {
             </span>
           </p>
         )}
+        {formDialog(
+          editing === key,
+          t('admin:catalogue.editPackage'),
+          <EntityForm
+            title={t('admin:catalogue.editPackage')}
+            submitLabel={t('admin:catalogue.save')}
+            fields={PACKAGE_FIELDS}
+            values={packageFormValues(pkg)}
+            schema={packageFormSchema}
+            onSave={(payload) => saved(catalogueApi.updatePackage(pkg.id, payload).then(rememberWarning))}
+            onCancel={() => setEditing(null)}
+          />,
+        )}
       </li>
     )
   }
 
   function addonRow(addon: AdminAddon) {
     const key = `addon:${addon.id}`
-    if (editing === key) {
-      return (
-        <li key={addon.id} className={LIST_ROW}>
-          <EntityForm
-            title={t('admin:catalogue.editAddon')}
-            submitLabel={t('admin:catalogue.save')}
-            fields={ADDON_FIELDS}
-            values={addonFormValues(addon)}
-            schema={addonFormSchema}
-            onSave={(payload) => saved(catalogueApi.updateAddon(addon.id, payload))}
-            onCancel={() => setEditing(null)}
-          />
-        </li>
-      )
-    }
     return (
       <li key={addon.id} className={LIST_ROW}>
         {rowLayout(
@@ -319,6 +315,19 @@ export function AdminCatalogue() {
             () => catalogueApi.updateAddon(addon.id, { isActive: !addon.isActive }),
             () => catalogueApi.deleteAddon(addon.id),
           ),
+        )}
+        {formDialog(
+          editing === key,
+          t('admin:catalogue.editAddon'),
+          <EntityForm
+            title={t('admin:catalogue.editAddon')}
+            submitLabel={t('admin:catalogue.save')}
+            fields={ADDON_FIELDS}
+            values={addonFormValues(addon)}
+            schema={addonFormSchema}
+            onSave={(payload) => saved(catalogueApi.updateAddon(addon.id, payload))}
+            onCancel={() => setEditing(null)}
+          />,
         )}
       </li>
     )
@@ -339,7 +348,13 @@ export function AdminCatalogue() {
         ) : (
           <ul>{addons.map(addonRow)}</ul>
         )}
-        {editing === newKey ? (
+        <Button size="console-sm" variant="console-outline" className="mt-2 self-start" onClick={() => setEditing(newKey)}>
+          <Plus aria-hidden="true" />
+          {t('admin:catalogue.addAddon')}
+        </Button>
+        {formDialog(
+          editing === newKey,
+          t('admin:catalogue.newAddon'),
           <EntityForm
             title={t('admin:catalogue.newAddon')}
             submitLabel={t('admin:catalogue.create')}
@@ -348,12 +363,7 @@ export function AdminCatalogue() {
             schema={addonFormSchema}
             onSave={(payload) => saved(catalogueApi.createAddon({ ...payload, serviceId }))}
             onCancel={() => setEditing(null)}
-          />
-        ) : (
-          <Button size="console-sm" variant="console-outline" className="mt-2 self-start" onClick={() => setEditing(newKey)}>
-            <Plus aria-hidden="true" />
-            {t('admin:catalogue.addAddon')}
-          </Button>
+          />,
         )}
       </section>
     )
@@ -368,7 +378,9 @@ export function AdminCatalogue() {
       <Card key={service.id} variant="console">
         {/* The title row is split from the lists by a full-width hairline. */}
         <CardHeader className="border-b">
-          {editing === key ? (
+          {formDialog(
+            editing === key,
+            t('admin:catalogue.editService'),
             <EntityForm
               title={t('admin:catalogue.editService')}
               submitLabel={t('admin:catalogue.save')}
@@ -377,31 +389,30 @@ export function AdminCatalogue() {
               schema={serviceFormSchema}
               onSave={(payload) => saved(catalogueApi.updateService(service.id, payload))}
               onCancel={() => setEditing(null)}
-            />
-          ) : (
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-              <div className="flex min-w-0 flex-col gap-1.5">
-                {/* The badge is part of the heading's name ("Portraits Active"); it wraps under a long name. */}
-                <h2 className={cn(SECTION_TITLE, 'flex flex-wrap items-center gap-x-3 gap-y-1.5')}>
-                  <span className="min-w-0 wrap-anywhere">{service.nameEn}</span> {statusBadge(service.isActive)}
-                </h2>
-                <p className={cn(META, 'wrap-anywhere')}>
-                  <span className={FIGURE}>/{service.slug}</span> ·{' '}
-                  {feePercent === null
-                    ? <span className={ITEM}>{t('admin:catalogue.feeDefault')}</span>
-                    : withFigure(t('admin:catalogue.feeOverride', { percent: feePercent }), feePercent)}{' '}
-                  · {withFigure(t('admin:catalogue.order', { order: service.sortOrder }), service.sortOrder)}
-                </p>
-              </div>
-              {rowActions(
-                service.nameEn,
-                service.isActive,
-                key,
-                () => catalogueApi.updateService(service.id, { isActive: !service.isActive }),
-                () => catalogueApi.deleteService(service.id),
-              )}
-            </div>
+            />,
           )}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              {/* The badge is part of the heading's name ("Portraits Active"); it wraps under a long name. */}
+              <h2 className={cn(SECTION_TITLE, 'flex flex-wrap items-center gap-x-3 gap-y-1.5')}>
+                <span className="min-w-0 wrap-anywhere">{service.nameEn}</span> {statusBadge(service.isActive)}
+              </h2>
+              <p className={cn(META, 'wrap-anywhere')}>
+                <span className={FIGURE}>/{service.slug}</span> ·{' '}
+                {feePercent === null
+                  ? <span className={ITEM}>{t('admin:catalogue.feeDefault')}</span>
+                  : withFigure(t('admin:catalogue.feeOverride', { percent: feePercent }), feePercent)}{' '}
+                · {withFigure(t('admin:catalogue.order', { order: service.sortOrder }), service.sortOrder)}
+              </p>
+            </div>
+            {rowActions(
+              service.nameEn,
+              service.isActive,
+              key,
+              () => catalogueApi.updateService(service.id, { isActive: !service.isActive }),
+              () => catalogueApi.deleteService(service.id),
+            )}
+          </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-8">
           <section className="flex flex-col">
@@ -411,7 +422,13 @@ export function AdminCatalogue() {
             ) : (
               <ul>{service.packages.map(packageRow)}</ul>
             )}
-            {editing === newPackageKey ? (
+            <Button size="console-sm" variant="console-outline" className="mt-2 self-start" onClick={() => setEditing(newPackageKey)}>
+              <Plus aria-hidden="true" />
+              {t('admin:catalogue.addPackage')}
+            </Button>
+            {formDialog(
+              editing === newPackageKey,
+              t('admin:catalogue.newPackage'),
               <EntityForm
                 title={t('admin:catalogue.newPackage')}
                 submitLabel={t('admin:catalogue.create')}
@@ -422,12 +439,7 @@ export function AdminCatalogue() {
                   saved(catalogueApi.createPackage({ ...payload, serviceId: service.id }).then(rememberWarning))
                 }
                 onCancel={() => setEditing(null)}
-              />
-            ) : (
-              <Button size="console-sm" variant="console-outline" className="mt-2 self-start" onClick={() => setEditing(newPackageKey)}>
-                <Plus aria-hidden="true" />
-                {t('admin:catalogue.addPackage')}
-              </Button>
+              />,
             )}
           </section>
           {addonSection(service.id, service.addons, t('admin:catalogue.addons'))}
@@ -443,13 +455,12 @@ export function AdminCatalogue() {
         eyebrowIcon={Package}
         title={t('admin:catalogue.title')}
         actions={
-          // The page's one main action, hidden while the new-service form is open.
-          editing !== 'service:new' ? (
-            <Button size="console" onClick={() => setEditing('service:new')}>
-              <Plus aria-hidden="true" />
-              {t('admin:catalogue.addService')}
-            </Button>
-          ) : undefined
+          // The page's one main action. It stays mounted while its dialog is
+          // open, so focus returns to it when the dialog closes.
+          <Button size="console" onClick={() => setEditing('service:new')}>
+            <Plus aria-hidden="true" />
+            {t('admin:catalogue.addService')}
+          </Button>
         }
       >
         <p className={cn(META, 'max-w-prose')}>{t('admin:catalogue.intro')}</p>
@@ -462,7 +473,9 @@ export function AdminCatalogue() {
         </p>
       )}
 
-      {editing === 'service:new' && (
+      {formDialog(
+        editing === 'service:new',
+        t('admin:catalogue.newService'),
         <EntityForm
           title={t('admin:catalogue.newService')}
           submitLabel={t('admin:catalogue.create')}
@@ -471,7 +484,7 @@ export function AdminCatalogue() {
           schema={serviceFormSchema}
           onSave={(payload) => saved(catalogueApi.createService(payload))}
           onCancel={() => setEditing(null)}
-        />
+        />,
       )}
 
       {loaded === null && (

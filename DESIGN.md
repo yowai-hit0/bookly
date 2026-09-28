@@ -335,6 +335,7 @@ Geist and Geist Mono, self-hosted with `@fontsource-variable`. The page title is
   - `Callout variant="console"`: info, success, warning and destructive banners.
   - `Card variant="console"`: a flat panel.
 - **Status** (`StatusBadge`, `StatusGlyph`, `StatusShapeGlyph`): the admin layout switches every badge under it, the legend popover included, to four shapes. A filled check is current, an outlined check an earlier success, a clock waiting, a cross failed or cancelled. Dashed and dotted edges keep a hold and a lapsed hold apart in greyscale, and the word is always there. The client now renders bookings through this same mapping.
+- **Dialogs** (since 2026-09-27, `components/ui/dialog.tsx`, `console/FormDialog.tsx`): every admin create and edit form opens in a modal (the availability page's "Add block" stays inline). It closes on ×, Escape, the scrim and Cancel, scrolls inside itself on a short screen, and returns focus to its opener. Client pages still have no modals.
 - **Calendar** (the FullCalendar block in `index.css`):
   - A hairline grid, mono hours and dates, and a violet chip for today.
   - Square events on the raised surface with a 3px status edge. A hold has a dashed edge, a block keeps its hatch, and a conflict is a 2px danger line inside the event.

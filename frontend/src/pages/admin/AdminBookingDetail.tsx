@@ -10,6 +10,7 @@ import {
   MapPin,
   MessageSquareText,
   MessageSquareX,
+  Plus,
   Timer,
   TriangleAlert,
   Users,
@@ -33,6 +34,7 @@ import { StatusBadge, type StatusShape, StatusShapeGlyph } from '@/components/ui
 import { Textarea } from '@/components/ui/textarea'
 import { formatDate, formatDateTime, formatMoney, formatTime } from '@/lib/format'
 import { SELECT_CLASS } from './AdminField'
+import { FormDialog } from './console/FormDialog'
 import { cn } from '@/lib/utils'
 import { StageLegend } from '@/pages/StageLegend'
 import { CHECKBOX, DATA, FIELD, META, PAGE, SECTION_TITLE, SUBPANEL, TEXTAREA } from './console/classes'
@@ -58,6 +60,12 @@ const KIGALI_OFFSET = '+02:00'
 
 type Failure = { code: string } | null
 
+/**
+ * Which form is open in a dialog (admin console fixes, item 1, 2026-09-27):
+ * every create and edit form on this page opens in one, and one at a time.
+ */
+type OpenForm = 'addon' | 'reschedule' | 'cancel' | 'delivery' | null
+
 /** Help text under a field or a group of buttons: 13px, muted. */
 const HINT = 'text-muted-foreground text-[0.8125rem] leading-snug'
 
@@ -81,6 +89,7 @@ export function AdminBookingDetail() {
   const [state, setState] = useState<'loading' | 'ready' | 'missing' | 'failed'>('loading')
   const [failure, setFailure] = useState<Failure>(null)
   const [busy, setBusy] = useState(false)
+  const [openForm, setOpenForm] = useState<OpenForm>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -176,6 +185,31 @@ export function AdminBookingDetail() {
 
   const { schedule, money, actions } = booking
 
+  // A refused action shows where the eye is: inside the open dialog, or at the
+  // top of the page when none is open. Never both, so there is one alert.
+  const failureNote =
+    failure === null ? null : (
+      <Callout variant="console" tone="destructive" icon={CircleAlert} role="alert">
+        {t(`admin:booking.errors.${failure.code}`, { defaultValue: t('admin:booking.errors.failed') })}
+      </Callout>
+    )
+
+  /** Runs a dialog's action, and closes the dialog only when it worked. */
+  async function submitFrom(action: () => Promise<{ booking: AdminBooking }>): Promise<void> {
+    if (await attempt(action)) setOpenForm(null)
+  }
+
+  function formDialog(form: Exclude<OpenForm, null>, title: string, body: ReactNode) {
+    return (
+      <FormDialog open={openForm === form} onClose={() => setOpenForm(null)} title={title}>
+        <div className="flex flex-col gap-5">
+          {failureNote}
+          {body}
+        </div>
+      </FormDialog>
+    )
+  }
+
   return (
     <Shell
       head={
@@ -198,11 +232,7 @@ export function AdminBookingDetail() {
     >
       <StatusBand booking={booking} />
 
-      {failure !== null && (
-        <Callout variant="console" tone="destructive" icon={CircleAlert} role="alert">
-          {t(`admin:booking.errors.${failure.code}`, { defaultValue: t('admin:booking.errors.failed') })}
-        </Callout>
-      )}
+      {openForm === null && failureNote}
 
       <div className="flex flex-col">
         <Section title={t('admin:booking.sections.shoot')}>
@@ -310,16 +340,32 @@ export function AdminBookingDetail() {
             )}
           </div>
           {actions.canEditAddons && (
-            <div className={SUBPANEL}>
-              <p className="text-base font-medium">{t('admin:booking.addons.title')}</p>
-              <AddonForm
-                serviceId={booking.service.id}
-                busy={busy}
-                onAdd={(addonId, quantity) => act(() => bookingsApi.addAddon(booking.id, addonId, quantity))}
-              />
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="console-outline"
+                size="console"
+                className={cn(BUTTON_WIDTH, 'sm:self-start')}
+                onClick={() => setOpenForm('addon')}
+              >
+                <Plus aria-hidden="true" />
+                {t('admin:booking.addons.open')}
+              </Button>
               <p className={HINT}>{t('admin:booking.addons.note')}</p>
             </div>
           )}
+          {actions.canEditAddons &&
+            formDialog(
+              'addon',
+              t('admin:booking.addons.title'),
+              <>
+                <AddonForm
+                  serviceId={booking.service.id}
+                  busy={busy}
+                  onAdd={(addonId, quantity) => submitFrom(() => bookingsApi.addAddon(booking.id, addonId, quantity))}
+                />
+                <p className={HINT}>{t('admin:booking.addons.note')}</p>
+              </>,
+            )}
         </Section>
 
         <Payments
@@ -332,7 +378,11 @@ export function AdminBookingDetail() {
           <DeliveryForm
             booking={booking}
             busy={busy}
-            onSave={(body) => act(() => bookingsApi.saveDelivery(booking.id, body))}
+            editing={openForm === 'delivery'}
+            onEdit={() => setOpenForm('delivery')}
+            onCloseEdit={() => setOpenForm(null)}
+            failureNote={failureNote}
+            onSave={(body) => submitFrom(() => bookingsApi.saveDelivery(booking.id, body))}
             onSend={(recipient) => act(() => bookingsApi.sendDelivery(booking.id, recipient))}
           />
         ) : (
@@ -349,9 +399,47 @@ export function AdminBookingDetail() {
         <Section title={t('admin:booking.sections.actions')}>
           <div className="flex flex-col gap-6">
             {actions.canReschedule && (
-              <RescheduleForm booking={booking} busy={busy} onSubmit={(startsAt) => act(() => bookingsApi.reschedule(booking.id, startsAt))} />
+              <div className="flex flex-col gap-2">
+                <Button
+                  variant="console-outline"
+                  size="console"
+                  className={cn(BUTTON_WIDTH, 'sm:self-start')}
+                  onClick={() => setOpenForm('reschedule')}
+                >
+                  {t('admin:booking.reschedule.move')}
+                </Button>
+                <p className={HINT}>{t('admin:booking.reschedule.note')}</p>
+              </div>
             )}
-            {actions.canCancel && <CancelForm busy={busy} onSubmit={(reason) => act(() => bookingsApi.cancel(booking.id, reason))} />}
+            {actions.canReschedule &&
+              formDialog(
+                'reschedule',
+                t('admin:booking.reschedule.move'),
+                <RescheduleForm
+                  booking={booking}
+                  busy={busy}
+                  onSubmit={(startsAt) => submitFrom(() => bookingsApi.reschedule(booking.id, startsAt))}
+                />,
+              )}
+            {actions.canCancel && (
+              // Set off from the routine actions by a hairline above and below
+              // (admin-booking-detail.md); the dialog is the second step.
+              <div className="border-y py-6">
+                <Button variant="destructive" size="console" className={BUTTON_WIDTH} onClick={() => setOpenForm('cancel')}>
+                  {t('admin:booking.cancel.start')}
+                </Button>
+              </div>
+            )}
+            {actions.canCancel &&
+              formDialog(
+                'cancel',
+                t('admin:booking.cancel.start'),
+                <CancelForm
+                  busy={busy}
+                  onKeep={() => setOpenForm(null)}
+                  onSubmit={(reason) => submitFrom(() => bookingsApi.cancel(booking.id, reason))}
+                />,
+              )}
             {actions.canRequestSessionFee && (
               <div className="flex flex-col gap-2">
                 {/* The page's one main action: the inverted neutral button. */}
@@ -844,11 +932,20 @@ function RefundForm({
 function DeliveryForm({
   booking,
   busy,
+  editing,
+  onEdit,
+  onCloseEdit,
+  failureNote,
   onSave,
   onSend,
 }: {
   booking: AdminBooking
   busy: boolean
+  /** The link form is open in its dialog. */
+  editing: boolean
+  onEdit: () => void
+  onCloseEdit: () => void
+  failureNote: ReactNode
   onSave: (body: { url: string; expiresOn?: string; note?: string | null }) => Promise<void>
   /** `recipient` only when the photographer changed the address. */
   onSend: (recipient?: string) => Promise<void>
@@ -860,6 +957,15 @@ function DeliveryForm({
   const [url, setUrl] = useState(delivery.url ?? '')
   const [expiresOn, setExpiresOn] = useState(delivery.expiresOn ?? '')
   const [note, setNote] = useState(delivery.note ?? '')
+
+  // Closing the dialog without saving discards the edit: each opening starts
+  // from what is stored.
+  function openEdit() {
+    setUrl(delivery.url ?? '')
+    setExpiresOn(delivery.expiresOn ?? '')
+    setNote(delivery.note ?? '')
+    onEdit()
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -881,58 +987,86 @@ function DeliveryForm({
         </Fact>
       )}
 
-      {actions.canEditDelivery ? (
-        <form onSubmit={submit} className="flex flex-col gap-5">
-          <div className={FIELD_GROUP}>
-            <Label htmlFor={`${fieldId}url`}>{t('admin:booking.delivery.url')}</Label>
-            <Input
-              id={`${fieldId}url`}
-              type="url"
-              inputMode="url"
-              placeholder="https://"
-              value={url}
-              onChange={(event) => setUrl(event.target.value)}
-              className={FIELD}
-            />
-          </div>
-          <div className={FIELD_GROUP}>
-            <Label htmlFor={`${fieldId}expires`}>{t('admin:booking.delivery.expires')}</Label>
-            <Input
-              id={`${fieldId}expires`}
-              type="date"
-              value={expiresOn}
-              onChange={(event) => setExpiresOn(event.target.value)}
-              className={cn(FIELD, 'tabular-nums sm:w-44')}
-            />
-            <p className={HINT}>{t('admin:booking.delivery.expiresHint')}</p>
-          </div>
-          <div className={FIELD_GROUP}>
-            <Label htmlFor={`${fieldId}note`}>{t('admin:booking.delivery.note')}</Label>
-            <Textarea id={`${fieldId}note`} rows={2} value={note} onChange={(event) => setNote(event.target.value)} className={TEXTAREA} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <div className={BUTTONS}>
-              <Button type="submit" variant="console-outline" size="console" className={BUTTON_WIDTH} aria-disabled={busy}>
-                {t('admin:booking.delivery.save')}
+      {delivery.url !== null && (
+        <div className="flex flex-col gap-4 sm:gap-3">
+          <Fact term={t('admin:booking.delivery.url')}>
+            <span className="wrap-anywhere">{delivery.url}</span>
+          </Fact>
+          {delivery.expiresOn !== null && <Fact term={t('admin:booking.delivery.expires')}>{formatDate(delivery.expiresOn)}</Fact>}
+        </div>
+      )}
+
+      {actions.canEditDelivery && (
+        <div className="flex flex-col gap-2">
+          <div className={BUTTONS}>
+            <Button variant="console-outline" size="console" className={BUTTON_WIDTH} onClick={openEdit}>
+              {t(delivery.url === null ? 'admin:booking.delivery.addLink' : 'admin:booking.delivery.changeLink')}
+            </Button>
+            {/* Only opens the confirm step below; "Send now" there is what sends. */}
+            {actions.canSendDelivery && !confirming && (
+              <Button
+                type="button"
+                variant="console-outline"
+                size="console"
+                className={BUTTON_WIDTH}
+                aria-disabled={busy}
+                onClick={() => setConfirming(true)}
+              >
+                {t(delivery.sentAt === null ? 'admin:booking.delivery.send' : 'admin:booking.delivery.sendAgain')}
               </Button>
-              {/* Only opens the confirm step below; "Send now" there is what sends. */}
-              {actions.canSendDelivery && !confirming && (
-                <Button
-                  type="button"
-                  variant="console-outline"
-                  size="console"
-                  className={BUTTON_WIDTH}
-                  aria-disabled={busy}
-                  onClick={() => setConfirming(true)}
-                >
-                  {t(delivery.sentAt === null ? 'admin:booking.delivery.send' : 'admin:booking.delivery.sendAgain')}
-                </Button>
-              )}
-            </div>
-            <p className={HINT}>{t('admin:booking.delivery.note_hint')}</p>
+            )}
           </div>
-        </form>
-      ) : null}
+          <p className={HINT}>{t('admin:booking.delivery.note_hint')}</p>
+        </div>
+      )}
+
+      {actions.canEditDelivery && (
+        <FormDialog open={editing} onClose={onCloseEdit} title={t('admin:booking.sections.delivery')}>
+          <div className="flex flex-col gap-5">
+            {failureNote}
+            <form onSubmit={submit} className="flex flex-col gap-5">
+              <div className={FIELD_GROUP}>
+                <Label htmlFor={`${fieldId}url`}>{t('admin:booking.delivery.url')}</Label>
+                <Input
+                  id={`${fieldId}url`}
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://"
+                  value={url}
+                  onChange={(event) => setUrl(event.target.value)}
+                  className={FIELD}
+                />
+              </div>
+              <div className={FIELD_GROUP}>
+                <Label htmlFor={`${fieldId}expires`}>{t('admin:booking.delivery.expires')}</Label>
+                <Input
+                  id={`${fieldId}expires`}
+                  type="date"
+                  value={expiresOn}
+                  onChange={(event) => setExpiresOn(event.target.value)}
+                  className={cn(FIELD, 'tabular-nums sm:w-44')}
+                />
+                <p className={HINT}>{t('admin:booking.delivery.expiresHint')}</p>
+              </div>
+              <div className={FIELD_GROUP}>
+                <Label htmlFor={`${fieldId}note`}>{t('admin:booking.delivery.note')}</Label>
+                <Textarea id={`${fieldId}note`} rows={2} value={note} onChange={(event) => setNote(event.target.value)} className={TEXTAREA} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <div className={BUTTONS}>
+                  <Button type="submit" size="console" className={BUTTON_WIDTH} aria-disabled={busy}>
+                    {t('admin:booking.delivery.save')}
+                  </Button>
+                  <Button type="button" variant="console-outline" size="console" className={BUTTON_WIDTH} onClick={onCloseEdit}>
+                    {t('admin:catalogue.cancel')}
+                  </Button>
+                </div>
+                <p className={HINT}>{t('admin:booking.delivery.note_hint')}</p>
+              </div>
+            </form>
+          </div>
+        </FormDialog>
+      )}
 
       {actions.canEditDelivery && actions.canSendDelivery && confirming && (
         <ConfirmRecipient
@@ -946,14 +1080,6 @@ function DeliveryForm({
         />
       )}
 
-      {actions.canEditDelivery ? null : (
-        <div className="flex flex-col gap-4 sm:gap-3">
-          <Fact term={t('admin:booking.delivery.url')}>
-            <span className="wrap-anywhere">{delivery.url}</span>
-          </Fact>
-          {delivery.expiresOn !== null && <Fact term={t('admin:booking.delivery.expires')}>{formatDate(delivery.expiresOn)}</Fact>}
-        </div>
-      )}
     </Section>
   )
 }
@@ -1148,56 +1274,49 @@ function RescheduleForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className={FIELD_GROUP}>
-          <Label htmlFor={fieldId}>{t('admin:booking.reschedule.newStart')}</Label>
-          <Input
-            id={fieldId}
-            type="datetime-local"
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            className={cn(FIELD, 'tabular-nums sm:w-60')}
-          />
-        </div>
-        <Button type="submit" variant="console-outline" size="console" className={BUTTON_WIDTH} aria-disabled={busy}>
-          {t('admin:booking.reschedule.move')}
-        </Button>
+    <form onSubmit={submit} className="flex flex-col gap-5">
+      <div className={FIELD_GROUP}>
+        <Label htmlFor={fieldId}>{t('admin:booking.reschedule.newStart')}</Label>
+        <Input
+          id={fieldId}
+          type="datetime-local"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          className={cn(FIELD, 'tabular-nums sm:w-60')}
+        />
+        <p className={HINT}>{t('admin:booking.reschedule.note')}</p>
       </div>
-      <p className={HINT}>{t('admin:booking.reschedule.note')}</p>
+      <Button type="submit" size="console" className={cn(BUTTON_WIDTH, 'sm:self-start')} aria-disabled={busy}>
+        {t('admin:booking.reschedule.move')}
+      </Button>
     </form>
   )
 }
 
 /**
- * Cancelling asks twice. Its block is set off from the routine actions by a
- * hairline above and below (admin-booking-detail.md): the opener is the red
- * tint, and the confirm, which cannot be undone, is the solid red.
+ * Cancelling asks twice: the red-tinted opener on the page, then this form in
+ * its dialog, whose confirm, which cannot be undone, is the solid red.
  */
-function CancelForm({ busy, onSubmit }: { busy: boolean; onSubmit: (reason: string | null) => Promise<void> }) {
+function CancelForm({
+  busy,
+  onKeep,
+  onSubmit,
+}: {
+  busy: boolean
+  onKeep: () => void
+  onSubmit: (reason: string | null) => Promise<void>
+}) {
   const { t } = useTranslation()
   const fieldId = useId()
-  const [confirming, setConfirming] = useState(false)
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const reason = String(new FormData(event.currentTarget).get('reason') ?? '').trim()
     void onSubmit(reason === '' ? null : reason)
-    setConfirming(false)
-  }
-
-  if (!confirming) {
-    return (
-      <div className="border-y py-6">
-        <Button variant="destructive" size="console" className={BUTTON_WIDTH} onClick={() => setConfirming(true)}>
-          {t('admin:booking.cancel.start')}
-        </Button>
-      </div>
-    )
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4 border-y py-6">
+    <form onSubmit={submit} className="flex flex-col gap-5">
       <Callout variant="console" tone="destructive" icon={TriangleAlert}>
         <p className="font-medium">{t('admin:booking.cancel.warning')}</p>
       </Callout>
@@ -1210,7 +1329,7 @@ function CancelForm({ busy, onSubmit }: { busy: boolean; onSubmit: (reason: stri
         <Button type="submit" variant="console-destructive-solid" size="console" className={BUTTON_WIDTH} aria-disabled={busy}>
           {t('admin:booking.cancel.confirm')}
         </Button>
-        <Button type="button" variant="console-outline" size="console" className={BUTTON_WIDTH} onClick={() => setConfirming(false)}>
+        <Button type="button" variant="console-outline" size="console" className={BUTTON_WIDTH} onClick={onKeep}>
           {t('admin:booking.cancel.keep')}
         </Button>
       </div>

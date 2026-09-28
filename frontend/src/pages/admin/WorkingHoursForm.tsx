@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { AdminField, SELECT_CLASS } from './AdminField'
 import { CHECKBOX, CHOICE, EYEBROW, FIELD, SUBPANEL, TEXTAREA } from './console/classes'
+import { useInDialog } from './console/in-dialog'
 
 /**
  * One working-hours row: a weekly rule, or one date that differs from it
@@ -39,6 +40,7 @@ type Props = {
 
 export function WorkingHoursForm({ title, submitLabel, values, onSave, onCancel }: Props) {
   const { t } = useTranslation()
+  const inDialog = useInDialog()
   const navigate = useNavigate()
   const openId = useId()
   const [kind, setKind] = useState(values.kind)
@@ -92,12 +94,13 @@ export function WorkingHoursForm({ title, submitLabel, values, onSave, onCancel 
 
   return (
     <form
-      className={SUBPANEL}
+      className={inDialog ? 'flex flex-col gap-4' : SUBPANEL}
       aria-label={title}
       noValidate
       onSubmit={onSubmit}
     >
-      <h3 className="text-base font-medium">{title}</h3>
+      {/* In a dialog the dialog's own title names the form. */}
+      {!inDialog && <h3 className="text-base font-medium">{title}</h3>}
 
       <fieldset className="flex flex-col gap-2">
         <legend className={cn(EYEBROW, 'mb-1')}>{t('admin:availability.fields.kind')}</legend>

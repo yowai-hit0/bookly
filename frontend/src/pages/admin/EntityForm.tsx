@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { CHECKBOX, FIELD, SUBPANEL, TEXTAREA } from './console/classes'
+import { useInDialog } from './console/in-dialog'
 
 /**
  * The one form behind every catalogue editor (plan.md Task 10). Inputs are
@@ -43,6 +44,7 @@ const FORM_FIELD_FOR: Record<string, string> = { bookingFeeRateOverride: 'bookin
 
 export function EntityForm<T>({ title, submitLabel, fields, values, schema, onSave, onCancel }: Props<T>) {
   const { t } = useTranslation()
+  const inDialog = useInDialog()
   const navigate = useNavigate()
   const idPrefix = useId()
   const [invalid, setInvalid] = useState<ReadonlySet<string>>(new Set())
@@ -91,8 +93,9 @@ export function EntityForm<T>({ title, submitLabel, fields, values, schema, onSa
   }
 
   return (
-    <form className={SUBPANEL} aria-label={title} noValidate onSubmit={onSubmit}>
-      <h3 className="text-base font-medium">{title}</h3>
+    <form className={inDialog ? 'flex flex-col gap-4' : SUBPANEL} aria-label={title} noValidate onSubmit={onSubmit}>
+      {/* In a dialog the dialog's own title names the form. */}
+      {!inDialog && <h3 className="text-base font-medium">{title}</h3>}
       <div className="grid gap-4 sm:grid-cols-2">
         {fields.map((field) => {
           const inputId = `${idPrefix}-${field.name}`

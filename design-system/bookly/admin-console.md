@@ -250,6 +250,15 @@ A centred 400px panel on the canvas, `border`, 2px radius, `p-8` (`p-6` below `s
 
 Square cells, hairline grid, mono hour labels and date numbers, today marked by a violet date chip. Events are square chips on `--console-surface` with a 3px left edge in the status colour (the one sanctioned side edge in admin: it is an event's status key in a dense grid, and the status word and icon are still inside the event), 13px Geist title, mono time. The conflict outline (2px danger) and the block hatch keep their meaning. The toolbar is a joined bordered strip; the view switch is a segmented control whose active segment is filled `--primary`.
 
+### 6.11 Dialogs (2026-09-27)
+
+User decision: every create and edit form in the admin opens in a modal dialog, opened by its button; the one exception is the availability page's "Add block", which stays inline. One-click actions (Mark completed, No-show, Resend link) stay plain buttons.
+
+- `components/ui/dialog.tsx` is the shadcn Dialog over Radix, in the console look: a `--popover` panel with a hairline and 2px corners over a 60% black scrim, no shadow. It closes on the ×, Escape, a click on the scrim and the form's own Cancel; Radix traps focus inside it.
+- `pages/admin/console/FormDialog.tsx` wraps a form: a header with the title (and the × at 44px below `lg`), then a body that scrolls inside the panel on a short screen, never the page. It returns focus to the button that opened it (Radix does so only for its own trigger), so that button stays mounted while the dialog is open.
+- Closing without saving discards what was typed; a successful save closes the dialog and the page shows what the API answered. A refused save keeps the dialog open and shows the refusal inside it, where the eye is.
+- The shared forms (EntityForm, BlockForm, WorkingHoursForm) drop their own heading and panel frame inside a dialog (`InDialogContext`), since the dialog titles them.
+
 ### 6.10 Buttons (`button.tsx`, opt-in `size="console"` and `variant` additions)
 
 - Default (inverted neutral), `console-outline` (`--console-border-strong` edge, transparent, hover `bg-muted`), ghost, destructive (tint + red text), and `console-destructive-solid` (`--console-danger-solid` fill, white label) for the irreversible confirm. The client's `destructive-solid` is never used in admin: the dark `--destructive` is a text colour.

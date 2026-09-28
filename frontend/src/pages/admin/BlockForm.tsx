@@ -18,6 +18,7 @@ import { formatDateTime, formatTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { AdminField } from './AdminField'
 import { CHOICE, EYEBROW, FIELD, SUBPANEL, TEXTAREA } from './console/classes'
+import { useInDialog } from './console/in-dialog'
 
 /**
  * Creating or editing one block (plan.md Task 8, spec §3.3 step 3, §6.4). The
@@ -47,6 +48,7 @@ const FORM_FIELD_FOR: Record<string, string> = { startsAt: 'startTime', endsAt: 
 
 export function BlockForm({ title, submitLabel, values, onSave, onCancel }: Props) {
   const { t } = useTranslation()
+  const inDialog = useInDialog()
   const navigate = useNavigate()
   const [mode, setMode] = useState(values.mode)
   const [invalid, setInvalid] = useState<ReadonlySet<string>>(new Set())
@@ -105,12 +107,13 @@ export function BlockForm({ title, submitLabel, values, onSave, onCancel }: Prop
 
   return (
     <form
-      className={SUBPANEL}
+      className={inDialog ? 'flex flex-col gap-4' : SUBPANEL}
       aria-label={title}
       noValidate
       onSubmit={onSubmit}
     >
-      <h3 className="text-base font-medium">{title}</h3>
+      {/* In a dialog the dialog's own title names the form. */}
+      {!inDialog && <h3 className="text-base font-medium">{title}</h3>}
 
       <fieldset className="flex flex-col gap-2">
         <legend className={cn(EYEBROW, 'mb-1')}>{t('admin:availability.fields.mode')}</legend>

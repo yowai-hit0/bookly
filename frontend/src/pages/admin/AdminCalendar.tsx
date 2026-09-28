@@ -26,6 +26,7 @@ import { TIME_ZONE } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { BlockForm } from './BlockForm'
 import { META, PAGE } from './console/classes'
+import { FormDialog } from './console/FormDialog'
 import { MetaItem, PageHeader } from './console/PageHeader'
 
 /**
@@ -192,17 +193,17 @@ export function AdminCalendar() {
         title={t('admin:calendar.title')}
         meta={<MetaItem icon={Globe}>{t('admin:calendar.timezoneNote')}</MetaItem>}
         actions={
-          blocking ? undefined : (
-            <Button size="console" onClick={() => setBlocking(true)}>
-              {t('admin:calendar.blockTime')}
-            </Button>
-          )
+          // Stays mounted while the dialog is open, so focus returns to it on close.
+          <Button size="console" onClick={() => setBlocking(true)}>
+            {t('admin:calendar.blockTime')}
+          </Button>
         }
       />
 
       {/* Blocking time is most often decided while looking at the calendar, so
-          the form opens here rather than sending him to the availability page. */}
-      {blocking && (
+          the form opens here, in a dialog, rather than sending him to the
+          availability page. */}
+      <FormDialog open={blocking} onClose={() => setBlocking(false)} title={t('admin:availability.blocks.new')} wide>
         <BlockForm
           title={t('admin:availability.blocks.new')}
           submitLabel={t('admin:availability.create')}
@@ -214,7 +215,7 @@ export function AdminCalendar() {
           }}
           onCancel={() => setBlocking(false)}
         />
-      )}
+      </FormDialog>
 
       {/* The loading line and the failure sit close above the calendar they
           are about, not a section's gap away from it. */}

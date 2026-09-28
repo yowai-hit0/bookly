@@ -30,6 +30,8 @@ Each list is a `ul`; each row is a `li`, `flex-wrap items-center justify-between
 
 ## The two forms (`WorkingHoursForm`, `BlockForm`)
 
+**Changed 2026-09-27 (admin console fixes, item 1, user decision):** working hours (new and edit) and editing an existing block open in a dialog (`admin-console.md` §6.11); **"Add block" stays inline** under its list, as below. The rest of this section describes the inline case.
+
 Both open **inline**, in place of the row being edited or under the list for a new one, and only one is open at a time. Keep that: an inline form keeps the surrounding rows visible, which is the whole reason the two lists share a page.
 
 - Form shell: `flex-col gap-3 rounded-md border p-3`, `aria-label={title}`, `h3` at `text-sm font-medium`. Inside a card, the form's border needs to read as a nested surface — use `bg-muted/40` with the border, or `rounded-lg` and a slightly heavier border. It must not look like a second card floating in the first.

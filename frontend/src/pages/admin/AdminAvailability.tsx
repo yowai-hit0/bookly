@@ -20,6 +20,7 @@ import { formatDate, formatTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { BlockForm } from './BlockForm'
 import { META, PAGE, SECTION_TITLE } from './console/classes'
+import { FormDialog } from './console/FormDialog'
 import { PageHeader } from './console/PageHeader'
 import { WorkingHoursForm } from './WorkingHoursForm'
 
@@ -52,8 +53,6 @@ const LIST = '-mx-(--card-spacing) border-y'
 const ROW =
   'flex flex-col gap-3 border-b px-(--card-spacing) py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-6 lg:py-3.5'
 
-/** A row with an open form in its place. */
-const FORM_ROW = 'border-b px-(--card-spacing) py-4 last:border-b-0'
 
 /** The two lines of a row's words: the name, then its qualifiers. */
 const ROW_TEXT = 'flex min-w-0 flex-col gap-1'
@@ -149,20 +148,6 @@ export function AdminAvailability() {
     const key = `hours:${row.id}`
     const name = nameOfHours(row)
 
-    if (editing === key) {
-      return (
-        <li key={row.id} className={FORM_ROW}>
-          <WorkingHoursForm
-            title={t('admin:availability.hours.editTitle')}
-            submitLabel={t('admin:availability.save')}
-            values={workingHoursFormValues(row)}
-            onSave={(payload) => saved(availabilityApi.updateWorkingHours(row.id, payload))}
-            onCancel={() => setEditing(null)}
-          />
-        </li>
-      )
-    }
-
     const isClosed = !(row.isOpen && row.opensMinute !== null && row.closesMinute !== null)
 
     return (
@@ -226,6 +211,15 @@ export function AdminAvailability() {
             {t('admin:availability.delete')}
           </Button>
         </div>
+        <FormDialog open={editing === key} onClose={() => setEditing(null)} title={t('admin:availability.hours.editTitle')} wide>
+          <WorkingHoursForm
+            title={t('admin:availability.hours.editTitle')}
+            submitLabel={t('admin:availability.save')}
+            values={workingHoursFormValues(row)}
+            onSave={(payload) => saved(availabilityApi.updateWorkingHours(row.id, payload))}
+            onCancel={() => setEditing(null)}
+          />
+        </FormDialog>
       </li>
     )
   }
@@ -233,20 +227,6 @@ export function AdminAvailability() {
   function blockRow(block: AdminBlock) {
     const key = `block:${block.id}`
     const name = nameOfBlock(block)
-
-    if (editing === key) {
-      return (
-        <li key={block.id} className={FORM_ROW}>
-          <BlockForm
-            title={t('admin:availability.blocks.editTitle')}
-            submitLabel={t('admin:availability.save')}
-            values={blockFormValues(block)}
-            onSave={(payload) => saved(availabilityApi.updateBlock(block.id, payload))}
-            onCancel={() => setEditing(null)}
-          />
-        </li>
-      )
-    }
 
     return (
       <li key={block.id} className={ROW}>
@@ -278,6 +258,15 @@ export function AdminAvailability() {
             {t('admin:availability.delete')}
           </Button>
         </div>
+        <FormDialog open={editing === key} onClose={() => setEditing(null)} title={t('admin:availability.blocks.editTitle')} wide>
+          <BlockForm
+            title={t('admin:availability.blocks.editTitle')}
+            submitLabel={t('admin:availability.save')}
+            values={blockFormValues(block)}
+            onSave={(payload) => saved(availabilityApi.updateBlock(block.id, payload))}
+            onCancel={() => setEditing(null)}
+          />
+        </FormDialog>
       </li>
     )
   }
@@ -333,7 +322,16 @@ export function AdminAvailability() {
               ) : (
                 <ul className={LIST}>{data.workingHours.map(hoursRow)}</ul>
               )}
-              {editing === 'hours:new' ? (
+              <Button
+                size="console"
+                variant="console-outline"
+                className="sm:self-start"
+                onClick={() => setEditing('hours:new')}
+              >
+                <Plus aria-hidden="true" />
+                {t('admin:availability.hours.add')}
+              </Button>
+              <FormDialog open={editing === 'hours:new'} onClose={() => setEditing(null)} title={t('admin:availability.hours.new')} wide>
                 <WorkingHoursForm
                   title={t('admin:availability.hours.new')}
                   submitLabel={t('admin:availability.create')}
@@ -341,17 +339,7 @@ export function AdminAvailability() {
                   onSave={(payload) => saved(availabilityApi.createWorkingHours(payload))}
                   onCancel={() => setEditing(null)}
                 />
-              ) : (
-                <Button
-                  size="console"
-                  variant="console-outline"
-                  className="sm:self-start"
-                  onClick={() => setEditing('hours:new')}
-                >
-                  <Plus aria-hidden="true" />
-                  {t('admin:availability.hours.add')}
-                </Button>
-              )}
+              </FormDialog>
             </CardContent>
           </Card>
 
@@ -368,6 +356,7 @@ export function AdminAvailability() {
               ) : (
                 <ul className={LIST}>{data.blocks.map(blockRow)}</ul>
               )}
+              {/* "Add block" stays inline, the one exception to the modals (2026-09-27). */}
               {editing === 'block:new' ? (
                 <BlockForm
                   title={t('admin:availability.blocks.new')}

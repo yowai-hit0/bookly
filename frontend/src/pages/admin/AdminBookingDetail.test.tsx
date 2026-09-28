@@ -228,6 +228,16 @@ async function renderLoaded(path = DETAIL_PATH) {
   return router
 }
 
+/**
+ * Every create and edit form on the page opens in a dialog from its button
+ * (admin console fixes, item 1, 2026-09-27). While one is open the page behind
+ * it is hidden from assistive tech, so a test reads the page before opening one.
+ */
+async function openDialog(opener: string): Promise<HTMLElement> {
+  await user().click(screen.getByRole('button', { name: opener }))
+  return screen.getByRole('dialog')
+}
+
 function section(title: string): HTMLElement {
   const heading = screen.getByRole('heading', { level: 2, name: title })
   const element = heading.closest('section')
@@ -482,6 +492,7 @@ describe('the reschedule field', () => {
   it('opens on the booking’s own Kigali wall time', async () => {
     stubApi()
     await renderLoaded()
+    await openDialog('Move booking')
 
     expect(screen.getByLabelText('New start (Kigali time)')).toHaveValue('2027-01-06T09:00')
   })
@@ -490,6 +501,7 @@ describe('the reschedule field', () => {
     const { sent } = stubApi()
     await renderLoaded()
 
+    await openDialog('Move booking')
     fireEvent.change(screen.getByLabelText('New start (Kigali time)'), { target: { value: '2027-01-07T14:30' } })
     await user().click(screen.getByRole('button', { name: 'Move booking' }))
 
@@ -515,6 +527,7 @@ describe('the reschedule field', () => {
     stubApi({ onPost: (_call, current) => ((current.value = moved), json({ booking: moved })) })
     await renderLoaded()
 
+    await openDialog('Move booking')
     fireEvent.change(screen.getByLabelText('New start (Kigali time)'), { target: { value: '2027-01-07T14:30' } })
     await user().click(screen.getByRole('button', { name: 'Move booking' }))
 
@@ -526,6 +539,7 @@ describe('the reschedule field', () => {
     const { sent } = stubApi()
     await renderLoaded()
 
+    await openDialog('Move booking')
     fireEvent.change(screen.getByLabelText('New start (Kigali time)'), { target: { value: '' } })
     await user().click(screen.getByRole('button', { name: 'Move booking' }))
 
@@ -556,8 +570,9 @@ describe('with the browser in America/New_York', () => {
     const { sent } = stubApi()
     await renderLoaded()
 
-    expect(screen.getByLabelText('New start (Kigali time)')).toHaveValue('2027-01-06T09:00')
     expect(section('The shoot')).toHaveTextContent('Wednesday, 6 January 2027, 09:00 – 10:30')
+    await openDialog('Move booking')
+    expect(screen.getByLabelText('New start (Kigali time)')).toHaveValue('2027-01-06T09:00')
 
     await user().click(screen.getByRole('button', { name: 'Move booking' }))
 
@@ -695,6 +710,7 @@ describe('when the API refuses an action', () => {
     await renderLoaded()
     const before = gets(sent).length
 
+    await openDialog('Move booking')
     fireEvent.change(screen.getByLabelText('New start (Kigali time)'), { target: { value: '2027-01-07T14:30' } })
     await user().click(screen.getByRole('button', { name: 'Move booking' }))
 
@@ -735,6 +751,7 @@ describe('when the API refuses an action', () => {
     stubApi({ onPost: () => json({ error: 'unchanged', booking: BOOKING }, 409) })
     await renderLoaded()
 
+    await openDialog('Move booking')
     await user().click(screen.getByRole('button', { name: 'Move booking' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('That is the time the booking already has.')
@@ -854,14 +871,18 @@ describe('the post-shoot add-on editor', () => {
     stubApi({ booking: COMPLETED })
     await renderLoaded()
 
-    expect(await screen.findByLabelText('Add-on')).toBeInTheDocument()
-    expect(section('Money')).toHaveTextContent('Add-ons from the shoot')
-    expect(screen.getByRole('button', { name: 'Add to the booking' })).toBeInTheDocument()
+    // The opener sits in the money section; the form opens in a dialog (2026-09-27).
+    expect(within(section('Money')).getByRole('button', { name: 'Add an add-on' })).toBeInTheDocument()
+    const dialog = await openDialog('Add an add-on')
+    expect(dialog).toHaveAccessibleName('Add-ons from the shoot')
+    expect(await within(dialog).findByLabelText('Add-on')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Add to the booking' })).toBeInTheDocument()
   })
 
   it('asks the catalogue for what he sells, once', async () => {
     const { sent } = stubApi({ booking: COMPLETED })
     await renderLoaded()
+    await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
 
     expect(gets(sent).filter((call) => call.url === '/api/admin/catalogue')).toHaveLength(1)
@@ -870,6 +891,7 @@ describe('the post-shoot add-on editor', () => {
   it('offers this service’s own add-ons and the shared ones, and nothing else', async () => {
     stubApi({ booking: COMPLETED })
     await renderLoaded()
+    await openDialog('Add an add-on')
 
     const select = await screen.findByLabelText('Add-on')
     const options = within(select).getAllByRole('option').map((option) => (option as HTMLOptionElement).value)
@@ -881,6 +903,7 @@ describe('the post-shoot add-on editor', () => {
   it('never offers an add-on he has retired, nor one belonging to another service', async () => {
     stubApi({ booking: COMPLETED })
     await renderLoaded()
+    await openDialog('Add an add-on')
 
     const select = await screen.findByLabelText('Add-on')
     const options = within(select).getAllByRole('option').map((option) => (option as HTMLOptionElement).value)
@@ -901,6 +924,7 @@ describe('the post-shoot add-on editor', () => {
       },
     })
     await renderLoaded()
+    await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
 
     await user().selectOptions(screen.getByLabelText('Add-on'), OWN_ADDON_ID)
@@ -919,6 +943,7 @@ describe('the post-shoot add-on editor', () => {
   it('sends a quantity of one when the field is left as it opens', async () => {
     const { sent } = stubApi({ booking: COMPLETED })
     await renderLoaded()
+    await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
 
     await user().selectOptions(screen.getByLabelText('Add-on'), SHARED_ADDON_ID)
@@ -931,6 +956,7 @@ describe('the post-shoot add-on editor', () => {
   it('posts nothing at all while no add-on has been chosen', async () => {
     const { sent } = stubApi({ booking: COMPLETED })
     await renderLoaded()
+    await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
 
     await user().click(screen.getByRole('button', { name: 'Add to the booking' }))
@@ -941,6 +967,7 @@ describe('the post-shoot add-on editor', () => {
   it('never sends a price: only an id and a quantity decide what is charged', async () => {
     const { sent } = stubApi({ booking: COMPLETED })
     await renderLoaded()
+    await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
 
     await user().selectOptions(screen.getByLabelText('Add-on'), OWN_ADDON_ID)
@@ -953,6 +980,7 @@ describe('the post-shoot add-on editor', () => {
   it('says so when the catalogue has nothing to sell for this service', async () => {
     stubApi({ booking: COMPLETED, catalogue: { services: [], sharedAddons: [] } })
     await renderLoaded()
+    await openDialog('Add an add-on')
 
     expect(await screen.findByText('No add-ons are on sale for this service.')).toBeInTheDocument()
     expect(screen.queryByLabelText('Add-on')).toBeNull()
@@ -961,10 +989,12 @@ describe('the post-shoot add-on editor', () => {
   it('says the add-ons would not load, and leaves the rest of the page usable', async () => {
     const { sent } = stubApi({ booking: COMPLETED, catalogue: null })
     await renderLoaded()
+    await openDialog('Add an add-on')
 
     // Not "no add-ons are on sale": he sells them, we could not read them.
     expect(await screen.findByRole('alert')).toHaveTextContent('We could not load the add-ons.')
     expect(screen.queryByText('No add-ons are on sale for this service.')).toBeNull()
+    await user().keyboard('{Escape}')
     // The money, the payments and the actions are all still there.
     expect(section('Money')).toHaveTextContent('Total50,000 RWF')
     expect(section('Payments')).toHaveTextContent('Booking fee')
@@ -1141,13 +1171,17 @@ describe('requesting the session fee', () => {
   it('shows the not_allowed refusal for an add-on the API will not take, and stays usable', async () => {
     stubApi({ booking: COMPLETED, onPost: () => json({ error: 'not_allowed', booking: COMPLETED }, 409) })
     await renderLoaded()
+    await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
 
     await user().selectOptions(screen.getByLabelText('Add-on'), OWN_ADDON_ID)
     await user().click(screen.getByRole('button', { name: 'Add to the booking' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('That is not possible for this booking any more.')
-    expect(screen.getByRole('button', { name: 'Add to the booking' })).toBeInTheDocument()
+    // A refusal keeps the dialog open, with the words inside it.
+    const dialog = screen.getByRole('dialog')
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('That is not possible for this booking any more.')
+    expect(within(dialog).getByRole('button', { name: 'Add to the booking' })).toBeInTheDocument()
+    await user().keyboard('{Escape}')
     expect(section('Money')).toHaveTextContent('Total50,000 RWF')
   })
 })
@@ -1170,6 +1204,7 @@ describe('the quantity the add-on form sends', () => {
   ])('sends nothing at all for %s: the field refuses it first', async (_case, value) => {
     const { sent } = stubApi({ booking: COMPLETED })
     await renderLoaded()
+    await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
 
     await user().selectOptions(screen.getByLabelText('Add-on'), OWN_ADDON_ID)
@@ -1183,6 +1218,7 @@ describe('the quantity the add-on form sends', () => {
   it('reads an emptied field as one', async () => {
     const { sent } = stubApi({ booking: COMPLETED })
     await renderLoaded()
+    await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
 
     await user().selectOptions(screen.getByLabelText('Add-on'), OWN_ADDON_ID)
@@ -1196,6 +1232,7 @@ describe('the quantity the add-on form sends', () => {
   it('sends the highest quantity the API takes', async () => {
     const { sent } = stubApi({ booking: COMPLETED })
     await renderLoaded()
+    await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
 
     await user().selectOptions(screen.getByLabelText('Add-on'), OWN_ADDON_ID)
@@ -1263,6 +1300,14 @@ function linkField(): HTMLElement {
   return screen.getByLabelText('Link to the photos')
 }
 
+/** The link form opens in a dialog: "Add the photo link" first, "Change the link" once one is saved. */
+async function openLinkDialog(): Promise<HTMLElement> {
+  const opener =
+    screen.queryByRole('button', { name: 'Add the photo link' }) ?? screen.getByRole('button', { name: 'Change the link' })
+  await user().click(opener)
+  return screen.getByRole('dialog')
+}
+
 describe('the delivery section', () => {
   it('is not on the page at all with neither an editor nor a link', async () => {
     stubApi()
@@ -1287,17 +1332,22 @@ describe('the delivery section', () => {
     stubApi({ booking: DELIVERABLE })
     await renderLoaded()
 
-    expect(linkField()).toBeInTheDocument()
-    expect(screen.getByLabelText('Link expires')).toBeInTheDocument()
-    expect(screen.getByLabelText('A line for the client (optional)')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Save the link' })).toBeInTheDocument()
-    expect(deliverySection()).toHaveTextContent('Left blank, the client gets 90 days from today.')
+    // The section offers the opener; the form itself opens in a dialog (2026-09-27).
+    expect(within(deliverySection()).getByRole('button', { name: 'Add the photo link' })).toBeInTheDocument()
     expect(deliverySection()).toHaveTextContent('Saving only stores the link. The client hears nothing until you send it.')
+    const dialog = await openLinkDialog()
+    expect(dialog).toHaveAccessibleName('The photos')
+    expect(within(dialog).getByLabelText('Link to the photos')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Link expires')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('A line for the client (optional)')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Save the link' })).toBeInTheDocument()
+    expect(dialog).toHaveTextContent('Left blank, the client gets 90 days from today.')
   })
 
   it('starts empty on a booking with nothing saved', async () => {
     stubApi({ booking: DELIVERABLE })
     await renderLoaded()
+    await openLinkDialog()
 
     expect(linkField()).toHaveValue('')
     expect(screen.getByLabelText('Link expires')).toHaveValue('')
@@ -1307,6 +1357,7 @@ describe('the delivery section', () => {
   it('prefills every field from the booking', async () => {
     stubApi({ booking: WITH_LINK })
     await renderLoaded()
+    await openLinkDialog()
 
     expect(linkField()).toHaveValue(DELIVERY_LINK)
     expect(screen.getByLabelText('Link expires')).toHaveValue('2027-03-15')
@@ -1336,6 +1387,7 @@ describe('saving the link', () => {
   it('sends the link, the date he chose and the note he wrote', async () => {
     const { sent } = stubApi({ booking: DELIVERABLE })
     await renderLoaded()
+    await openLinkDialog()
 
     await user().type(linkField(), DELIVERY_LINK)
     fireEvent.change(screen.getByLabelText('Link expires'), { target: { value: '2027-03-15' } })
@@ -1353,6 +1405,7 @@ describe('saving the link', () => {
   it('leaves the date out when the field is blank, so the API dates it (spec A-8)', async () => {
     const { sent } = stubApi({ booking: DELIVERABLE })
     await renderLoaded()
+    await openLinkDialog()
 
     await user().type(linkField(), DELIVERY_LINK)
     await user().click(screen.getByRole('button', { name: 'Save the link' }))
@@ -1365,6 +1418,7 @@ describe('saving the link', () => {
   it('sends a null note when the box is empty or only spaces', async () => {
     const { sent } = stubApi({ booking: DELIVERABLE })
     await renderLoaded()
+    await openLinkDialog()
 
     await user().type(linkField(), DELIVERY_LINK)
     fireEvent.change(screen.getByLabelText('A line for the client (optional)'), { target: { value: '   ' } })
@@ -1377,6 +1431,7 @@ describe('saving the link', () => {
   it('sends the link and the note without the whitespace around them', async () => {
     const { sent } = stubApi({ booking: DELIVERABLE })
     await renderLoaded()
+    await openLinkDialog()
 
     fireEvent.change(linkField(), { target: { value: `  ${DELIVERY_LINK}  ` } })
     fireEvent.change(screen.getByLabelText('A line for the client (optional)'), { target: { value: `  ${DELIVERY_NOTE}  ` } })
@@ -1389,6 +1444,7 @@ describe('saving the link', () => {
   it('sends nothing at all when there is no link to save', async () => {
     const { sent } = stubApi({ booking: DELIVERABLE })
     await renderLoaded()
+    await openLinkDialog()
 
     await user().click(screen.getByRole('button', { name: 'Save the link' }))
     fireEvent.change(linkField(), { target: { value: '   ' } })
@@ -1406,6 +1462,7 @@ describe('saving the link', () => {
       },
     })
     await renderLoaded()
+    await openLinkDialog()
 
     await user().type(linkField(), DELIVERY_LINK)
     await user().click(screen.getByRole('button', { name: 'Save the link' }))
@@ -1684,7 +1741,11 @@ describe('notes to the client (2026-09-25)', () => {
  * from *that* day rather than leaving the date the client was already told.
  */
 describe('what the form does with the booking it gets back', () => {
-  it('leaves the date field blank after the API has dated the link', async () => {
+  // Changed 2026-09-27 (item 1): the link form opens in a dialog, and each
+  // opening starts from what is stored, so closing it unsaved discards the edit.
+  // A date the API chose is therefore shown on the next opening, and saving
+  // again keeps that same date rather than re-dating the link.
+  it('shows the date the API chose on the next opening, and a second save keeps it', async () => {
     const dated: AdminBooking = { ...WITH_LINK, delivery: { ...WITH_LINK.delivery, expiresOn: '2027-04-06', note: null } }
     const { sent } = stubApi({
       booking: DELIVERABLE,
@@ -1694,17 +1755,19 @@ describe('what the form does with the booking it gets back', () => {
       },
     })
     await renderLoaded()
+    await openLinkDialog()
 
     await user().type(linkField(), DELIVERY_LINK)
     await user().click(screen.getByRole('button', { name: 'Save the link' }))
     await screen.findByRole('button', { name: 'Send the photos' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(writes(sent)[0]?.body).not.toHaveProperty('expiresOn')
 
-    // The booking now carries a date; the field he would edit does not.
-    expect(screen.getByLabelText('Link expires')).toHaveValue('')
-
+    await openLinkDialog()
+    expect(screen.getByLabelText('Link expires')).toHaveValue('2027-04-06')
     await user().click(screen.getByRole('button', { name: 'Save the link' }))
 
     await waitFor(() => expect(writes(sent)).toHaveLength(2))
-    expect(Object.keys(writes(sent)[1]?.body as object)).not.toContain('expiresOn')
+    expect(writes(sent)[1]?.body).toMatchObject({ url: DELIVERY_LINK, expiresOn: '2027-04-06' })
   })
 })

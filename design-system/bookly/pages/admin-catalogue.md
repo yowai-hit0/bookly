@@ -48,4 +48,5 @@ loading, failed, empty, service with no packages, package with a duration warnin
 
 ## Do not
 
-- No drag-to-reorder (ordering is the display-order field), no bulk actions, no modal editor, no new copy.
+- No drag-to-reorder (ordering is the display-order field), no bulk actions, no new copy.
+- **Changed 2026-09-27 (admin console fixes, item 1, user decision):** the editor **is** a modal now (`admin-console.md` §6.11): new and edit service, package and add-on each open `EntityForm` in a dialog from their button. "Add service" stays visible while its dialog is open, so focus can return to it.

@@ -366,6 +366,8 @@ test('signs in, filters the list, moves a booking and then cancels it', async ({
   await expect(shoot).toContainText('Wednesday, 6 January 2027, 09:00 – 10:30')
 
   // The field opens on Kigali wall time, not on the browser's 02:00.
+  // Each form opens in a dialog from its button (2026-09-27); inside it, the submit has the same name.
+  await page.getByRole('button', { name: 'Move booking' }).click()
   const newStart = page.getByLabel('New start (Kigali time)')
   await expect(newStart).toHaveValue('2027-01-06T09:00')
   await newStart.fill('2027-01-07T14:30')
@@ -414,7 +416,8 @@ test('adds a post-shoot add-on to a completed booking and requests the session f
   await expect(money).toContainText('Still to pay20,000 RWF')
 
   // The picker offers what the catalogue sells for this service.
-  const picker = page.getByLabel('Add-on')
+  await page.getByRole('button', { name: 'Add an add-on' }).click()
+  const picker = page.getByLabel('Add-on', { exact: true })
   await expect(picker).toBeVisible()
   await picker.selectOption(PRINTS_ID)
   await page.getByRole('button', { name: 'Add to the booking' }).click()
@@ -453,6 +456,7 @@ test('saves the delivery link on a completed booking and sends the photos', asyn
   // Nothing to send until a link is saved.
   await expect(page.getByRole('button', { name: 'Send the photos' })).toHaveCount(0)
 
+  await page.getByRole('button', { name: 'Add the photo link' }).click()
   await page.getByLabel('Link to the photos').fill(DELIVERY_LINK)
   await page.getByLabel('A line for the client (optional)').fill('The raw files are in the second folder.')
   await page.getByRole('button', { name: 'Save the link' }).click()

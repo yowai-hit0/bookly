@@ -440,6 +440,8 @@ describe('services', () => {
     expect(screen.queryByRole('form')).not.toBeInTheDocument()
   })
 
+  // Forms open in a modal (2026-09-27): while one is open the page behind it
+  // is out of reach, so a second form cannot open over it.
   it('closes a form on Cancel without sending anything, and keeps one form open at a time', async () => {
     signIn()
     const api = stubApi()
@@ -447,16 +449,36 @@ describe('services', () => {
     const u = user()
 
     await u.click(screen.getByRole('button', { name: 'Add service' }))
-    await u.click(screen.getByRole('button', { name: 'Edit Standard' }))
+    expect(screen.getByRole('dialog', { name: 'New service' })).toContainElement(form('New service'))
+    expect(screen.queryByRole('button', { name: 'Edit Standard' })).not.toBeInTheDocument()
+    await u.click(within(form('New service')).getByRole('button', { name: 'Cancel' }))
 
+    await u.click(screen.getByRole('button', { name: 'Edit Standard' }))
     expect(screen.getAllByRole('form')).toHaveLength(1)
     expect(form('Edit package')).toBeInTheDocument()
 
     await u.click(within(form('Edit package')).getByRole('button', { name: 'Cancel' }))
 
     expect(screen.queryByRole('form')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(writes(api)).toEqual([])
     expect(catalogueLoads(api)).toBe(1)
+  })
+
+  it('closes a form on Escape too, and gives focus back to the button that opened it', async () => {
+    signIn()
+    const api = stubApi()
+    await renderLoaded()
+    const u = user()
+
+    const add = screen.getByRole('button', { name: 'Add service' })
+    await u.click(add)
+    expect(form('New service')).toBeInTheDocument()
+    await u.keyboard('{Escape}')
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(add).toHaveFocus()
+    expect(writes(api)).toEqual([])
   })
 })
 
@@ -574,9 +596,10 @@ describe('add-ons', () => {
     await renderLoaded()
     const u = user()
 
+    // The form opens in a dialog (2026-09-27); which list it belongs to shows in the POST's scope.
     await u.click(within(container()).getByRole('button', { name: 'Add add-on' }))
     const newAddon = form('New add-on')
-    expect(container()).toContainElement(newAddon)
+    expect(screen.getByRole('dialog', { name: 'New add-on' })).toContainElement(newAddon)
     await fill(newAddon, { Name: 'Printed album', 'Price (RWF)': '25000', 'Display order': '1' })
     await u.click(within(newAddon).getByRole('button', { name: 'Create' }))
 

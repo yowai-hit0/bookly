@@ -173,6 +173,9 @@
     "breadcrumb": {
       "label": "Breadcrumb"
     },
+    "dialog": {
+      "close": "Close"
+    },
     "calendar": {
       "title": "Calendar",
       "timezoneNote": "All times are Kigali time (UTC+2).",
@@ -594,6 +597,7 @@
         "loading": "Loading the add-ons…",
         "none": "No add-ons are on sale for this service.",
         "note": "Adding one raises what the client owes. Ask for it with the session fee below.",
+        "open": "Add an add-on",
         "loadFailed": "We could not load the add-ons. Check your connection and try again."
       },
       "sessionFee": {
@@ -632,6 +636,8 @@
         "recipientHint": "Change it only if the client asked. A different address is used for this email only; the booking keeps {{email}}.",
         "recipientInvalid": "Enter a valid email address.",
         "confirmSend": "Send now",
+        "addLink": "Add the photo link",
+        "changeLink": "Change the link",
         "back": "Back"
       }
     }

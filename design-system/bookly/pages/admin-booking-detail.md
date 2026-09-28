@@ -59,5 +59,6 @@ loading, load failed (alert), missing (404 `h1`), ready; action busy; action ref
 
 ## Do not
 
-- No modal confirm, no toasts, no undo, no tabs, no two-column split, no new copy.
+- No toasts, no undo, no tabs, no two-column split.
+- **Changed 2026-09-27 (admin console fixes, item 1, user decision):** reschedule, cancel (reason and the solid confirm), add an add-on and the delivery link each open in a dialog from their button (`admin-console.md` §6.11). The Send / Send again confirm step stays inline. New strings for the openers: "Add an add-on", "Add the photo link", "Change the link".
 - Do not change action gating (`actions.*`) or any request logic.
