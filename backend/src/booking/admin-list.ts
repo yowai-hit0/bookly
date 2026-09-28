@@ -5,14 +5,17 @@ import { type BookingStage, bookingStage, stageWhere } from './stage.js';
 import { bookingTotals } from './totals.js';
 
 /**
- * The bookings list (plan.md Task 19): filtered by status and date, paged by a
- * cursor rather than an offset.
+ * The bookings list (plan.md Task 19): filtered by status and date, and paged
+ * by number with a total (admin console fixes, item 5, 2026-09-27).
  *
- * A cursor, because an offset is not stable. Page 2 of `OFFSET 20` shifts the
- * moment a booking is created or rescheduled, so a row can be shown twice or
- * skipped entirely. The cursor names the last row seen -- its start and its id
- * -- and the next page is everything ordered after it, which stays correct
- * however the table changes underneath.
+ * It was a cursor, because an offset is not stable: page 2 of `OFFSET 20`
+ * shifts the moment a booking is created or rescheduled, so a row can be shown
+ * twice or skipped. The photographer asked for numbered pages and a total
+ * instead ("Showing 21-40 of 132"), which only an offset can give, and accepted
+ * that trade: one person edits these bookings, and a page is re-read on every
+ * change of filter or page. The order stays deterministic -- start, then id --
+ * so the same page asked twice over an unchanged table is the same rows, and
+ * the count and the page are read in one transaction so they agree.
  *
  * Amounts come from `bookingTotals()` (data-model_v2.md §6.1), computed from
  * each row's own add-ons and payments, which the query loads with it: one
@@ -35,8 +38,9 @@ export type BookingsQuery = {
   to?: KigaliDate;
   /** A reference, a name, an email or a phone number, matched loosely. */
   search?: string;
-  cursor?: string;
-  limit?: number;
+  /** 1-based. Past the last page, the last page is answered. */
+  page?: number;
+  pageSize?: number;
 };
 
 export type BookingListRow = {
@@ -62,33 +66,40 @@ export type BookingListRow = {
 
 export type BookingsPage = {
   bookings: BookingListRow[];
-  /** Pass back as `cursor` for the next page; null at the end. */
-  nextCursor: string | null;
+  /** Every booking the filter matches, across all pages. */
+  total: number;
+  /** The page answered, 1-based: the one asked for, or the last one if it was past the end. */
+  page: number;
+  pageSize: number;
+  /** At least 1, so a list with nothing in it is still "page 1 of 1". */
+  pageCount: number;
 };
 
 export async function findBookings(prisma: PrismaClient, query: BookingsQuery = {}): Promise<BookingsPage> {
-  const limit = Math.min(Math.max(query.limit ?? BOOKINGS_PAGE_SIZE, 1), BOOKINGS_MAX_PAGE_SIZE);
+  const pageSize = Math.min(Math.max(Math.trunc(query.pageSize ?? BOOKINGS_PAGE_SIZE), 1), BOOKINGS_MAX_PAGE_SIZE);
   const now = query.now ?? new Date();
   const where = bookingsWhere(query, now);
 
-  // One row more than asked for: whether it comes back is whether there is a
-  // next page, and no second count query is needed to know.
-  const rows = await prisma.booking.findMany({
-    where,
-    orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
-    take: limit + 1,
-    include: {
-      addons: { select: { stage: true, amountRwf: true } },
-      payments: { select: { status: true, amountRwf: true } },
-    },
-  });
+  return prisma.$transaction(async (tx) => {
+    const total = await tx.booking.count({ where });
+    const pageCount = Math.max(1, Math.ceil(total / pageSize));
+    // A page past the end (a filter narrowed the list under a bookmarked
+    // URL) answers the last page rather than an empty one.
+    const page = Math.min(Math.max(Math.trunc(query.page ?? 1), 1), pageCount);
 
-  const page = rows.slice(0, limit);
-  const last = page.at(-1);
-  return {
-    bookings: page.map((row) => toRow(row, now)),
-    nextCursor: rows.length > limit && last !== undefined ? encodeCursor(last.startsAt, last.id) : null,
-  };
+    const rows = await tx.booking.findMany({
+      where,
+      orderBy: [{ startsAt: 'desc' }, { id: 'desc' }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        addons: { select: { stage: true, amountRwf: true } },
+        payments: { select: { status: true, amountRwf: true } },
+      },
+    });
+
+    return { bookings: rows.map((row) => toRow(row, now)), total, page, pageSize, pageCount };
+  });
 }
 
 function bookingsWhere(query: BookingsQuery, now: Date): Prisma.BookingWhereInput {
@@ -96,19 +107,11 @@ function bookingsWhere(query: BookingsQuery, now: Date): Prisma.BookingWhereInpu
   if (query.from !== undefined) startsAt.gte = kigaliMinuteToUtc(query.from, 0);
   if (query.to !== undefined) startsAt.lt = kigaliMinuteToUtc(query.to, MINUTES_PER_DAY);
 
-  const after = query.cursor === undefined ? null : decodeCursor(query.cursor);
   const search = query.search?.trim() ?? '';
 
   return {
     ...(query.statuses !== undefined && query.statuses.length > 0 ? { status: { in: [...query.statuses] } } : {}),
     ...(Object.keys(startsAt).length > 0 ? { startsAt } : {}),
-    // Strictly after the cursor in the list's own order: the same start with a
-    // smaller id, or an earlier start.
-    ...(after === null
-      ? {}
-      : {
-          OR: [{ startsAt: { lt: after.startsAt } }, { startsAt: after.startsAt, id: { lt: after.id } }],
-        }),
     AND: [
       ...(query.stages !== undefined && query.stages.length > 0 ? [{ OR: query.stages.map((stage) => stageWhere(stage, now)) }] : []),
       ...(search === ''
@@ -151,21 +154,4 @@ function toRow(booking: ListedBooking, now: Date): BookingListRow {
     refundDueRwf: totals.refundDueRwf,
     hasRefundDue: totals.refundDueRwf > 0,
   };
-}
-
-/** What our own ids look like: anything else never reaches the uuid column. */
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** `<start>|<id>`, base64url. Opaque to the caller, who only hands it back. */
-export function encodeCursor(startsAt: Date, id: string): string {
-  return Buffer.from(`${startsAt.toISOString()}|${id}`).toString('base64url');
-}
-
-/** The row a cursor names, or null when it is not one we wrote. */
-export function decodeCursor(cursor: string): { startsAt: Date; id: string } | null {
-  const [startsAt, id, ...rest] = Buffer.from(cursor, 'base64url').toString('utf8').split('|');
-  if (startsAt === undefined || id === undefined || rest.length > 0) return null;
-  const at = new Date(startsAt);
-  if (Number.isNaN(at.getTime()) || !UUID.test(id)) return null;
-  return { startsAt: at, id };
 }

@@ -11,7 +11,7 @@ import {
   insertPayment,
   seedWorld,
 } from '../test/payment-fixtures.js';
-import { BOOKINGS_MAX_PAGE_SIZE, BOOKINGS_PAGE_SIZE, decodeCursor, encodeCursor, findBookings } from './admin-list.js';
+import { BOOKINGS_MAX_PAGE_SIZE, BOOKINGS_PAGE_SIZE, findBookings } from './admin-list.js';
 import { BOOKING_STAGES, bookingStage } from './stage.js';
 import { bookingTotals } from './totals.js';
 
@@ -23,11 +23,12 @@ import { bookingTotals } from './totals.js';
  * `from` day and one at 23:59 on the `to` day are both in, one an hour outside
  * either end is not; the search matches reference, name, email and phone
  * case-insensitively; filters combine as AND; the order is `starts_at DESC,
- * id DESC` with the id breaking real ties; and the cursor is stable -- a
- * booking created between two pages neither repeats a row nor skips one, which
- * is the whole reason it is not an OFFSET. The page size defaults to 25 and
- * clamps at 100 however large a limit is asked for, `decodeCursor` refuses
- * anything it did not write, and every money column on a row is
+ * id DESC` with the id breaking real ties. Paging is by number with a total
+ * (2026-09-27, replacing the cursor): pages walk the list in that order with
+ * nothing repeated or skipped over an unchanged table, the total and the page
+ * count follow the filter, a page past the end answers the last page, and an
+ * empty list is still page 1 of 1. The page size defaults to 25 and clamps at
+ * 100 however large a size is asked for; every money column on a row is
  * `bookingTotals()` and nothing else -- including the status-aware outstanding
  * that is 0 for a no-show, a cancellation or an expired hold.
  *
@@ -161,7 +162,13 @@ describe('filtering by status', () => {
   it('answers nothing for a status nothing holds', async () => {
     await book({ status: 'confirmed' });
 
-    expect(await findBookings(prisma, { statuses: ['expired'] })).toStrictEqual({ bookings: [], nextCursor: null });
+    expect(await findBookings(prisma, { statuses: ['expired'] })).toStrictEqual({
+      bookings: [],
+      total: 0,
+      page: 1,
+      pageSize: BOOKINGS_PAGE_SIZE,
+      pageCount: 1,
+    });
   });
 });
 
@@ -325,9 +332,9 @@ describe('the order', () => {
   });
 });
 
-// --- Cursor paging ------------------------------------------------------------------------
+// --- Numbered pages -----------------------------------------------------------------------
 
-describe('paging by cursor', () => {
+describe('paging by number', () => {
   /** Five bookings an hour apart, newest first: the order the list will use. */
   async function inOrder(): Promise<string[]> {
     const created: Booking[] = [];
@@ -346,157 +353,107 @@ describe('paging by cursor', () => {
       .map((row) => row.reference);
   }
 
-  it('walks the whole list two rows at a time and ends with a null cursor', async () => {
+  it('walks the whole list two rows at a time, with the total and the page count on every page', async () => {
     const shoots = await inOrder();
 
-    const first = await findBookings(prisma, { limit: 2 });
+    const first = await findBookings(prisma, { page: 1, pageSize: 2 });
     expect(first.bookings.map((row) => row.reference)).toEqual([shoots[0], shoots[1]]);
-    expect(first.nextCursor).not.toBeNull();
+    expect(first).toMatchObject({ total: 5, page: 1, pageSize: 2, pageCount: 3 });
 
-    const second = await findBookings(prisma, { limit: 2, cursor: first.nextCursor ?? '' });
+    const second = await findBookings(prisma, { page: 2, pageSize: 2 });
     expect(second.bookings.map((row) => row.reference)).toEqual([shoots[2], shoots[3]]);
-    expect(second.nextCursor).not.toBeNull();
+    expect(second).toMatchObject({ total: 5, page: 2, pageCount: 3 });
 
-    const third = await findBookings(prisma, { limit: 2, cursor: second.nextCursor ?? '' });
+    const third = await findBookings(prisma, { page: 3, pageSize: 2 });
     expect(third.bookings.map((row) => row.reference)).toEqual([shoots[4]]);
-    expect(third.nextCursor).toBeNull();
-  });
-
-  it('skips and repeats nothing when a newer booking is made between two pages', async () => {
-    const shoots = await inOrder();
-
-    const first = await findBookings(prisma, { limit: 2 });
-    // A booking made after page 1 was read, later than everything on it. An
-    // OFFSET would now shift every later row down and repeat the last one.
-    await book({ startsAt: at('2027-03-20', '09:00'), status: 'confirmed' });
-    const second = await findBookings(prisma, { limit: 2, cursor: first.nextCursor ?? '' });
-    const third = await findBookings(prisma, { limit: 2, cursor: second.nextCursor ?? '' });
+    expect(third).toMatchObject({ total: 5, page: 3, pageCount: 3 });
 
     const walked = [...first.bookings, ...second.bookings, ...third.bookings].map((row) => row.reference);
     expect(walked).toEqual(shoots);
     expect(new Set(walked).size).toBe(walked.length);
-    expect(third.nextCursor).toBeNull();
   });
 
-  it('answers a null cursor when the last page is exactly full', async () => {
+  it('answers the same rows for the same page asked twice over an unchanged table', async () => {
     await inOrder();
 
-    const page = await findBookings(prisma, { limit: 5 });
+    const once = await findBookings(prisma, { page: 2, pageSize: 2 });
+    const again = await findBookings(prisma, { page: 2, pageSize: 2 });
+
+    expect(again.bookings.map((row) => row.id)).toEqual(once.bookings.map((row) => row.id));
+  });
+
+  it('counts a last page that is exactly full as the last page', async () => {
+    await inOrder();
+
+    const page = await findBookings(prisma, { page: 1, pageSize: 5 });
 
     expect(page.bookings).toHaveLength(5);
-    expect(page.nextCursor).toBeNull();
+    expect(page).toMatchObject({ total: 5, page: 1, pageCount: 1 });
   });
 
-  it('answers nothing, with no cursor, past the end of the list', async () => {
+  it('answers the last page for a page past the end, so a stale link still shows bookings', async () => {
     const shoots = await inOrder();
-    const all = await findBookings(prisma, { limit: 5 });
-    expect(all.bookings.map((row) => row.reference)).toEqual(shoots);
 
-    const past = await findBookings(prisma, { limit: 5, cursor: encodeCursor(new Date('2000-01-01T00:00:00Z'), all.bookings[0]?.id ?? '') });
+    const past = await findBookings(prisma, { page: 99, pageSize: 2 });
 
-    expect(past).toStrictEqual({ bookings: [], nextCursor: null });
+    expect(past.page).toBe(3);
+    expect(past.bookings.map((row) => row.reference)).toEqual([shoots[4]]);
   });
 
-  it('carries its filter with it: a cursor page is still filtered', async () => {
+  it('answers page 1 for a page below it', async () => {
+    const shoots = await inOrder();
+
+    for (const page of [0, -3]) {
+      const answer = await findBookings(prisma, { page, pageSize: 2 });
+      expect(answer.page).toBe(1);
+      expect(answer.bookings.map((row) => row.reference)).toEqual([shoots[0], shoots[1]]);
+    }
+  });
+
+  it('is page 1 of 1 for an empty list, not page 0 of 0', async () => {
+    expect(await findBookings(prisma, { page: 4 })).toMatchObject({ bookings: [], total: 0, page: 1, pageCount: 1 });
+  });
+
+  it('carries its filter with it: the total, the page count and every page are filtered', async () => {
     await book({ startsAt: at('2027-03-11', '09:00'), status: 'confirmed' });
     const cancelledLate = await book({ startsAt: at('2027-03-11', '12:00'), status: 'cancelled_by_admin' });
     const cancelledEarly = await book({ startsAt: at('2027-03-11', '06:00'), status: 'cancelled_by_admin' });
 
-    const first = await findBookings(prisma, { statuses: ['cancelled_by_admin'], limit: 1 });
+    const first = await findBookings(prisma, { statuses: ['cancelled_by_admin'], page: 1, pageSize: 1 });
     expect(first.bookings.map((row) => row.reference)).toEqual([cancelledLate.reference]);
+    expect(first).toMatchObject({ total: 2, pageCount: 2 });
 
-    const second = await findBookings(prisma, { statuses: ['cancelled_by_admin'], limit: 1, cursor: first.nextCursor ?? '' });
+    const second = await findBookings(prisma, { statuses: ['cancelled_by_admin'], page: 2, pageSize: 1 });
     expect(second.bookings.map((row) => row.reference)).toEqual([cancelledEarly.reference]);
-    expect(second.nextCursor).toBeNull();
   });
 });
 
 // --- Page size ----------------------------------------------------------------------------
 
 describe('the page size', () => {
-  it('defaults to 25 and reports there is more', async () => {
+  it('defaults to 25, and the total says how many more there are', async () => {
     await bulkBookings(BOOKINGS_PAGE_SIZE + 1, at('2027-03-11', '09:00'));
 
     const page = await findBookings(prisma);
 
     expect(BOOKINGS_PAGE_SIZE).toBe(25);
     expect(page.bookings).toHaveLength(BOOKINGS_PAGE_SIZE);
-    expect(page.nextCursor).not.toBeNull();
+    expect(page).toMatchObject({ total: BOOKINGS_PAGE_SIZE + 1, page: 1, pageSize: BOOKINGS_PAGE_SIZE, pageCount: 2 });
   });
 
-  it('clamps at 100 however large a limit is asked for', async () => {
+  it('clamps at 100 however large a size is asked for', async () => {
     await bulkBookings(BOOKINGS_MAX_PAGE_SIZE + 1, at('2027-03-11', '09:00'));
 
     expect(BOOKINGS_MAX_PAGE_SIZE).toBe(100);
-    expect((await findBookings(prisma, { limit: 1_000_000 })).bookings).toHaveLength(BOOKINGS_MAX_PAGE_SIZE);
-    expect((await findBookings(prisma, { limit: BOOKINGS_MAX_PAGE_SIZE })).bookings).toHaveLength(BOOKINGS_MAX_PAGE_SIZE);
+    expect((await findBookings(prisma, { pageSize: 1_000_000 })).bookings).toHaveLength(BOOKINGS_MAX_PAGE_SIZE);
+    expect((await findBookings(prisma, { pageSize: BOOKINGS_MAX_PAGE_SIZE })).bookings).toHaveLength(BOOKINGS_MAX_PAGE_SIZE);
   });
 
-  it('clamps a zero or negative limit up to one row', async () => {
+  it('clamps a zero or negative size up to one row', async () => {
     await bulkBookings(3, at('2027-03-11', '09:00'));
 
-    expect((await findBookings(prisma, { limit: 0 })).bookings).toHaveLength(1);
-    expect((await findBookings(prisma, { limit: -10 })).bookings).toHaveLength(1);
-  });
-});
-
-// --- The cursor itself --------------------------------------------------------------------
-
-describe('encodeCursor and decodeCursor', () => {
-  it('round-trips a start and an id', () => {
-    const startsAt = new Date('2027-03-11T07:00:00.000Z');
-    const id = '3f1b9c2a-0000-4000-8000-00000000abcd';
-
-    const decoded = decodeCursor(encodeCursor(startsAt, id));
-
-    expect(decoded).not.toBeNull();
-    expect(decoded?.startsAt.toISOString()).toBe(startsAt.toISOString());
-    expect(decoded?.id).toBe(id);
-  });
-
-  it('is opaque base64url, carrying no separator a URL would have to escape', () => {
-    const cursor = encodeCursor(new Date('2027-03-11T07:00:00.000Z'), '3f1b9c2a-0000-4000-8000-00000000abcd');
-
-    expect(cursor).toMatch(/^[A-Za-z0-9_-]+$/);
-    expect(encodeURIComponent(cursor)).toBe(cursor);
-  });
-
-  it.each([
-    ['empty', ''],
-    ['not base64 at all', '!!!not-base64!!!'],
-    ['base64 of nothing', Buffer.from('').toString('base64url')],
-    ['no separator', Buffer.from('2027-03-11T07:00:00.000Z').toString('base64url')],
-    ['a separator too many', Buffer.from('2027-03-11T07:00:00.000Z|3f1b9c2a-0000-4000-8000-00000000abcd|extra').toString('base64url')],
-    ['an unparseable date', Buffer.from('not-a-date|3f1b9c2a-0000-4000-8000-00000000abcd').toString('base64url')],
-    ['an empty date', Buffer.from('|3f1b9c2a-0000-4000-8000-00000000abcd').toString('base64url')],
-    ['an id that is not a uuid', Buffer.from('2027-03-11T07:00:00.000Z|nope').toString('base64url')],
-    ['an id with a letter past f', Buffer.from('2027-03-11T07:00:00.000Z|3f1b9c2a-0000-4000-8000-00000000abcz').toString('base64url')],
-  ])('refuses a cursor with %s', (_case, cursor) => {
-    expect(decodeCursor(cursor)).toBeNull();
-  });
-
-  /**
-   * FAILING, and left failing deliberately. `admin-list.ts:156` checks the id
-   * with `/^[0-9a-f-]{36}$/i`, which is 36 characters of hex OR dashes in any
-   * arrangement -- not a uuid. Anything that gets past it goes straight into a
-   * `where` on `booking.id`, a `uuid` column, and PostgreSQL raises 22P02
-   * "invalid input syntax for type uuid", which surfaces as a 500 from
-   * `GET /api/admin/bookings` (see routes/admin-bookings.test.ts, "answers a
-   * crafted cursor ... without a 500"). The docblock says this function answers
-   * "null when it is not one we wrote"; these are not ones we wrote.
-   */
-  it.each([
-    ['thirty-six dashes', '-'.repeat(36)],
-    ['thirty-six hex digits with no dashes', '0'.repeat(36)],
-    ['dashes in the wrong places', '3f1b9c2a0000-4000-8000-00000000ab-cd'],
-  ])('refuses an id of %s, which is not a uuid', (_case, id) => {
-    expect(decodeCursor(Buffer.from(`2027-03-11T07:00:00.000Z|${id}`).toString('base64url'))).toBeNull();
-  });
-
-  it('a cursor it refuses is simply ignored, not an error, so the list still answers', async () => {
-    const booking = await book({ status: 'confirmed' });
-
-    expect(await references({ cursor: 'not-a-cursor-we-wrote' })).toEqual([booking.reference]);
+    expect((await findBookings(prisma, { pageSize: 0 })).bookings).toHaveLength(1);
+    expect((await findBookings(prisma, { pageSize: -10 })).bookings).toHaveLength(1);
   });
 });
 
@@ -652,7 +609,7 @@ describe('filtering by display stage', () => {
 
     for (const stage of BOOKING_STAGES) {
       const expected = bookings.filter((booking) => bookingStage(booking, NOW, 'admin') === stage).map((b) => b.id).sort();
-      const page = await findBookings(prisma, { stages: [stage], now: NOW, limit: 100 });
+      const page = await findBookings(prisma, { stages: [stage], now: NOW, pageSize: 100 });
       expect([stage, page.bookings.map((row) => row.id).sort()]).toEqual([stage, expected]);
       for (const row of page.bookings) expect(row.stage).toBe(stage);
     }
@@ -664,17 +621,17 @@ describe('filtering by display stage', () => {
     const bookings = await everyStage();
     const ids = (stage: string) => bookings.filter((b) => bookingStage(b, NOW, 'admin') === stage).map((b) => b.id);
 
-    const several = await findBookings(prisma, { stages: ['in_progress', 'needs_review'], now: NOW, limit: 100 });
+    const several = await findBookings(prisma, { stages: ['in_progress', 'needs_review'], now: NOW, pageSize: 100 });
     expect(several.bookings.map((row) => row.id).sort()).toEqual([...ids('in_progress'), ...ids('needs_review')].sort());
 
-    const byStatus = await findBookings(prisma, { statuses: ['completed'], now: NOW, limit: 100 });
+    const byStatus = await findBookings(prisma, { statuses: ['completed'], now: NOW, pageSize: 100 });
     expect(byStatus.bookings.map((row) => row.id).sort()).toEqual([...ids('completed'), ...ids('closed')].sort());
   });
 
   it('stages every row it returns, filtered or not', async () => {
     const bookings = await everyStage();
 
-    const page = await findBookings(prisma, { now: NOW, limit: 100 });
+    const page = await findBookings(prisma, { now: NOW, pageSize: 100 });
 
     for (const row of page.bookings) {
       const booking = bookings.find((b) => b.id === row.id);

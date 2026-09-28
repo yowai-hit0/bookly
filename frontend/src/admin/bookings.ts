@@ -61,7 +61,8 @@ export type BookingListRow = {
   hasRefundDue: boolean
 }
 
-export type BookingsPage = { bookings: BookingListRow[]; nextCursor: string | null }
+/** A numbered page of the list, with the total it is a page of (2026-09-27). */
+export type BookingsPage = { bookings: BookingListRow[]; total: number; page: number; pageSize: number; pageCount: number }
 
 export type BookingTotals = {
   quotedTotalRwf: number
@@ -151,8 +152,9 @@ export type BookingsFilter = {
   from?: string
   to?: string
   search?: string
-  cursor?: string
-  limit?: number
+  /** 1-based. */
+  page?: number
+  pageSize?: number
 }
 
 export const bookingsApi = {
@@ -164,8 +166,8 @@ export const bookingsApi = {
       ['from', filter.from],
       ['to', filter.to],
       ['search', filter.search],
-      ['cursor', filter.cursor],
-      ['limit', filter.limit?.toString()],
+      ['page', filter.page?.toString()],
+      ['pageSize', filter.pageSize?.toString()],
     ] as const) {
       if (value !== undefined && value !== '') query.set(key, value)
     }

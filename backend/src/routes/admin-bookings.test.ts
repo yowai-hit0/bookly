@@ -6,7 +6,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
 import { issueAdminToken } from '../auth/token.js';
 import { findBookingByToken } from '../booking/access.js';
-import { encodeCursor } from '../booking/admin-list.js';
 import { clientBookingView } from '../booking/client-view.js';
 import { type AdminBooking, adminBookingView, findAdminBooking } from '../booking/admin-view.js';
 import { createPrismaClient } from '../db/client.js';
@@ -29,8 +28,8 @@ import {
  * payments/refund.test.ts. What is proven here is the HTTP contract: every
  * route sits behind `requireAdmin`, so no token, a forged one or an expired one
  * is 401 and nothing else; the list's query is parsed by the one admin rule
- * (400 for a malformed request, 422 for a value outside its range) and a cursor
- * it did not write is simply ignored; an unknown booking is 404 and a malformed
+ * (400 for a malformed request, 422 for a value outside its range) and pages
+ * are numbered with a total (2026-09-27); an unknown booking is 404 and a malformed
  * id is 400, not 404; and every answer -- including every refusal -- is the
  * booking as `adminBookingView` renders it.
  *
@@ -240,7 +239,7 @@ describe('every route is behind requireAdmin (spec §2.2)', () => {
 // --- The list ---------------------------------------------------------------------------
 
 describe('GET /bookings', () => {
-  it('answers every booking, newest shoot first, with a null cursor on the last page', async () => {
+  it('answers every booking, newest shoot first, as page 1 of 1 with the total', async () => {
     const early = await insertBooking(prisma, world, { status: 'confirmed', startsAt: WEDNESDAY_0900 });
     const late = await insertBooking(prisma, world, { status: 'confirmed', startsAt: THURSDAY_0900 });
 
@@ -248,7 +247,7 @@ describe('GET /bookings', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.bookings.map((row: { reference: string }) => row.reference)).toEqual([late.reference, early.reference]);
-    expect(res.body.nextCursor).toBeNull();
+    expect(res.body).toMatchObject({ total: 2, page: 1, pageSize: 25, pageCount: 1 });
     expect(res.headers['content-type']).toMatch(/application\/json/);
   });
 
@@ -333,64 +332,41 @@ describe('GET /bookings', () => {
     expect(res.body.bookings.map((row: { reference: string }) => row.reference)).toEqual([booking.reference]);
   });
 
-  it('pages with the cursor it handed back', async () => {
+  it('pages by number, with the total and the page count', async () => {
     const early = await insertBooking(prisma, world, { status: 'confirmed', startsAt: WEDNESDAY_0900 });
     const late = await insertBooking(prisma, world, { status: 'confirmed', startsAt: THURSDAY_0900 });
 
-    const first = await get(`${BOOKINGS}?limit=1`);
+    const first = await get(`${BOOKINGS}?page=1&pageSize=1`);
     expect(first.body.bookings.map((row: { reference: string }) => row.reference)).toEqual([late.reference]);
-    expect(typeof first.body.nextCursor).toBe('string');
+    expect(first.body).toMatchObject({ total: 2, page: 1, pageSize: 1, pageCount: 2 });
 
-    const second = await get(`${BOOKINGS}?limit=1&cursor=${encodeURIComponent(first.body.nextCursor)}`);
-
+    const second = await get(`${BOOKINGS}?page=2&pageSize=1`);
     expect(second.body.bookings.map((row: { reference: string }) => row.reference)).toEqual([early.reference]);
-    expect(second.body.nextCursor).toBeNull();
+    expect(second.body).toMatchObject({ total: 2, page: 2, pageCount: 2 });
   });
 
-  it('ignores a cursor it did not write rather than failing', async () => {
+  it('answers the last page for a page past the end', async () => {
     const booking = await insertBooking(prisma, world, { status: 'confirmed', startsAt: WEDNESDAY_0900 });
 
-    const res = await get(`${BOOKINGS}?cursor=not-a-cursor-we-wrote`);
+    const res = await get(`${BOOKINGS}?page=7`);
 
     expect(res.status).toBe(200);
+    expect(res.body.page).toBe(1);
     expect(res.body.bookings.map((row: { reference: string }) => row.reference)).toEqual([booking.reference]);
-  });
-
-  /**
-   * FAILING, and left failing deliberately: this answers 500 `internal_error`.
-   * `admin-list.ts:156` checks a cursor's id with `/^[0-9a-f-]{36}$/i`, which
-   * matches 36 dashes, so the string reaches a `where` on `booking.id` and
-   * PostgreSQL raises 22P02, "invalid input syntax for type uuid". The root
-   * cause has its own failing test in booking/admin-list.test.ts.
-   */
-  it('answers a crafted cursor that is not one we wrote without a 500', async () => {
-    await insertBooking(prisma, world, { status: 'confirmed', startsAt: WEDNESDAY_0900 });
-    const cursor = Buffer.from(`2027-01-01T00:00:00.000Z|${'-'.repeat(36)}`).toString('base64url');
-
-    const res = await get(`${BOOKINGS}?cursor=${encodeURIComponent(cursor)}`);
-
-    expect(res.status).toBeLessThan(500);
-  });
-
-  it('accepts a cursor for a row that no longer exists, answering what follows it', async () => {
-    await insertBooking(prisma, world, { status: 'confirmed', startsAt: WEDNESDAY_0900 });
-    const cursor = encodeCursor(new Date('2000-01-01T00:00:00Z'), UNKNOWN_ID);
-
-    const res = await get(`${BOOKINGS}?cursor=${encodeURIComponent(cursor)}`);
-
-    expect([res.status, res.body]).toEqual([200, { bookings: [], nextCursor: null }]);
   });
 
   it.each([
     ['a status outside the vocabulary', 'status=declined', 400],
     ['a malformed date', 'from=2026-13-40', 400],
     ['a date the engine refuses', 'from=0050-01-01', 422],
-    ['a limit that is not a number', 'limit=plenty', 400],
-    ['a limit of zero', 'limit=0', 422],
-    ['a limit past the maximum', 'limit=101', 422],
+    ['a page that is not a number', 'page=plenty', 400],
+    ['a page of zero', 'page=0', 422],
+    ['a page size of zero', 'pageSize=0', 422],
+    ['a page size past the maximum', 'pageSize=101', 422],
     ['an unknown query key', 'sort=price', 400],
     ['a search longer than 200 characters', `search=${'x'.repeat(201)}`, 422],
-    ['a cursor longer than 500 characters', `cursor=${'x'.repeat(501)}`, 422],
+    // Paging is by number since 2026-09-27: a cursor is an unknown key now.
+    ['a cursor, which the list no longer takes', 'cursor=abc', 400],
   ])('refuses %s with %s', async (_case, query, status) => {
     const res = await get(`${BOOKINGS}?${query}`);
 

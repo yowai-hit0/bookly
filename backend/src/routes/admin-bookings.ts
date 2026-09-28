@@ -27,7 +27,7 @@ import { kigaliDate, parseOrReject } from './validation.js';
  * (plan.md Task 19; spec §3.6, §6.11, §6.12, §6.16, §6.21). Mounted behind
  * `requireAdmin`, so every route here is his alone (spec §2.2).
  *
- *   GET  /bookings?stage=&status=&from=&to=&search=&cursor=&limit=   (`stage` since 2026-09-25; `status` still read)
+ *   GET  /bookings?stage=&status=&from=&to=&search=&page=&pageSize=   (`stage` since 2026-09-25; `status` still read; numbered pages since 2026-09-27)
  *        200 { bookings, nextCursor }
  *   GET  /bookings/:id                      200 { booking } | 404
  *   POST /bookings/:id/reschedule  { startsAt }
@@ -101,8 +101,9 @@ const listQuery = z.strictObject({
   from: kigaliDate.optional(),
   to: kigaliDate.optional(),
   search: z.string().trim().max(200).optional(),
-  cursor: z.string().max(500).optional(),
-  limit: z.coerce.number().int().min(1).max(BOOKINGS_MAX_PAGE_SIZE).optional(),
+  /** 1-based; past the end answers the last page. */
+  page: z.coerce.number().int().min(1).max(1_000_000).optional(),
+  pageSize: z.coerce.number().int().min(1).max(BOOKINGS_MAX_PAGE_SIZE).optional(),
 });
 
 const rescheduleBody = z.strictObject({
@@ -188,8 +189,8 @@ export function adminBookingsRouter(deps: AdminBookingsDeps): Router {
         ...(query.from === undefined ? {} : { from: query.from }),
         ...(query.to === undefined ? {} : { to: query.to }),
         ...(query.search === undefined ? {} : { search: query.search }),
-        ...(query.cursor === undefined ? {} : { cursor: query.cursor }),
-        ...(query.limit === undefined ? {} : { limit: query.limit }),
+        ...(query.page === undefined ? {} : { page: query.page }),
+        ...(query.pageSize === undefined ? {} : { pageSize: query.pageSize }),
       }),
     );
   });

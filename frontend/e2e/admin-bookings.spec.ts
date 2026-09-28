@@ -192,7 +192,7 @@ async function mockApi(page: Page, options: { completed?: boolean } = {}) {
         const matching = bookings
           .filter((entry) => stages.length === 0 || stages.includes(String(entry.stage)))
           .filter((entry) => search === '' || entry.reference.toLowerCase().includes(search.toLowerCase()))
-        await route.fulfill({ json: { bookings: matching.map(row), nextCursor: null } })
+        await route.fulfill({ json: { bookings: matching.map(row), total: matching.length, page: 1, pageSize: 25, pageCount: 1 } })
         return
       }
 
@@ -352,9 +352,13 @@ test('signs in, filters the list, moves a booking and then cancels it', async ({
   await expect(rows.nth(1)).toContainText('Wednesday, 6 January 2027')
   await expect(rows.nth(1)).toContainText('09:00 – 10:30')
 
-  await page.getByRole('button', { name: 'Confirmed' }).click()
+  // The status filter is a dropdown of checkboxes (2026-09-27).
+  await page.getByRole('button', { name: 'Status: All' }).click()
+  await page.getByRole('checkbox', { name: 'Confirmed' }).click()
+  await page.keyboard.press('Escape')
 
   await expect(page).toHaveURL(/\?stage=confirmed$/)
+  await expect(page.getByRole('button', { name: 'Status: 1 selected' })).toBeVisible()
   await expect(rows).toHaveCount(2)
   await expect(page.getByRole('link', { name: 'BKY-2701-00042' })).toBeVisible()
 

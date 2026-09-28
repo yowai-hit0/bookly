@@ -12,12 +12,15 @@ import { routes } from '@/routes'
  * routes with `fetch` stubbed.
  *
  * What is proven: every row shows its shoot in Kigali wall time whatever the
- * browser's own zone, its reference as a link into the booking, and the money
- * the API derived -- what is still owed, and what is owed back. The filter
- * lives in the URL, so a status toggle, a date or a search is bookmarkable and
- * survives a reload, and each change re-asks the API with exactly that filter.
- * "Load more" appends the page that follows the cursor rather than replacing
- * what is on screen or repeating it. A 401 sends him to sign in.
+ * browser's own zone, the client's name (not their email), one link into the
+ * booking named by its reference, and the money the API derived -- what is
+ * still owed, and what is owed back. The filter lives in the URL, so a stage
+ * chosen in the status dropdown, a date or a search is bookmarkable and
+ * survives a reload, and each change re-asks the API with exactly that filter
+ * and goes back to page 1. Pages are numbered (2026-09-27): the pager says
+ * which rows of how many are shown, moves by number or by arrow, keeps the
+ * filter, and is there with its arrows disabled on a single page. A 401 sends
+ * him to sign in.
  */
 
 const SESSION = { token: 'header.payload.signature', expiresAt: '2999-01-01T00:00:00.000Z' }
@@ -75,7 +78,7 @@ const NO_SHOW: BookingListRow = {
   hasRefundDue: false,
 }
 
-const PAGE = { bookings: [CONFIRMED, CANCELLED, NO_SHOW], nextCursor: null }
+const PAGE = { bookings: [CONFIRMED, CANCELLED, NO_SHOW], total: 3, page: 1, pageSize: 25, pageCount: 1 }
 
 type Handler = (url: string) => Response | Promise<Response>
 
@@ -119,8 +122,14 @@ function references(bodyRows: HTMLElement[]): string[] {
   return bodyRows.map((row) => within(row).getByRole('link').textContent ?? '')
 }
 
-function statusButton(name: string): HTMLElement {
-  return screen.getByRole('button', { name })
+/** The status filter is a dropdown of checkboxes (2026-09-27); this opens it. */
+async function openStatusFilter(): Promise<HTMLElement> {
+  await user().click(screen.getByRole('button', { name: /^Status: / }))
+  return screen.findByRole('dialog')
+}
+
+function stageBox(name: string): HTMLElement {
+  return screen.getByRole('checkbox', { name })
 }
 
 beforeEach(() => {
@@ -135,7 +144,7 @@ afterEach(() => {
 // --- Rendering ---------------------------------------------------------------------
 
 describe('the list', () => {
-  it('shows each shoot in Kigali wall time, its reference as a link, and the client', async () => {
+  it('shows each shoot in Kigali wall time, the client’s name, and one link named by its reference', async () => {
     stubFetch()
     renderAt()
 
@@ -144,7 +153,8 @@ describe('the list', () => {
     expect(first).toHaveTextContent('Wednesday, 6 January 2027')
     expect(first).toHaveTextContent('09:00 – 10:30')
     expect(first).toHaveTextContent('Aline Uwase')
-    expect(first).toHaveTextContent('aline@example.com')
+    // The client column is the name only since 2026-09-27; the email is on the booking.
+    expect(first).not.toHaveTextContent('aline@example.com')
     expect(first).toHaveTextContent('Portraits')
     expect(first).toHaveTextContent('Standard')
     expect(second).toHaveTextContent('Tuesday, 5 January 2027')
@@ -152,6 +162,9 @@ describe('the list', () => {
     expect(third).toHaveTextContent('Monday, 4 January 2027')
     expect(screen.getByRole('link', { name: 'BKY-2701-00042' })).toHaveAttribute('href', '/admin/bookings/b1')
     expect(screen.getByRole('link', { name: 'BKY-2701-00043' })).toHaveAttribute('href', '/admin/bookings/b2')
+    // One real link per row, stretched over it; the reference is not a column any more.
+    for (const row of [first, second, third]) expect(within(row as HTMLElement).getAllByRole('link')).toHaveLength(1)
+    expect(screen.queryByRole('columnheader', { name: 'Reference' })).not.toBeInTheDocument()
   })
 
   it('names each status in words', async () => {
@@ -164,17 +177,19 @@ describe('the list', () => {
     expect(third).toHaveTextContent('No-show')
   })
 
-  it('explains every stage beside the Status column, by click or keyboard (2026-09-25)', async () => {
+  it('explains every stage, and what to do about it, beside the status filter, by click or keyboard', async () => {
     stubFetch()
     renderAt()
     await rows()
 
-    const trigger = within(screen.getByRole('columnheader', { name: /Status/ })).getByRole('button', { name: 'What the statuses mean' })
+    const filters = screen.getByRole('region', { name: 'Filters' })
+    const trigger = within(filters).getByRole('button', { name: 'What the statuses mean' })
     await user().click(trigger)
     const legend = await screen.findByRole('dialog')
     expect(legend).toHaveTextContent('Needs review')
     expect(legend).toHaveTextContent('The shoot has ended. Mark it completed or no-show.')
     expect(legend).toHaveTextContent('The photos email has been sent.')
+    expect(legend).toHaveTextContent('Send the photos.')
 
     await user().keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -221,7 +236,7 @@ describe('the list', () => {
   })
 
   it('says so when nothing matches', async () => {
-    stubFetch(() => json({ bookings: [], nextCursor: null }))
+    stubFetch(() => json({ bookings: [], total: 0, page: 1, pageSize: 25, pageCount: 1 }))
     renderAt()
 
     expect(await screen.findByText('No bookings match these filters.')).toBeInTheDocument()
@@ -249,31 +264,35 @@ describe('the list', () => {
 
 describe('filtering', () => {
   // The filter is by display stage since 2026-09-25.
-  it('toggles a stage into the URL, presses the button, and re-asks with it', async () => {
+  it('ticks a stage into the URL, says how many are chosen, and re-asks with it', async () => {
     const mock = stubFetch()
     const router = renderAt()
     await rows()
+    expect(screen.getByRole('button', { name: 'Status: All' })).toBeInTheDocument()
 
-    await user().click(statusButton('Needs review'))
+    await openStatusFilter()
+    await user().click(stageBox('Needs review'))
 
     await waitFor(() => expect(listCalls(mock)).toHaveLength(2))
     expect(router.state.location.search).toBe('?stage=needs_review')
     expect(listCalls(mock)[1]).toBe(`${BOOKINGS_API}?stage=needs_review`)
-    expect(statusButton('Needs review')).toHaveAttribute('aria-pressed', 'true')
-    expect(statusButton('Completed')).toHaveAttribute('aria-pressed', 'false')
+    expect(stageBox('Needs review')).toBeChecked()
+    expect(stageBox('Completed')).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Status: 1 selected' })).toBeInTheDocument()
   })
 
   it('toggles a stage back off', async () => {
     const mock = stubFetch()
     const router = renderAt('/admin/bookings?stage=confirmed')
     await rows()
-    expect(statusButton('Confirmed')).toHaveAttribute('aria-pressed', 'true')
+    await openStatusFilter()
+    expect(stageBox('Confirmed')).toBeChecked()
 
-    await user().click(statusButton('Confirmed'))
+    await user().click(stageBox('Confirmed'))
 
     await waitFor(() => expect(router.state.location.search).toBe(''))
     expect(listCalls(mock).at(-1)).toBe(BOOKINGS_API)
-    expect(statusButton('Confirmed')).toHaveAttribute('aria-pressed', 'false')
+    expect(stageBox('Confirmed')).not.toBeChecked()
   })
 
   it('keeps several stages at once, repeated in the query', async () => {
@@ -281,7 +300,8 @@ describe('filtering', () => {
     const router = renderAt('/admin/bookings?stage=confirmed')
     await rows()
 
-    await user().click(statusButton('No-show'))
+    await openStatusFilter()
+    await user().click(stageBox('No-show'))
 
     await waitFor(() => expect(listCalls(mock)).toHaveLength(2))
     expect(router.state.location.search).toBe('?stage=confirmed&stage=no_show')
@@ -294,10 +314,11 @@ describe('filtering', () => {
     await rows()
 
     expect(listCalls(mock)).toEqual([`${BOOKINGS_API}?stage=confirmed&stage=in_progress&stage=needs_review&stage=completed&stage=closed`])
+    await openStatusFilter()
     for (const name of ['Confirmed', 'In progress', 'Needs review', 'Completed', 'Closed']) {
-      expect(statusButton(name)).toHaveAttribute('aria-pressed', 'true')
+      expect(stageBox(name)).toBeChecked()
     }
-    expect(statusButton('No-show')).toHaveAttribute('aria-pressed', 'false')
+    expect(stageBox('No-show')).not.toBeChecked()
   })
 
   it('reads the whole filter out of the URL on first render', async () => {
@@ -308,8 +329,7 @@ describe('filtering', () => {
     expect(listCalls(mock)).toEqual([
       `${BOOKINGS_API}?stage=confirmed&stage=completed&from=2027-01-01&to=2027-01-31&search=Uwase`,
     ])
-    expect(statusButton('Confirmed')).toHaveAttribute('aria-pressed', 'true')
-    expect(statusButton('Completed')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Status: 2 selected' })).toBeInTheDocument()
     expect(screen.getByLabelText('From')).toHaveValue('2027-01-01')
     expect(screen.getByLabelText('To')).toHaveValue('2027-01-31')
     expect(screen.getByLabelText('Search')).toHaveValue('Uwase')
@@ -368,7 +388,7 @@ describe('filtering', () => {
 
     await waitFor(() => expect(router.state.location.search).toBe(''))
     expect(listCalls(mock).at(-1)).toBe(BOOKINGS_API)
-    expect(statusButton('Confirmed')).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Status: All' })).toBeInTheDocument()
   })
 
   it('offers nothing to clear when nothing is filtered', async () => {
@@ -382,74 +402,95 @@ describe('filtering', () => {
 
 // --- Paging -------------------------------------------------------------------------
 
-describe('load more', () => {
-  const MORE: BookingListRow = { ...CONFIRMED, id: 'b4', reference: 'BKY-2701-00045', startsAt: '2027-01-03T07:00:00.000Z', endsAt: '2027-01-03T08:30:00.000Z' }
+describe('numbered pages', () => {
+  const PAGE_2: BookingListRow = { ...CONFIRMED, id: 'b4', reference: 'BKY-2701-00045', startsAt: '2027-01-03T07:00:00.000Z', endsAt: '2027-01-03T08:30:00.000Z' }
 
-  /** Page 1 holds the three fixtures and a cursor; page 2 holds one more and none. */
+  /** 132 bookings, 25 to a page: whatever page is asked for comes back with its number. */
   function paged(): ReturnType<typeof stubFetch> {
-    return stubFetch((url) =>
-      url.includes('cursor=')
-        ? json({ bookings: [MORE], nextCursor: null })
-        : json({ bookings: [CONFIRMED, CANCELLED, NO_SHOW], nextCursor: 'bmV4dA' }),
-    )
+    return stubFetch((url) => {
+      const page = Number(new URL(url, 'http://x').searchParams.get('page') ?? '1')
+      return json({ bookings: page === 1 ? [CONFIRMED, CANCELLED, NO_SHOW] : [PAGE_2], total: 132, page, pageSize: 25, pageCount: 6 })
+    })
   }
 
-  it('appends the next page without repeating what is already shown', async () => {
-    const mock = paged()
-    renderAt()
-    expect(references(await rows())).toEqual(['BKY-2701-00042', 'BKY-2701-00043', 'BKY-2701-00044'])
+  function pager(): HTMLElement {
+    return screen.getByRole('navigation', { name: 'Pages' })
+  }
 
-    await user().click(screen.getByRole('button', { name: 'Load more' }))
-
-    await waitFor(async () => expect(await rows()).toHaveLength(4))
-    const shown = references(await rows())
-    expect(shown).toEqual(['BKY-2701-00042', 'BKY-2701-00043', 'BKY-2701-00044', 'BKY-2701-00045'])
-    expect(new Set(shown).size).toBe(shown.length)
-    expect(listCalls(mock)[1]).toBe(`${BOOKINGS_API}?cursor=bmV4dA`)
-  })
-
-  it('carries the filter into the next page', async () => {
-    const mock = paged()
-    renderAt('/admin/bookings?stage=confirmed&search=Uwase')
-    await rows()
-
-    await user().click(screen.getByRole('button', { name: 'Load more' }))
-
-    await waitFor(() => expect(listCalls(mock)).toHaveLength(2))
-    expect(listCalls(mock)[1]).toBe(`${BOOKINGS_API}?stage=confirmed&search=Uwase&cursor=bmV4dA`)
-  })
-
-  it('stops offering more once the cursor comes back null', async () => {
+  it('says which rows of how many are shown, and offers the pages', async () => {
     paged()
     renderAt()
     await rows()
 
-    await user().click(screen.getByRole('button', { name: 'Load more' }))
-
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument())
+    expect(pager()).toHaveTextContent('Showing 1–25 of 132')
+    expect(within(pager()).getByRole('button', { name: 'Page 1' })).toHaveAttribute('aria-current', 'page')
+    expect(within(pager()).getByRole('button', { name: 'Page 2' })).toBeInTheDocument()
+    expect(within(pager()).getByRole('button', { name: 'Page 6' })).toBeInTheDocument()
+    expect(within(pager()).queryByRole('button', { name: 'Page 4' })).not.toBeInTheDocument()
+    expect(within(pager()).getByRole('button', { name: 'Previous page' })).toBeDisabled()
+    expect(within(pager()).getByRole('button', { name: 'Next page' })).toBeEnabled()
   })
 
-  it('offers nothing more when the first page is the whole list', async () => {
+  it('goes to a page by number, into the URL, and asks the API for it', async () => {
+    const mock = paged()
+    const router = renderAt()
+    await rows()
+
+    await user().click(within(pager()).getByRole('button', { name: 'Page 2' }))
+
+    await waitFor(() => expect(references(screen.getAllByRole('row').slice(1))).toEqual(['BKY-2701-00045']))
+    expect(router.state.location.search).toBe('?page=2')
+    expect(listCalls(mock).at(-1)).toBe(`${BOOKINGS_API}?page=2`)
+    expect(pager()).toHaveTextContent('Showing 26–50 of 132')
+    expect(within(pager()).getByRole('button', { name: 'Page 2' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('moves by arrow, and keeps the filter while it pages', async () => {
+    const mock = paged()
+    const router = renderAt('/admin/bookings?stage=confirmed&search=Uwase')
+    await rows()
+
+    await user().click(within(pager()).getByRole('button', { name: 'Next page' }))
+
+    await waitFor(() => expect(router.state.location.search).toBe('?stage=confirmed&search=Uwase&page=2'))
+    expect(listCalls(mock).at(-1)).toBe(`${BOOKINGS_API}?stage=confirmed&search=Uwase&page=2`)
+  })
+
+  it('goes back to page 1 when the filter changes', async () => {
+    const mock = paged()
+    const router = renderAt('/admin/bookings?page=3')
+    await rows()
+
+    await openStatusFilter()
+    await user().click(stageBox('Confirmed'))
+
+    await waitFor(() => expect(router.state.location.search).toBe('?stage=confirmed'))
+    expect(listCalls(mock).at(-1)).toBe(`${BOOKINGS_API}?stage=confirmed`)
+  })
+
+  it('is there on a single page, with both arrows disabled', async () => {
     stubFetch()
     renderAt()
     await rows()
 
-    expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
+    expect(pager()).toHaveTextContent('Showing 1–3 of 3')
+    expect(within(pager()).getByRole('button', { name: 'Previous page' })).toBeDisabled()
+    expect(within(pager()).getByRole('button', { name: 'Next page' })).toBeDisabled()
   })
 
-  it('sends him to sign in when the next page answers 401', async () => {
+  it('sends him to sign in when a later page answers 401', async () => {
     let first = true
     stubFetch(() => {
       if (first) {
         first = false
-        return json({ bookings: [CONFIRMED], nextCursor: 'bmV4dA' })
+        return json({ bookings: [CONFIRMED], total: 30, page: 1, pageSize: 25, pageCount: 2 })
       }
       return json({ error: 'unauthenticated' }, 401)
     })
     renderAt()
     await rows()
 
-    await user().click(screen.getByRole('button', { name: 'Load more' }))
+    await user().click(within(pager()).getByRole('button', { name: 'Next page' }))
 
     expect(await screen.findByRole('heading', { name: 'Admin sign in' })).toBeInTheDocument()
     expect(readSession()).toBeNull()

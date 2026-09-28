@@ -104,7 +104,7 @@ afterEach(() => {
 
 describe('bookingsApi.list', () => {
   it('asks for the bare path when there is nothing to filter by', async () => {
-    const mock = stubFetch(() => json({ bookings: [], nextCursor: null }))
+    const mock = stubFetch(() => json({ bookings: [], total: 0, page: 1, pageSize: 25, pageCount: 1 }))
 
     await bookingsApi.list()
 
@@ -112,7 +112,7 @@ describe('bookingsApi.list', () => {
   })
 
   it('repeats status rather than joining it, in the order given', async () => {
-    const mock = stubFetch(() => json({ bookings: [], nextCursor: null }))
+    const mock = stubFetch(() => json({ bookings: [], total: 0, page: 1, pageSize: 25, pageCount: 1 }))
 
     await bookingsApi.list({ statuses: ['confirmed', 'no_show', 'cancelled_by_admin'] })
 
@@ -120,7 +120,7 @@ describe('bookingsApi.list', () => {
   })
 
   it('sends every status the API knows, unchanged', async () => {
-    const mock = stubFetch(() => json({ bookings: [], nextCursor: null }))
+    const mock = stubFetch(() => json({ bookings: [], total: 0, page: 1, pageSize: 25, pageCount: 1 }))
 
     await bookingsApi.list({ statuses: BOOKING_STATUSES })
 
@@ -128,24 +128,24 @@ describe('bookingsApi.list', () => {
     expect(url.searchParams.getAll('status')).toEqual([...BOOKING_STATUSES])
   })
 
-  it('carries the dates, the search, the cursor and the limit', async () => {
-    const mock = stubFetch(() => json({ bookings: [], nextCursor: null }))
+  it('carries the dates, the search, the page and the page size', async () => {
+    const mock = stubFetch(() => json({ bookings: [], total: 0, page: 1, pageSize: 25, pageCount: 1 }))
 
-    await bookingsApi.list({ from: '2027-01-01', to: '2027-01-31', search: 'Uwase', cursor: 'Y3Vyc29y', limit: 50 })
+    await bookingsApi.list({ from: '2027-01-01', to: '2027-01-31', search: 'Uwase', page: 3, pageSize: 50 })
 
-    expect(sent(mock).url).toBe('/api/admin/bookings?from=2027-01-01&to=2027-01-31&search=Uwase&cursor=Y3Vyc29y&limit=50')
+    expect(sent(mock).url).toBe('/api/admin/bookings?from=2027-01-01&to=2027-01-31&search=Uwase&page=3&pageSize=50')
   })
 
   it('leaves out anything empty or absent', async () => {
-    const mock = stubFetch(() => json({ bookings: [], nextCursor: null }))
+    const mock = stubFetch(() => json({ bookings: [], total: 0, page: 1, pageSize: 25, pageCount: 1 }))
 
-    await bookingsApi.list({ statuses: [], from: '', to: '', search: '', cursor: '' })
+    await bookingsApi.list({ statuses: [], from: '', to: '', search: '' })
 
     expect(sent(mock).url).toBe('/api/admin/bookings')
   })
 
   it('escapes what it is given rather than pasting it into the URL', async () => {
-    const mock = stubFetch(() => json({ bookings: [], nextCursor: null }))
+    const mock = stubFetch(() => json({ bookings: [], total: 0, page: 1, pageSize: 25, pageCount: 1 }))
 
     await bookingsApi.list({ search: 'a&b=c d+e' })
 
@@ -162,7 +162,7 @@ describe('bookingsApi.list', () => {
   })
 
   it('sends the bearer token and asks for JSON, with no body to post', async () => {
-    const mock = stubFetch(() => json({ bookings: [], nextCursor: null }))
+    const mock = stubFetch(() => json({ bookings: [], total: 0, page: 1, pageSize: 25, pageCount: 1 }))
 
     await bookingsApi.list()
 

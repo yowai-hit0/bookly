@@ -476,6 +476,31 @@
       "stageLegend": {
         "label": "What the statuses mean",
         "title": "What the statuses mean"
+      },
+      "statusFilter": {
+        "all": "Status: All",
+        "some": "Status: {{count}} selected",
+        "clear": "Show every status"
+      },
+      "stageAction": {
+        "awaiting_payment": "Nothing to do: it confirms itself when paid, or the hold runs out.",
+        "confirmed": "Get ready for the shoot. You can still move or cancel it.",
+        "in_progress": "Nothing to do until the shoot ends.",
+        "needs_review": "Add any add-ons, collect what is owed, then mark it completed or no-show.",
+        "completed": "Send the photos.",
+        "closed": "Nothing left to do.",
+        "no_show": "Nothing left to do.",
+        "expired": "Nothing to do: the time is free again.",
+        "cancelled_by_client": "Check the payments for anything flagged to refund.",
+        "cancelled_by_admin": "Send the refund, then record it on the booking."
+      },
+      "pager": {
+        "label": "Pages",
+        "previous": "Previous page",
+        "next": "Next page",
+        "page": "Page {{page}}",
+        "showing": "Showing {{from}}–{{to}} of {{total}}",
+        "showingNone": "Showing 0 of 0"
       }
     },
     "booking": {
