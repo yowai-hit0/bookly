@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Booking, Prisma, PrismaClient } from '@prisma/client';
 import { type AccessToken, accessTokenExpiry, generateAccessToken } from '../booking/access-token.js';
+import { completeIfSettled } from '../booking/auto-complete.js';
 import { expireOverlappingStaleHolds } from '../booking/claim.js';
 import { bookingTotals } from '../booking/totals.js';
 import { isSlotTaken, isTransactionConflict } from '../db/errors.js';
@@ -264,6 +265,10 @@ async function applyEvent(
     await tx.payment.update({ where: { id: payment.id }, data: { status: 'succeeded', settledAt, ...reported } });
     await flagOverpayment(tx, logs, payment);
     await receipt(tx, logs, payment, reported, settledAt);
+    // Paid in full after the shoot has begun: the booking completes itself, in
+    // this same transaction (item 6, 2026-09-27). A replay never gets here --
+    // the payment is settled and step 4 ignores it.
+    if (await completeIfSettled(tx, payment.booking_id, settledAt)) return finish('applied', 'payment_succeeded_booking_completed');
     return finish('applied', 'payment_succeeded');
   }
 

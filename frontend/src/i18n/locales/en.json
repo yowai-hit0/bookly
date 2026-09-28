@@ -610,7 +610,8 @@
         "nothing_to_pay": "There is nothing left to pay on this booking.",
         "in_progress": "The client is paying right now. Wait for that to finish.",
         "too_large": "That would make the booking worth more than the system can hold.",
-        "no_link": "Save a link to the photos first."
+        "no_link": "Save a link to the photos first.",
+        "balance_due": "The client still owes money on this booking. It completes by itself once it is paid in full."
       },
       "addons": {
         "title": "Add-ons from the shoot",
@@ -623,7 +624,9 @@
         "none": "No add-ons are on sale for this service.",
         "note": "Adding one raises what the client owes. Ask for it with the session fee below.",
         "open": "Add an add-on",
-        "loadFailed": "We could not load the add-ons. Check your connection and try again."
+        "loadFailed": "We could not load the add-ons. Check your connection and try again.",
+        "added": "Added. The client now owes {{amount}}. Once every add-on is in, ask for it with the session fee.",
+        "toSessionFee": "Go to Request session fee"
       },
       "sessionFee": {
         "request": "Request {{amount}} session fee",
@@ -663,8 +666,10 @@
         "confirmSend": "Send now",
         "addLink": "Add the photo link",
         "changeLink": "Change the link",
-        "back": "Back"
-      }
+        "back": "Back",
+        "opensWhenPaid": "Photo delivery opens once this booking is completed: by itself when it is paid in full, or when you mark it completed."
+      },
+      "completeOwed": "Mark completed opens once nothing is owed. {{amount}} is still to pay. Paid in full, the booking completes by itself."
     }
   },
   "checkout": {

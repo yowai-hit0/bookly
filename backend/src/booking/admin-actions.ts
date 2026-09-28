@@ -6,6 +6,7 @@ import { issueAccessToken } from './access-link.js';
 import { hashAccessToken } from './access-token.js';
 import { type AdminBooking, findAdminBooking } from './admin-view.js';
 import { expireOverlappingStaleHolds } from './claim.js';
+import { bookingTotals } from './totals.js';
 
 /**
  * What the photographer does to a booking after it exists (plan.md Task 19;
@@ -28,7 +29,9 @@ export type AdminActionResult =
   | { status: 'ok'; booking: AdminBooking }
   | { status: 'not_found' }
   /** The booking is not in a state this action applies to. */
-  | { status: 'not_allowed' };
+  | { status: 'not_allowed' }
+  /** Completing it with money still owed: "completed" means paid (2026-09-27). */
+  | { status: 'balance_due' };
 
 export type RescheduleResult = AdminActionResult | { status: 'slot_taken' } | { status: 'unchanged' };
 
@@ -195,7 +198,12 @@ export async function cancelByAdmin(deps: AdminActionDeps, bookingId: string, re
   return reload(deps, booking.id);
 }
 
-/** The shoot happened (spec §3.5 step 1). Task 20 builds on `completed_at`. */
+/**
+ * The shoot happened (spec §3.5 step 1). Task 20 builds on `completed_at`.
+ * Refused as `balance_due` while anything is owed (2026-09-27): a booking
+ * that is paid in full after its shoot completes by itself
+ * (`auto-complete.ts`), and one that is not waits for the money.
+ */
 export async function markCompleted(deps: AdminActionDeps, bookingId: string): Promise<AdminActionResult> {
   return close(deps, bookingId, 'completed', { completedAt: deps.now() });
 }
@@ -220,6 +228,9 @@ async function close(
   if (booking === null) return { status: 'not_found' };
   // Only a confirmed booking whose shoot has begun can be closed either way.
   if (booking.status !== 'confirmed' || booking.startsAt > deps.now()) return { status: 'not_allowed' };
+  if (status === 'completed' && bookingTotals(booking, booking.addons, booking.payments).outstandingRwf > 0) {
+    return { status: 'balance_due' };
+  }
 
   const { count } = await deps.prisma.booking.updateMany({
     where: { id: booking.id, status: 'confirmed' },

@@ -28,12 +28,12 @@ import { kigaliDate, parseOrReject } from './validation.js';
  * `requireAdmin`, so every route here is his alone (spec §2.2).
  *
  *   GET  /bookings?stage=&status=&from=&to=&search=&page=&pageSize=   (`stage` since 2026-09-25; `status` still read; numbered pages since 2026-09-27)
- *        200 { bookings, nextCursor }
+ *        200 { bookings, total, page, pageSize, pageCount }
  *   GET  /bookings/:id                      200 { booking } | 404
  *   POST /bookings/:id/reschedule  { startsAt }
  *        200 { booking } | 404 | 409 slot_taken | 409 not_allowed | 422
  *   POST /bookings/:id/cancel      { reason? }        200 | 404 | 409
- *   POST /bookings/:id/complete                      200 | 404 | 409
+ *   POST /bookings/:id/complete                      200 | 404 | 409 not_allowed | 409 balance_due (money owed, 2026-09-27)
  *   POST /bookings/:id/no-show                       200 | 404 | 409
  *   POST /bookings/:id/resend-link                   200 | 404 | 409
  *   POST /payments/:id/refund      { reference, refundedAt? }
@@ -251,7 +251,7 @@ export function adminBookingsRouter(deps: AdminBookingsDeps): Router {
     const body = parseOrReject(addonBody, req.body, res);
     if (body === undefined) return;
 
-    await answer(prisma, now, res, await addPostShootAddon({ prisma }, id, body), id);
+    await answer(prisma, now, res, await addPostShootAddon({ prisma, now }, id, body), id);
   });
 
   router.delete('/bookings/:id/addons/:addonId', async (req, res) => {
@@ -260,7 +260,7 @@ export function adminBookingsRouter(deps: AdminBookingsDeps): Router {
     const addonId = parseOrReject(rowId, req.params.addonId, res);
     if (addonId === undefined) return;
 
-    await answer(prisma, now, res, await removePostShootAddon({ prisma }, id, addonId), id);
+    await answer(prisma, now, res, await removePostShootAddon({ prisma, now }, id, addonId), id);
   });
 
   if (paymentProviderId !== undefined) {

@@ -101,10 +101,15 @@ const BOOKING: AdminBooking = {
   actions: { canReschedule: true, canCancel: true, canComplete: false, canMarkNoShow: false, canResendLink: true, canEditAddons: false, canRequestSessionFee: false, canEditDelivery: false, canSendDelivery: false },
 }
 
-/** The same booking with a shoot that has begun: every action is open. */
+/**
+ * The same booking with a shoot that has begun, paid in full: every action is
+ * open. "Completed" means paid (2026-09-27), so `canComplete` needs nothing owed.
+ */
 const STARTED: AdminBooking = {
   ...BOOKING,
-  actions: { canReschedule: true, canCancel: true, canComplete: true, canMarkNoShow: true, canResendLink: true, canEditAddons: false, canRequestSessionFee: false, canEditDelivery: false, canSendDelivery: false },
+  stage: 'needs_review',
+  money: { ...BOOKING.money, totals: { ...BOOKING.money.totals, collectedRwf: 50_000, outstandingRwf: 0 } },
+  actions: { canReschedule: true, canCancel: true, canComplete: true, canMarkNoShow: true, canResendLink: true, canEditAddons: true, canRequestSessionFee: false, canEditDelivery: false, canSendDelivery: false },
 }
 
 const CANCELLED: AdminBooking = {
@@ -826,7 +831,10 @@ describe('when the API refuses an action', () => {
  * screen catches up with the booking the 409 carried.
  */
 
-/** A completed shoot with the editor open: 50,000 owed, 20,000 paid, 30,000 outstanding. */
+/**
+ * A booking completed before 2026-09-27 that still owes 30,000: it keeps the
+ * session fee, but its add-ons are locked, and delivery is open.
+ */
 const COMPLETED: AdminBooking = {
   ...BOOKING,
   status: 'completed',
@@ -838,28 +846,48 @@ const COMPLETED: AdminBooking = {
     canComplete: false,
     canMarkNoShow: false,
     canResendLink: true,
-    canEditAddons: true,
+    canEditAddons: false,
     canRequestSessionFee: true,
     canEditDelivery: true,
     canSendDelivery: false,
   },
 }
 
+/**
+ * A shoot under way with the add-on editor open (2026-09-27): still
+ * `confirmed`, 50,000 owed, 20,000 paid, 30,000 outstanding.
+ */
+const UNDER_WAY: AdminBooking = {
+  ...BOOKING,
+  stage: 'needs_review',
+  actions: {
+    canReschedule: true,
+    canCancel: true,
+    canComplete: false,
+    canMarkNoShow: true,
+    canResendLink: true,
+    canEditAddons: true,
+    canRequestSessionFee: true,
+    canEditDelivery: false,
+    canSendDelivery: false,
+  },
+}
+
 /** The same booking once a 15,000 post-shoot line has been added. */
 const WITH_POST_SHOOT: AdminBooking = {
-  ...COMPLETED,
+  ...UNDER_WAY,
   addons: [
-    ...COMPLETED.addons,
+    ...UNDER_WAY.addons,
     { id: 'ba2', name: 'Twenty prints', unitPriceRwf: 15_000, quantity: 1, amountRwf: 15_000, stage: 'post_shoot', canRemove: true },
   ],
   money: {
-    ...COMPLETED.money,
+    ...UNDER_WAY.money,
     totals: { quotedTotalRwf: 50_000, grandTotalRwf: 65_000, collectedRwf: 20_000, refundDueRwf: 0, outstandingRwf: 45_000 },
   },
 }
 
 describe('the post-shoot add-on editor', () => {
-  it('does not render at all while the shoot is not completed', async () => {
+  it('does not render at all before the shoot has begun', async () => {
     stubApi()
     await renderLoaded()
 
@@ -868,7 +896,7 @@ describe('the post-shoot add-on editor', () => {
   })
 
   it('renders once the API says the add-ons may be edited', async () => {
-    stubApi({ booking: COMPLETED })
+    stubApi({ booking: UNDER_WAY })
     await renderLoaded()
 
     // The opener sits in the money section; the form opens in a dialog (2026-09-27).
@@ -880,7 +908,7 @@ describe('the post-shoot add-on editor', () => {
   })
 
   it('asks the catalogue for what he sells, once', async () => {
-    const { sent } = stubApi({ booking: COMPLETED })
+    const { sent } = stubApi({ booking: UNDER_WAY })
     await renderLoaded()
     await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
@@ -889,7 +917,7 @@ describe('the post-shoot add-on editor', () => {
   })
 
   it('offers this service’s own add-ons and the shared ones, and nothing else', async () => {
-    stubApi({ booking: COMPLETED })
+    stubApi({ booking: UNDER_WAY })
     await renderLoaded()
     await openDialog('Add an add-on')
 
@@ -901,7 +929,7 @@ describe('the post-shoot add-on editor', () => {
   })
 
   it('never offers an add-on he has retired, nor one belonging to another service', async () => {
-    stubApi({ booking: COMPLETED })
+    stubApi({ booking: UNDER_WAY })
     await renderLoaded()
     await openDialog('Add an add-on')
 
@@ -917,7 +945,7 @@ describe('the post-shoot add-on editor', () => {
 
   it('posts the id and the quantity, and re-renders from what the API answered', async () => {
     const { sent, current } = stubApi({
-      booking: COMPLETED,
+      booking: UNDER_WAY,
       onPost: (_call, state) => {
         state.value = WITH_POST_SHOOT
         return json({ booking: WITH_POST_SHOOT })
@@ -941,7 +969,7 @@ describe('the post-shoot add-on editor', () => {
   })
 
   it('sends a quantity of one when the field is left as it opens', async () => {
-    const { sent } = stubApi({ booking: COMPLETED })
+    const { sent } = stubApi({ booking: UNDER_WAY })
     await renderLoaded()
     await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
@@ -954,7 +982,7 @@ describe('the post-shoot add-on editor', () => {
   })
 
   it('posts nothing at all while no add-on has been chosen', async () => {
-    const { sent } = stubApi({ booking: COMPLETED })
+    const { sent } = stubApi({ booking: UNDER_WAY })
     await renderLoaded()
     await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
@@ -965,7 +993,7 @@ describe('the post-shoot add-on editor', () => {
   })
 
   it('never sends a price: only an id and a quantity decide what is charged', async () => {
-    const { sent } = stubApi({ booking: COMPLETED })
+    const { sent } = stubApi({ booking: UNDER_WAY })
     await renderLoaded()
     await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
@@ -978,7 +1006,7 @@ describe('the post-shoot add-on editor', () => {
   })
 
   it('says so when the catalogue has nothing to sell for this service', async () => {
-    stubApi({ booking: COMPLETED, catalogue: { services: [], sharedAddons: [] } })
+    stubApi({ booking: UNDER_WAY, catalogue: { services: [], sharedAddons: [] } })
     await renderLoaded()
     await openDialog('Add an add-on')
 
@@ -987,7 +1015,7 @@ describe('the post-shoot add-on editor', () => {
   })
 
   it('says the add-ons would not load, and leaves the rest of the page usable', async () => {
-    const { sent } = stubApi({ booking: COMPLETED, catalogue: null })
+    const { sent } = stubApi({ booking: UNDER_WAY, catalogue: null })
     await renderLoaded()
     await openDialog('Add an add-on')
 
@@ -1032,8 +1060,8 @@ describe('removing a post-shoot add-on', () => {
     const { sent } = stubApi({
       booking: WITH_POST_SHOOT,
       onPost: (_call, state) => {
-        state.value = COMPLETED
-        return json({ booking: COMPLETED })
+        state.value = UNDER_WAY
+        return json({ booking: UNDER_WAY })
       },
     })
     await renderLoaded()
@@ -1079,7 +1107,7 @@ describe('removing a post-shoot add-on', () => {
 
 describe('requesting the session fee', () => {
   it('names the outstanding amount the API derived', async () => {
-    stubApi({ booking: COMPLETED })
+    stubApi({ booking: UNDER_WAY })
     await renderLoaded()
 
     expect(screen.getByRole('button', { name: 'Request 30,000 RWF session fee' })).toBeInTheDocument()
@@ -1102,9 +1130,9 @@ describe('requesting the session fee', () => {
 
   it('posts the request and re-renders from the booking the API answered with', async () => {
     const asked: AdminBooking = {
-      ...COMPLETED,
+      ...UNDER_WAY,
       payments: [
-        ...COMPLETED.payments,
+        ...UNDER_WAY.payments,
         {
           id: 'pay2',
           kind: 'session_fee',
@@ -1123,7 +1151,7 @@ describe('requesting the session fee', () => {
         },
       ],
       messages: [
-        ...COMPLETED.messages,
+        ...UNDER_WAY.messages,
         {
           id: 'm2',
           kind: 'email',
@@ -1138,7 +1166,7 @@ describe('requesting the session fee', () => {
       ],
     }
     const { sent } = stubApi({
-      booking: COMPLETED,
+      booking: UNDER_WAY,
       onPost: (_call, state) => {
         state.value = asked
         return json({ booking: asked })
@@ -1159,7 +1187,7 @@ describe('requesting the session fee', () => {
     ['in_progress', 'The client is paying right now. Wait for that to finish.'],
     ['not_allowed', 'That is not possible for this booking any more. The booking below is up to date.'],
   ])('shows the %s refusal in its own words', async (code, words) => {
-    stubApi({ booking: COMPLETED, onPost: () => json({ error: code, booking: COMPLETED }, 409) })
+    stubApi({ booking: UNDER_WAY, onPost: () => json({ error: code, booking: UNDER_WAY }, 409) })
     await renderLoaded()
 
     await user().click(screen.getByRole('button', { name: 'Request 30,000 RWF session fee' }))
@@ -1169,7 +1197,7 @@ describe('requesting the session fee', () => {
   })
 
   it('shows the not_allowed refusal for an add-on the API will not take, and stays usable', async () => {
-    stubApi({ booking: COMPLETED, onPost: () => json({ error: 'not_allowed', booking: COMPLETED }, 409) })
+    stubApi({ booking: UNDER_WAY, onPost: () => json({ error: 'not_allowed', booking: UNDER_WAY }, 409) })
     await renderLoaded()
     await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
@@ -1196,13 +1224,80 @@ describe('requesting the session fee', () => {
  * defence rather than the first. An emptied field is valid HTML, and
  * `AddonForm`'s `Number(quantity) || 1` reads it as one.
  */
+describe('"completed" means paid (2026-09-27)', () => {
+  it('shows Mark completed disabled while money is owed, and says how much', async () => {
+    const { sent } = stubApi({ booking: UNDER_WAY })
+    await renderLoaded()
+
+    const complete = screen.getByRole('button', { name: 'Mark completed' })
+    expect(complete).toHaveAttribute('aria-disabled', 'true')
+    expect(complete).toHaveAccessibleDescription(
+      'Mark completed opens once nothing is owed. 30,000 RWF is still to pay. Paid in full, the booking completes by itself.',
+    )
+    await user().click(complete)
+    expect(writes(sent)).toEqual([])
+    // No-show is not held back by money.
+    expect(screen.getByRole('button', { name: 'Mark no-show' })).not.toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('shows neither the disabled button nor its hint once nothing is owed', async () => {
+    stubApi({ booking: STARTED })
+    await renderLoaded()
+
+    expect(screen.getAllByRole('button', { name: 'Mark completed' })).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Mark completed' })).not.toHaveAttribute('aria-disabled', 'true')
+    expect(screen.queryByText(/opens once nothing is owed/)).toBeNull()
+  })
+
+  it('shows the balance_due refusal in its own words, and the booking it carried', async () => {
+    stubApi({ booking: STARTED, onPost: () => json({ error: 'balance_due', booking: UNDER_WAY }, 409) })
+    await renderLoaded()
+
+    await user().click(screen.getByRole('button', { name: 'Mark completed' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The client still owes money on this booking. It completes by itself once it is paid in full.',
+    )
+    expect(screen.getByRole('button', { name: 'Mark completed' })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('points to Request session fee once an add-on is added, until the fee is asked for', async () => {
+    const REQUESTED: AdminBooking = { ...WITH_POST_SHOOT, actions: { ...WITH_POST_SHOOT.actions, canRequestSessionFee: false } }
+    stubApi({
+      booking: UNDER_WAY,
+      onPost: (call, state) => {
+        state.value = call.url.endsWith('/session-fee') ? REQUESTED : WITH_POST_SHOOT
+        return json({ booking: state.value })
+      },
+    })
+    await renderLoaded()
+    expect(screen.queryByRole('button', { name: 'Go to Request session fee' })).toBeNull()
+
+    await openDialog('Add an add-on')
+    await screen.findByLabelText('Add-on')
+    await user().selectOptions(screen.getByLabelText('Add-on'), OWN_ADDON_ID)
+    await user().click(screen.getByRole('button', { name: 'Add to the booking' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(within(section('Money')).getByRole('status')).toHaveTextContent(
+      'Added. The client now owes 45,000 RWF. Once every add-on is in, ask for it with the session fee.',
+    )
+    await user().click(screen.getByRole('button', { name: 'Go to Request session fee' }))
+    const request = screen.getByRole('button', { name: 'Request 45,000 RWF session fee' })
+    expect(request).toHaveFocus()
+
+    await user().click(request)
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Go to Request session fee' })).toBeNull())
+  })
+})
+
 describe('the quantity the add-on form sends', () => {
   it.each([
     ['a zero', '0'],
     ['a hundred', '100'],
     ['a negative', '-3'],
   ])('sends nothing at all for %s: the field refuses it first', async (_case, value) => {
-    const { sent } = stubApi({ booking: COMPLETED })
+    const { sent } = stubApi({ booking: UNDER_WAY })
     await renderLoaded()
     await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
@@ -1216,7 +1311,7 @@ describe('the quantity the add-on form sends', () => {
   })
 
   it('reads an emptied field as one', async () => {
-    const { sent } = stubApi({ booking: COMPLETED })
+    const { sent } = stubApi({ booking: UNDER_WAY })
     await renderLoaded()
     await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
@@ -1230,7 +1325,7 @@ describe('the quantity the add-on form sends', () => {
   })
 
   it('sends the highest quantity the API takes', async () => {
-    const { sent } = stubApi({ booking: COMPLETED })
+    const { sent } = stubApi({ booking: UNDER_WAY })
     await renderLoaded()
     await openDialog('Add an add-on')
     await screen.findByLabelText('Add-on')
@@ -1625,7 +1720,9 @@ describe('before the booking is marked completed', () => {
     stubApi({ booking: STARTED })
     await renderLoaded()
 
-    expect(deliverySection()).toHaveTextContent('Photo delivery opens once you mark this booking completed.')
+    expect(deliverySection()).toHaveTextContent(
+      'Photo delivery opens once this booking is completed: by itself when it is paid in full, or when you mark it completed.',
+    )
     expect(screen.queryByLabelText('Link to the photos')).toBeNull()
   })
 

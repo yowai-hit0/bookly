@@ -17,8 +17,10 @@ import { adminBookingView, findAdminBooking } from './admin-view.js';
  * line and totals do not move (spec §6.13). `amount_rwf` is unit × quantity,
  * which the CHECK insists on, and the quantity is bounded at both ends. Only
  * something he sells for this service -- its own add-on, or one shared with
- * every service -- and only while the shoot is `completed`, which is what the
- * editor unlocking means.
+ * every service -- and, since 2026-09-27, only while the booking is
+ * `confirmed` and its shoot has begun: add-ons come before completion, which
+ * needs everything paid, so they are locked once the booking is `completed`
+ * and refused before the shoot. `canEditAddons` says the same.
  *
  * The money is the point: a 15,000 add-on raises `grandTotalRwf` and
  * `outstandingRwf` by exactly 15,000 and leaves `quotedTotalRwf` alone (the v1
@@ -65,7 +67,7 @@ beforeEach(async () => {
 // --- Helpers ----------------------------------------------------------------------------
 
 function deps() {
-  return { prisma };
+  return { prisma, now: () => NOW };
 }
 
 type AddonRow = {
@@ -95,9 +97,12 @@ async function totalsOf(bookingId: string) {
   return adminBookingView(booking, NOW).money.totals;
 }
 
-/** A completed shoot: 40,000 package + a 10,000 at-booking add-on, 20,000 collected. */
-async function completedBooking(seed: Parameters<typeof insertBooking>[2] = {}): Promise<Booking> {
-  const booking = await insertBooking(prisma, world, { status: 'completed', ...seed });
+/**
+ * A confirmed booking whose shoot has begun (every fixture shoot is before NOW):
+ * 40,000 package + a 10,000 at-booking add-on, 20,000 collected.
+ */
+async function startedBooking(seed: Parameters<typeof insertBooking>[2] = {}): Promise<Booking> {
+  const booking = await insertBooking(prisma, world, { status: 'confirmed', ...seed });
   await insertPayment(prisma, booking.id, { status: 'succeeded', amountRwf: 20_000, ageSeconds: 600 });
   return booking;
 }
@@ -122,7 +127,7 @@ async function add(bookingId: string, addonId: string, quantity = 1) {
 
 describe('adding a post-shoot add-on', () => {
   it('copies the catalogue name and unit price onto the booking, at post_shoot stage', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS, { name: 'Twenty prints' });
 
     const result = await add(booking.id, prints.id);
@@ -144,7 +149,7 @@ describe('adding a post-shoot add-on', () => {
   });
 
   it('never re-reads the catalogue afterwards: renaming, repricing and deactivating it change nothing', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS, { name: 'Twenty prints' });
     await add(booking.id, prints.id, 2);
     const before = await totalsOf(booking.id);
@@ -160,7 +165,7 @@ describe('adding a post-shoot add-on', () => {
   });
 
   it('defaults the quantity to one', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS);
 
     await addPostShootAddon(deps(), booking.id, { addonId: prints.id, quantity: 1 });
@@ -173,7 +178,7 @@ describe('adding a post-shoot add-on', () => {
     [3, 3 * PRINTS],
     [ADDON_MAX_QUANTITY, ADDON_MAX_QUANTITY * PRINTS],
   ])('writes amount_rwf as unit × quantity for a quantity of %i', async (quantity, amountRwf) => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS);
 
     const result = await add(booking.id, prints.id, quantity);
@@ -183,7 +188,7 @@ describe('adding a post-shoot add-on', () => {
   });
 
   it.each([0, -1, ADDON_MAX_QUANTITY + 1, 10_000])('refuses a quantity of %i and writes nothing', async (quantity) => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS);
 
     const result = await add(booking.id, prints.id, quantity);
@@ -197,7 +202,7 @@ describe('adding a post-shoot add-on', () => {
 
 describe('which catalogue add-on may be added', () => {
   it('takes this service’s own add-on', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
 
     const result = await add(booking.id, world.ownAddonId);
 
@@ -206,7 +211,7 @@ describe('which catalogue add-on may be added', () => {
   });
 
   it('takes an add-on shared with every service', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
 
     const result = await add(booking.id, world.sharedAddonId);
 
@@ -215,7 +220,7 @@ describe('which catalogue add-on may be added', () => {
   });
 
   it('refuses an add-on that belongs to a different service', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const other = await prisma.service.create({ data: { slug: 'weddings', nameEn: 'Weddings' } });
     const theirs = await catalogueAddon(20_000, { name: 'Second shooter', serviceId: other.id });
 
@@ -226,7 +231,7 @@ describe('which catalogue add-on may be added', () => {
   });
 
   it('refuses an add-on he has deactivated: it is not something he sells today', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const retired = await catalogueAddon(PRINTS, { name: 'Polaroid pack', isActive: false });
 
     const result = await add(booking.id, retired.id);
@@ -236,7 +241,7 @@ describe('which catalogue add-on may be added', () => {
   });
 
   it('answers not_found for an add-on id nothing matches', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
 
     const result = await add(booking.id, '00000000-0000-4000-8000-0000000000aa');
 
@@ -244,7 +249,7 @@ describe('which catalogue add-on may be added', () => {
   });
 
   it('answers not_found for a booking id nothing matches, and touches no other booking', async () => {
-    const other = await completedBooking();
+    const other = await startedBooking();
     const prints = await catalogueAddon(PRINTS);
 
     const result = await add('00000000-0000-4000-8000-0000000000bb', prints.id);
@@ -254,10 +259,10 @@ describe('which catalogue add-on may be added', () => {
   });
 });
 
-// --- Adding: only once the shoot is done ---------------------------------------------------
+// --- Adding: while the shoot is under way, before completion ------------------------------
 
-describe('the editor is unlocked by completing the shoot', () => {
-  it.each(['pending_payment', 'confirmed', 'expired', 'no_show', 'cancelled_by_client', 'cancelled_by_admin'])(
+describe('the editor is open once the shoot has begun, and until the booking is completed (2026-09-27)', () => {
+  it.each(['pending_payment', 'completed', 'expired', 'no_show', 'cancelled_by_client', 'cancelled_by_admin'])(
     'refuses an add-on on a %s booking',
     async (status) => {
       const booking = await insertBooking(prisma, world, { status });
@@ -270,16 +275,31 @@ describe('the editor is unlocked by completing the shoot', () => {
     },
   );
 
-  it('allows it the moment the booking is completed, and says so through canEditAddons', async () => {
-    const booking = await insertBooking(prisma, world, { status: 'confirmed' });
+  it('refuses one on a confirmed booking whose shoot has not begun', async () => {
+    const booking = await insertBooking(prisma, world, { status: 'confirmed', startsAt: new Date(NOW.getTime() + 60 * 60_000) });
     const prints = await catalogueAddon(PRINTS);
+
     expect(await add(booking.id, prints.id)).toStrictEqual({ status: 'not_allowed' });
+    const view = adminBookingView((await findAdminBooking(prisma, booking.id)) ?? (() => { throw new Error('gone'); })(), NOW);
+    expect(view.actions.canEditAddons).toBe(false);
+  });
+
+  it('allows it once the shoot has begun, says so through canEditAddons, and locks it once completed', async () => {
+    const booking = await startedBooking();
+    const prints = await catalogueAddon(PRINTS);
+
+    expect((await add(booking.id, prints.id)).status).toBe('ok');
+    const open = adminBookingView((await findAdminBooking(prisma, booking.id)) ?? (() => { throw new Error('gone'); })(), NOW);
+    expect(open.actions.canEditAddons).toBe(true);
+    // Delivery is for after: it still needs `completed`.
+    expect(open.actions.canEditDelivery).toBe(false);
 
     await prisma.booking.update({ where: { id: booking.id }, data: { status: 'completed', completedAt: NOW } });
 
-    expect((await add(booking.id, prints.id)).status).toBe('ok');
-    const view = adminBookingView((await findAdminBooking(prisma, booking.id)) ?? (() => { throw new Error('gone'); })(), NOW);
-    expect(view.actions.canEditAddons).toBe(true);
+    expect(await add(booking.id, prints.id)).toStrictEqual({ status: 'not_allowed' });
+    const locked = adminBookingView((await findAdminBooking(prisma, booking.id)) ?? (() => { throw new Error('gone'); })(), NOW);
+    expect(locked.actions.canEditAddons).toBe(false);
+    expect(locked.actions.canEditDelivery).toBe(true);
   });
 });
 
@@ -287,7 +307,7 @@ describe('the editor is unlocked by completing the shoot', () => {
 
 describe('what adding one does to the money (data-model_v2.md §6.1)', () => {
   it('raises grandTotalRwf and outstandingRwf by 15,000, and leaves quotedTotalRwf alone (plan.md Task 20)', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS);
     const before = await totalsOf(booking.id);
     expect(before).toStrictEqual({
@@ -310,7 +330,7 @@ describe('what adding one does to the money (data-model_v2.md §6.1)', () => {
   });
 
   it('raises them by unit × quantity, not by the unit price', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS);
 
     await add(booking.id, prints.id, 4);
@@ -319,7 +339,7 @@ describe('what adding one does to the money (data-model_v2.md §6.1)', () => {
   });
 
   it('adds up across several add-ons', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS);
 
     await add(booking.id, prints.id);
@@ -333,7 +353,7 @@ describe('what adding one does to the money (data-model_v2.md §6.1)', () => {
   });
 
   it('answers the booking as it now stands, the new line included', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS, { name: 'Twenty prints' });
 
     const result = await add(booking.id, prints.id);
@@ -353,7 +373,7 @@ describe('what adding one does to the money (data-model_v2.md §6.1)', () => {
 describe('removing a post-shoot add-on', () => {
   /** A completed booking carrying one 15,000 post-shoot line. */
   async function withPostShootLine(): Promise<{ booking: Booking; lineId: string }> {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS, { name: 'Twenty prints' });
     await add(booking.id, prints.id);
     const line = (await addonRows(booking.id)).find((row) => row.stage === 'post_shoot');
@@ -407,7 +427,7 @@ describe('removing a post-shoot add-on', () => {
     expect(result).toStrictEqual({ status: 'not_found' });
   });
 
-  it.each(['confirmed', 'no_show', 'cancelled_by_admin'])('refuses on a %s booking, which has no open editor', async (status) => {
+  it.each(['completed', 'no_show', 'cancelled_by_admin'])('refuses on a %s booking, which has no open editor', async (status) => {
     const { booking, lineId } = await withPostShootLine();
     await prisma.booking.update({ where: { id: booking.id }, data: { status } });
 
@@ -443,7 +463,7 @@ describe('removing a post-shoot add-on', () => {
   });
 
   it('removes one line while another is paid for, when the sums allow it', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS, { name: 'Twenty prints' });
     await add(booking.id, prints.id);
     await add(booking.id, world.sharedAddonId);
@@ -478,7 +498,7 @@ describe('removing a post-shoot add-on', () => {
   });
 
   it('marks in the view exactly the lines it would allow removing', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS);
     await add(booking.id, prints.id);
     await insertPayment(prisma, booking.id, { status: 'succeeded', kind: 'session_fee', amountRwf: 45_000, ageSeconds: 300 });
@@ -496,7 +516,7 @@ describe('removing a post-shoot add-on', () => {
 
 describe('two edits arriving at once', () => {
   it('lands both adds, with no lost update in the totals', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS);
 
     const results = await Promise.all([add(booking.id, prints.id), add(booking.id, world.sharedAddonId)]);
@@ -507,7 +527,7 @@ describe('two edits arriving at once', () => {
   });
 
   it('lands five of the same add-on as five lines, each counted once', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS);
 
     const results = await Promise.all(Array.from({ length: 5 }, () => add(booking.id, prints.id)));
@@ -518,7 +538,7 @@ describe('two edits arriving at once', () => {
   });
 
   it('leaves the totals agreeing with the lines when an add races a remove', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS);
     await add(booking.id, prints.id);
     const first = (await addonRows(booking.id)).find((row) => row.stage === 'post_shoot');
@@ -535,7 +555,7 @@ describe('two edits arriving at once', () => {
   });
 
   it('never lets a remove racing a payment leave the client overpaid', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const prints = await catalogueAddon(PRINTS);
     await add(booking.id, prints.id);
     const line = (await addonRows(booking.id)).find((row) => row.stage === 'post_shoot');
@@ -566,7 +586,7 @@ describe('a price and a quantity whose product an integer cannot hold', () => {
   const INT4_MAX = 2_147_483_647;
 
   it('takes the largest amount the booking can still hold', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     // The ceiling is the booking's total, not the line by itself: the payment
     // that would collect what it owes has to fit the same `integer` column.
     const room = INT4_MAX - (await totalsOf(booking.id)).grandTotalRwf;
@@ -580,7 +600,7 @@ describe('a price and a quantity whose product an integer cannot hold', () => {
   });
 
   it('refuses the line that would take the booking past it', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const total = (await totalsOf(booking.id)).grandTotalRwf;
     // One rwf too many for the booking, though the line itself would fit.
     const expensive = await catalogueAddon(INT4_MAX - total + 1, { name: 'The whole studio' });
@@ -596,7 +616,7 @@ describe('a price and a quantity whose product an integer cannot hold', () => {
    * 22003 and surfacing as a 500 (routes/validation.ts).
    */
   it('refuses a product larger than an integer rather than throwing', async () => {
-    const booking = await completedBooking();
+    const booking = await startedBooking();
     const expensive = await catalogueAddon(INT4_MAX, { name: 'A price the catalogue allows' });
 
     const result = await add(booking.id, expensive.id, 2);

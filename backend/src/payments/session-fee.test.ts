@@ -146,10 +146,21 @@ async function catalogueAddon(priceRwf: number, name = 'Extra prints') {
   return prisma.addon.create({ data: { serviceId: world.serviceId, nameEn: name, priceRwf } });
 }
 
-/** Adds a post-shoot add-on through the real editor, which is what moves the money. */
+/**
+ * Adds a post-shoot add-on through the real editor, which is what moves the
+ * money. Since 2026-09-27 the editor is open only while the booking is
+ * `confirmed` and its shoot has begun, so the add-on goes on in that state, a
+ * minute into the shoot, and the booking is put back in whatever status the
+ * test set -- a `completed` booking carrying an add-on is the legacy data
+ * these tests are about, and it still exists.
+ */
 async function addAddon(bookingId: string, priceRwf: number): Promise<void> {
   const addon = await catalogueAddon(priceRwf, `Prints ${priceRwf}`);
-  const result = await addPostShootAddon({ prisma }, bookingId, { addonId: addon.id, quantity: 1 });
+  const before = await prisma.booking.findUniqueOrThrow({ where: { id: bookingId }, select: { status: true, startsAt: true } });
+  await prisma.booking.update({ where: { id: bookingId }, data: { status: 'confirmed' } });
+  const now = () => new Date(before.startsAt.getTime() + 60_000);
+  const result = await addPostShootAddon({ prisma, now }, bookingId, { addonId: addon.id, quantity: 1 });
+  await prisma.booking.update({ where: { id: bookingId }, data: { status: before.status } });
   if (result.status !== 'ok') throw new Error(`The add-on would not go on: ${result.status}`);
 }
 
@@ -705,16 +716,17 @@ describe('asking while the client is already paying', () => {
   });
 });
 
+// Add-ons are edited while the booking is confirmed and its shoot has begun (2026-09-27).
 describe('removing an add-on after the request was sent', () => {
   it('leaves the frozen amount above what the booking is now worth', async () => {
-    const { booking } = await owingBooking();
+    const { booking } = await owingBooking('confirmed');
     await addAddon(booking.id, 15_000);
     await requestSessionFee(deps(), booking.id);
     expect((await sessionFees())[0]).toMatchObject({ amount_rwf: 45_000 });
 
     // The photographer changes his mind and takes the add-on off again.
     const line = await prisma.bookingAddon.findFirstOrThrow({ where: { bookingId: booking.id, stage: 'post_shoot' } });
-    const removed = await removePostShootAddon({ prisma }, booking.id, line.id);
+    const removed = await removePostShootAddon({ prisma, now: () => new Date(booking.startsAt.getTime() + 60_000) }, booking.id, line.id);
 
     expect(removed.status).toBe('ok');
     // Nothing reconsiders the request: it still asks for 45,000 against 30,000 owed.
@@ -725,11 +737,11 @@ describe('removing an add-on after the request was sent', () => {
   });
 
   it('bills what is owed when the client pays, because an ask for more than that is stale', async () => {
-    const { booking } = await owingBooking();
+    const { booking } = await owingBooking('confirmed');
     await addAddon(booking.id, 15_000);
     await requestSessionFee(deps(), booking.id);
     const line = await prisma.bookingAddon.findFirstOrThrow({ where: { bookingId: booking.id, stage: 'post_shoot' } });
-    await removePostShootAddon({ prisma }, booking.id, line.id);
+    await removePostShootAddon({ prisma, now: () => new Date(booking.startsAt.getTime() + 60_000) }, booking.id, line.id);
     // Past the in-flight window, so the request reads as a request (initiate.ts).
     await prisma.$executeRaw`UPDATE payment SET initiated_at = initiated_at - interval '5 minutes' WHERE kind = 'session_fee'`;
     const provider = stubProvider();

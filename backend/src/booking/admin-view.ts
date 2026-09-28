@@ -97,7 +97,11 @@ export async function findAdminBooking(prisma: PrismaClient, id: string): Promis
 export function adminBookingView(booking: AdminBooking, now: Date): AdminBookingView {
   const shootStarted = booking.startsAt <= now;
   const totals = bookingTotals(booking, booking.addons, booking.payments);
-  const editableAddons = booking.status === 'completed';
+  // Add-ons are for the shoot itself: open once it has begun and while the
+  // booking is `confirmed`, locked once it is `completed` (2026-09-27). The
+  // photos are for after: delivery still needs `completed`.
+  const editableAddons = booking.status === 'confirmed' && shootStarted;
+  const deliverable = booking.status === 'completed';
 
   return {
     id: booking.id,
@@ -183,15 +187,17 @@ export function adminBookingView(booking: AdminBooking, now: Date): AdminBooking
     actions: {
       canReschedule: booking.status === 'confirmed',
       canCancel: booking.status === 'confirmed',
-      // Only once the shoot has begun: "after the shoot date passes" (spec §3.5).
-      canComplete: booking.status === 'confirmed' && shootStarted,
+      // Only once the shoot has begun (spec §3.5), and only with nothing owed:
+      // "completed" means paid (2026-09-27). With money owed the page shows the
+      // button disabled and says how much.
+      canComplete: booking.status === 'confirmed' && shootStarted && totals.outstandingRwf === 0,
       canMarkNoShow: booking.status === 'confirmed' && shootStarted,
       // A booking that was confirmed once has a client to send a link to.
       canResendLink: booking.confirmedAt !== null,
       canEditAddons: editableAddons,
       canRequestSessionFee: totals.outstandingRwf > 0 && (booking.status === 'confirmed' || booking.status === 'completed'),
-      canEditDelivery: editableAddons,
-      canSendDelivery: editableAddons && booking.deliveryUrl !== null,
+      canEditDelivery: deliverable,
+      canSendDelivery: deliverable && booking.deliveryUrl !== null,
     },
   };
 }

@@ -24,7 +24,7 @@ import { bookingTotals } from './totals.js';
  * each see the other's money as unspent.
  */
 
-export type AddonEditDeps = { prisma: PrismaClient };
+export type AddonEditDeps = { prisma: PrismaClient; now: () => Date };
 
 /** Enough for "20 extra prints"; a typo of 10,000 is not an add-on. */
 export const ADDON_MAX_QUANTITY = 99;
@@ -52,11 +52,13 @@ export type AddonEditResult =
 
 type Outcome = Exclude<AddonEditResult, { status: 'ok' }>['status'] | 'ok';
 
-type LockedBooking = { id: string; status: string; serviceId: string; packagePriceRwf: number };
+type LockedBooking = { id: string; status: string; serviceId: string; packagePriceRwf: number; startsAt: Date };
 
 /**
- * Adds one catalogue add-on to a completed booking, at the price it is sold
- * for now and the quantity agreed.
+ * Adds one catalogue add-on to a booking whose shoot has begun, at the price
+ * it is sold for now and the quantity agreed. Since 2026-09-27 that is while
+ * it is `confirmed` -- add-ons come before completion, which needs everything
+ * paid -- and never once it is `completed`.
  */
 export async function addPostShootAddon(
   deps: AddonEditDeps,
@@ -66,8 +68,7 @@ export async function addPostShootAddon(
   const outcome = await deps.prisma.$transaction(async (tx): Promise<Outcome> => {
     const booking = await lockBooking(tx, bookingId);
     if (booking === null) return 'not_found';
-    // The editor opens when the shoot is done, and not before (spec §3.5).
-    if (booking.status !== 'completed') return 'not_allowed';
+    if (!editable(booking, deps.now())) return 'not_allowed';
 
     const addon = await tx.addon.findUnique({ where: { id: request.addonId } });
     if (addon === null) return 'not_found';
@@ -106,7 +107,7 @@ export async function removePostShootAddon(deps: AddonEditDeps, bookingId: strin
   const outcome = await deps.prisma.$transaction(async (tx): Promise<Outcome> => {
     const booking = await lockBooking(tx, bookingId);
     if (booking === null) return 'not_found';
-    if (booking.status !== 'completed') return 'not_allowed';
+    if (!editable(booking, deps.now())) return 'not_allowed';
 
     const line = await tx.bookingAddon.findUnique({ where: { id: bookingAddonId } });
     if (line === null || line.bookingId !== booking.id) return 'not_found';
@@ -129,16 +130,21 @@ export async function removePostShootAddon(deps: AddonEditDeps, bookingId: strin
   return finish(deps, bookingId, outcome);
 }
 
+/** Open once the shoot has begun, while the booking is still `confirmed` (2026-09-27). */
+function editable(booking: LockedBooking, now: Date): boolean {
+  return booking.status === 'confirmed' && booking.startsAt <= now;
+}
+
 /** The booking row, held for the length of the edit so its totals cannot move. */
 async function lockBooking(tx: Prisma.TransactionClient, bookingId: string): Promise<LockedBooking | null> {
-  const rows = await tx.$queryRaw<{ id: string; status: string; service_id: string; package_price_rwf: number }[]>`
-    SELECT id::text AS id, status, service_id::text AS service_id, package_price_rwf
+  const rows = await tx.$queryRaw<{ id: string; status: string; service_id: string; package_price_rwf: number; starts_at: Date }[]>`
+    SELECT id::text AS id, status, service_id::text AS service_id, package_price_rwf, starts_at
       FROM booking
      WHERE id = ${bookingId}::uuid
        FOR UPDATE`;
   const row = rows[0];
   if (row === undefined) return null;
-  return { id: row.id, status: row.status, serviceId: row.service_id, packagePriceRwf: row.package_price_rwf };
+  return { id: row.id, status: row.status, serviceId: row.service_id, packagePriceRwf: row.package_price_rwf, startsAt: row.starts_at };
 }
 
 /** Every edit answers with the booking as it now stands, refusals included. */

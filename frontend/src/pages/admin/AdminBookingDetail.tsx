@@ -5,6 +5,7 @@ import {
   CircleAlert,
   ClipboardList,
   Hash,
+  HandCoins,
   History,
   type LucideIcon,
   MapPin,
@@ -15,7 +16,7 @@ import {
   TriangleAlert,
   Users,
 } from 'lucide-react'
-import { type FormEvent, type ReactNode, useEffect, useId, useState } from 'react'
+import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router'
 import { ApiError, UnauthenticatedError } from '@/admin/api'
@@ -92,6 +93,11 @@ export function AdminBookingDetail() {
   const [failure, setFailure] = useState<Failure>(null)
   const [busy, setBusy] = useState(false)
   const [openForm, setOpenForm] = useState<OpenForm>(null)
+  // Set when an add-on goes on, until the session fee is asked for: the page
+  // then points at "Request session fee" (2026-09-27).
+  const [feeDue, setFeeDue] = useState(false)
+  const requestFeeRef = useRef<HTMLButtonElement>(null)
+  const owedHintId = useId()
 
   useEffect(() => {
     let cancelled = false
@@ -219,6 +225,9 @@ export function AdminBookingDetail() {
   }
 
   const { schedule, money, actions } = booking
+  // Confirmed and the shoot has begun, but money is owed: "completed" means
+  // paid (2026-09-27), so the button shows, disabled, with what is owed.
+  const completeOwed = actions.canMarkNoShow && !actions.canComplete && money.totals.outstandingRwf > 0
 
   // A refused action shows where the eye is: inside the open dialog, or at the
   // top of the page when none is open. Never both, so there is one alert.
@@ -388,6 +397,26 @@ export function AdminBookingDetail() {
               <p className={HINT}>{t('admin:booking.addons.note')}</p>
             </div>
           )}
+          {feeDue && actions.canRequestSessionFee && (
+            <Callout
+              variant="console"
+              tone="info"
+              icon={HandCoins}
+              role="status"
+              action={
+                <Button
+                  variant="console-outline"
+                  size="console-sm"
+                  // Focusing it scrolls it into view as well.
+                  onClick={() => requestFeeRef.current?.focus()}
+                >
+                  {t('admin:booking.addons.toSessionFee')}
+                </Button>
+              }
+            >
+              <p>{t('admin:booking.addons.added', { amount: formatMoney(money.totals.outstandingRwf) })}</p>
+            </Callout>
+          )}
           {actions.canEditAddons &&
             formDialog(
               'addon',
@@ -396,7 +425,12 @@ export function AdminBookingDetail() {
                 <AddonForm
                   serviceId={booking.service.id}
                   busy={busy}
-                  onAdd={(addonId, quantity) => submitFrom(() => bookingsApi.addAddon(booking.id, addonId, quantity))}
+                  onAdd={async (addonId, quantity) => {
+                    if (await attempt(() => bookingsApi.addAddon(booking.id, addonId, quantity))) {
+                      setOpenForm(null)
+                      setFeeDue(true)
+                    }
+                  }}
                 />
                 <p className={HINT}>{t('admin:booking.addons.note')}</p>
               </>,
@@ -422,11 +456,12 @@ export function AdminBookingDetail() {
           />
         ) : (
           // Where the form will be, once the shoot has begun: the photographer
-          // otherwise has no way to know it exists (2026-09-25). `canComplete` is
-          // the API's "confirmed and the shoot has begun", on its clock.
-          actions.canComplete && (
+          // otherwise has no way to know it exists (2026-09-25). `canMarkNoShow`
+          // is the API's "confirmed and the shoot has begun", on its clock;
+          // `canComplete` now also needs nothing owed (2026-09-27).
+          actions.canMarkNoShow && (
             <Section title={t('admin:booking.sections.delivery')}>
-              <p className={META}>{t('admin:booking.delivery.opensWhenCompleted')}</p>
+              <p className={META}>{t('admin:booking.delivery.opensWhenPaid')}</p>
             </Section>
           )
         )}
@@ -479,10 +514,13 @@ export function AdminBookingDetail() {
               <div className="flex flex-col gap-2">
                 {/* The page's one main action: the inverted neutral button. */}
                 <Button
+                  ref={requestFeeRef}
                   size="console"
                   className={cn(BUTTON_WIDTH, 'sm:self-start')}
                   aria-disabled={busy}
-                  onClick={() => void act(() => bookingsApi.requestSessionFee(booking.id))}
+                  onClick={async () => {
+                    if (await attempt(() => bookingsApi.requestSessionFee(booking.id))) setFeeDue(false)
+                  }}
                 >
                   {t('admin:booking.sessionFee.request', { amount: formatMoney(money.totals.outstandingRwf) })}
                 </Button>
@@ -499,6 +537,18 @@ export function AdminBookingDetail() {
                     className={BUTTON_WIDTH}
                     aria-disabled={busy}
                     onClick={() => void act(() => bookingsApi.complete(booking.id))}
+                  >
+                    {t('admin:booking.complete')}
+                  </Button>
+                )}
+                {completeOwed && (
+                  // Focusable, so a screen reader hears why it does nothing.
+                  <Button
+                    variant="console-outline"
+                    size="console"
+                    className={BUTTON_WIDTH}
+                    aria-disabled="true"
+                    aria-describedby={owedHintId}
                   >
                     {t('admin:booking.complete')}
                   </Button>
@@ -526,6 +576,11 @@ export function AdminBookingDetail() {
                   </Button>
                 )}
               </div>
+              {completeOwed && (
+                <p id={owedHintId} className={HINT}>
+                  {t('admin:booking.completeOwed', { amount: formatMoney(money.totals.outstandingRwf) })}
+                </p>
+              )}
               <p className={HINT}>{t('admin:booking.resendNote')}</p>
             </div>
           </div>

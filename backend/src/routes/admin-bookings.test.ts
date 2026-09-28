@@ -31,7 +31,10 @@ import {
  * (400 for a malformed request, 422 for a value outside its range) and pages
  * are numbered with a total (2026-09-27); an unknown booking is 404 and a malformed
  * id is 400, not 404; and every answer -- including every refusal -- is the
- * booking as `adminBookingView` renders it.
+ * booking as `adminBookingView` renders it. Completing is `409 balance_due`
+ * while anything is owed -- "completed" means paid (2026-09-27) -- and the
+ * post-shoot add-ons routes are open on a `confirmed` booking whose shoot has
+ * begun, and shut once it is `completed`.
  *
  * That last part is the point of the 409s. A screen that acted on a stale view
  * gets back what is true, not only that it was wrong, so it can correct itself
@@ -601,6 +604,8 @@ describe('POST /bookings/:id/complete and /no-show', () => {
   it('completes once the shoot has begun and answers the completed booking', async () => {
     const { booking } = await confirmedBooking();
     await travelTo(AFTER_THE_SHOOT);
+    // (2026-09-27: completed means paid) settle what confirmedBooking() leaves owing.
+    await insertPayment(prisma, booking.id, { status: 'succeeded', kind: 'session_fee', amountRwf: 30_000, ageSeconds: 60 });
 
     const res = await post(`${BOOKINGS}/${booking.id}/complete`, {});
 
@@ -611,6 +616,18 @@ describe('POST /bookings/:id/complete and /no-show', () => {
       lifecycle: { completedAt: AFTER_THE_SHOOT.toISOString() },
       actions: { canReschedule: false, canCancel: false, canComplete: false, canMarkNoShow: false, canResendLink: true },
     });
+  });
+
+  it('answers 409 balance_due carrying the booking while the session fee is still owed (2026-09-27: completed means paid)', async () => {
+    const { booking } = await confirmedBooking();
+    await travelTo(AFTER_THE_SHOOT);
+
+    const res = await post(`${BOOKINGS}/${booking.id}/complete`, {});
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('balance_due');
+    expect(res.body).toStrictEqual({ error: 'balance_due', booking: await renderedBooking(booking.id) });
+    expect(res.body.booking).toMatchObject({ status: 'confirmed', money: { totals: { outstandingRwf: 30_000 } } });
   });
 
   it('marks a no-show once the shoot has begun, owing nothing further (spec §6.12)', async () => {
@@ -809,15 +826,19 @@ describe('every answer is the same booking shape', () => {
  * the whole `adminBookingView`.
  */
 describe('POST /bookings/:id/addons', () => {
-  /** A completed shoot with a live link and a settled booking fee: 50,000 owed, 20,000 paid. */
-  async function completedBooking(startsAt: Date = WEDNESDAY_0900) {
+  /**
+   * A confirmed booking whose shoot has begun, with a live link and a settled
+   * booking fee: 50,000 owed, 20,000 paid (2026-09-27: add-ons are editable
+   * then, not once the booking is `completed`).
+   */
+  async function shootBegunBooking(startsAt: Date = WEDNESDAY_0900) {
     const { booking } = await confirmedBooking(startsAt);
-    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'completed', completedAt: START } });
+    await travelTo(AFTER_THE_SHOOT);
     return booking;
   }
 
   it('adds the add-on and answers the whole booking as adminBookingView renders it', async () => {
-    const booking = await completedBooking();
+    const booking = await shootBegunBooking();
 
     const res = await post(`${BOOKINGS}/${booking.id}/addons`, { addonId: world.sharedAddonId, quantity: 2 });
 
@@ -835,7 +856,7 @@ describe('POST /bookings/:id/addons', () => {
   });
 
   it('defaults the quantity to one when the body leaves it out', async () => {
-    const booking = await completedBooking();
+    const booking = await shootBegunBooking();
 
     const res = await post(`${BOOKINGS}/${booking.id}/addons`, { addonId: world.ownAddonId });
 
@@ -855,7 +876,7 @@ describe('POST /bookings/:id/addons', () => {
     ['a negative quantity', { addonId: UNKNOWN_ID, quantity: -1 }, 422],
     ['a quantity of 100', { addonId: UNKNOWN_ID, quantity: 100 }, 422],
   ])('refuses %s and adds nothing', async (_case, body, status) => {
-    const booking = await completedBooking();
+    const booking = await shootBegunBooking();
 
     const res = await post(`${BOOKINGS}/${booking.id}/addons`, body);
 
@@ -870,7 +891,7 @@ describe('POST /bookings/:id/addons', () => {
   });
 
   it('answers 404 for an add-on that does not exist', async () => {
-    const booking = await completedBooking();
+    const booking = await shootBegunBooking();
 
     const res = await post(`${BOOKINGS}/${booking.id}/addons`, { addonId: UNKNOWN_ID });
 
@@ -883,7 +904,7 @@ describe('POST /bookings/:id/addons', () => {
     expect([res.status, res.body]).toEqual([400, { error: 'invalid_request' }]);
   });
 
-  it('answers 409 not_allowed carrying the booking when the shoot is not completed', async () => {
+  it('answers 409 not_allowed carrying the booking before the shoot has begun (2026-09-27: add-ons open once it has)', async () => {
     const { booking } = await confirmedBooking();
 
     const res = await post(`${BOOKINGS}/${booking.id}/addons`, { addonId: world.sharedAddonId });
@@ -894,7 +915,7 @@ describe('POST /bookings/:id/addons', () => {
   });
 
   it('answers 409 not_allowed for an add-on of another service', async () => {
-    const booking = await completedBooking();
+    const booking = await shootBegunBooking();
     const other = await prisma.service.create({ data: { slug: 'weddings', nameEn: 'Weddings' } });
     const theirs = await prisma.addon.create({ data: { serviceId: other.id, nameEn: 'Second shooter', priceRwf: 20_000 } });
 
@@ -906,16 +927,17 @@ describe('POST /bookings/:id/addons', () => {
 });
 
 describe('DELETE /bookings/:id/addons/:addonId', () => {
-  async function completedWithLine(startsAt: Date = WEDNESDAY_0900) {
+  /** A confirmed booking whose shoot has begun, with one post-shoot line already on it. */
+  async function shootBegunWithLine(startsAt: Date = WEDNESDAY_0900) {
     const { booking } = await confirmedBooking(startsAt);
-    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'completed', completedAt: START } });
+    await travelTo(AFTER_THE_SHOOT);
     const added = await post(`${BOOKINGS}/${booking.id}/addons`, { addonId: world.sharedAddonId, quantity: 3 });
     const line = added.body.booking.addons.find((addon: { stage: string }) => addon.stage === 'post_shoot');
     return { booking, lineId: line.id as string };
   }
 
   it('removes the line and answers the whole booking, both totals down', async () => {
-    const { booking, lineId } = await completedWithLine();
+    const { booking, lineId } = await shootBegunWithLine();
 
     const res = await del(`${BOOKINGS}/${booking.id}/addons/${lineId}`);
 
@@ -926,7 +948,7 @@ describe('DELETE /bookings/:id/addons/:addonId', () => {
   });
 
   it('answers 404 for an add-on row that does not exist', async () => {
-    const { booking } = await completedWithLine();
+    const { booking } = await shootBegunWithLine();
 
     const res = await del(`${BOOKINGS}/${booking.id}/addons/${UNKNOWN_ID}`);
 
@@ -934,8 +956,8 @@ describe('DELETE /bookings/:id/addons/:addonId', () => {
   });
 
   it('answers 404 for a line belonging to another booking, and leaves that booking alone', async () => {
-    const mine = await completedWithLine();
-    const theirs = await completedWithLine(THURSDAY_0900);
+    const mine = await shootBegunWithLine();
+    const theirs = await shootBegunWithLine(THURSDAY_0900);
 
     const res = await del(`${BOOKINGS}/${mine.booking.id}/addons/${theirs.lineId}`);
 
@@ -947,7 +969,7 @@ describe('DELETE /bookings/:id/addons/:addonId', () => {
     ['the booking id', (_bookingId: string, lineId: string) => `${BOOKINGS}/not-a-uuid/addons/${lineId}`],
     ['the add-on id', (bookingId: string) => `${BOOKINGS}/${bookingId}/addons/not-a-uuid`],
   ])('answers 400 when %s is not a uuid', async (_case, path) => {
-    const { booking, lineId } = await completedWithLine();
+    const { booking, lineId } = await shootBegunWithLine();
 
     const res = await del(path(booking.id, lineId));
 
@@ -956,7 +978,7 @@ describe('DELETE /bookings/:id/addons/:addonId', () => {
   });
 
   it('answers 409 not_allowed carrying the booking for an at_booking line', async () => {
-    const { booking } = await completedWithLine();
+    const { booking } = await shootBegunWithLine();
     const quoted = (await adminBooking(booking.id)).addons.find((addon) => addon.stage === 'at_booking');
 
     const res = await del(`${BOOKINGS}/${booking.id}/addons/${quoted?.id}`);
@@ -967,17 +989,18 @@ describe('DELETE /bookings/:id/addons/:addonId', () => {
   });
 
   it('answers 409 not_allowed on a booking whose editor is shut', async () => {
-    const { booking, lineId } = await completedWithLine();
-    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'no_show' } });
+    const { booking, lineId } = await shootBegunWithLine();
+    // (2026-09-27: add-ons lock once the booking is completed, not before)
+    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'completed', completedAt: START } });
 
     const res = await del(`${BOOKINGS}/${booking.id}/addons/${lineId}`);
 
     expect([res.status, res.body.error]).toEqual([409, 'not_allowed']);
-    expect(res.body.booking).toMatchObject({ status: 'no_show', actions: { canEditAddons: false } });
+    expect(res.body.booking).toMatchObject({ status: 'completed', actions: { canEditAddons: false } });
   });
 
   it('answers 409 already_paid carrying the booking once the client has paid for it', async () => {
-    const { booking, lineId } = await completedWithLine();
+    const { booking, lineId } = await shootBegunWithLine();
     await insertPayment(prisma, booking.id, { status: 'succeeded', kind: 'session_fee', amountRwf: 45_000, ageSeconds: 300 });
 
     const res = await del(`${BOOKINGS}/${booking.id}/addons/${lineId}`);
@@ -1082,22 +1105,30 @@ describe('POST /bookings/:id/session-fee', () => {
 // --- The post-shoot journey over HTTP ----------------------------------------------------------
 
 describe('the whole post-shoot sequence (spec §3.5 steps 1-3)', () => {
-  it('completes the shoot, adds an add-on, and asks for the new total', async () => {
+  it('adds an add-on once the shoot has begun, asks for the new total, and completes once it is settled', async () => {
+    // (2026-09-27: add-ons are for a confirmed booking whose shoot has begun,
+    // not a completed one, and completing needs nothing left owing.)
     const { booking } = await confirmedBooking();
     await travelTo(AFTER_THE_SHOOT);
 
-    const completed = await postPaid(`${BOOKINGS}/${booking.id}/complete`, {});
-    expect(completed.body.booking).toMatchObject({
-      status: 'completed',
-      actions: { canEditAddons: true, canRequestSessionFee: true },
-    });
-
     const added = await postPaid(`${BOOKINGS}/${booking.id}/addons`, { addonId: world.sharedAddonId, quantity: 3 });
+    expect(added.body.booking).toMatchObject({ status: 'confirmed', actions: { canEditAddons: true } });
     expect(added.body.booking.money.totals).toMatchObject({ grandTotalRwf: 65_000, outstandingRwf: 45_000 });
 
     const asked = await postPaid(`${BOOKINGS}/${booking.id}/session-fee`, {});
     expect(asked.status).toBe(200);
     expect(asked.body.booking.payments.at(-1)).toMatchObject({ kind: 'session_fee', amountRwf: 45_000, status: 'initiated' });
+
+    // Settling stands in for what a webhook would do elsewhere, so completion
+    // can be proven on its own.
+    await insertPayment(prisma, booking.id, { status: 'succeeded', kind: 'session_fee', amountRwf: 45_000, ageSeconds: 60 });
+
+    const completed = await postPaid(`${BOOKINGS}/${booking.id}/complete`, {});
+    expect(completed.status).toBe(200);
+    expect(completed.body.booking).toMatchObject({
+      status: 'completed',
+      actions: { canEditAddons: false, canRequestSessionFee: false },
+    });
 
     // Every answer along the way is the same booking shape.
     const keys = Object.keys(completed.body.booking).sort();
@@ -1120,7 +1151,8 @@ describe('POST /bookings/:id/addons with a product larger than an integer', () =
    */
   it('answers a 4xx rather than a 500', async () => {
     const { booking } = await confirmedBooking();
-    await prisma.booking.update({ where: { id: booking.id }, data: { status: 'completed', completedAt: START } });
+    // (2026-09-27: add-ons are for a confirmed booking whose shoot has begun)
+    await travelTo(AFTER_THE_SHOOT);
     const expensive = await prisma.addon.create({
       data: { serviceId: world.serviceId, nameEn: 'A price the catalogue allows', priceRwf: INT4_MAX },
     });
@@ -1476,8 +1508,11 @@ describe('the whole delivery sequence (spec §3.5 steps 5-7)', () => {
   it('completes the shoot, saves the link, sends it, and never reports a download count', async () => {
     const { booking } = await confirmedBooking();
     await travelTo(AFTER_THE_SHOOT);
+    // (2026-09-27: completed means paid) settle what confirmedBooking() leaves owing.
+    await insertPayment(prisma, booking.id, { status: 'succeeded', kind: 'session_fee', amountRwf: 30_000, ageSeconds: 60 });
 
     const completed = await post(`${BOOKINGS}/${booking.id}/complete`, {});
+    expect(completed.status).toBe(200);
     expect(completed.body.booking.actions).toMatchObject({ canEditDelivery: true, canSendDelivery: false });
 
     const saved = await put(`${BOOKINGS}/${booking.id}/delivery`, { url: DELIVERY_LINK });

@@ -43,7 +43,9 @@ import { bookingTotals } from './totals.js';
  * photographer alerted once per flagged payment (spec §6.16).
  *
  * **Complete and no-show:** only from `confirmed`, and only once the shoot has
- * begun. A no-show keeps its slot -- the time was consumed -- keeps the
+ * begun. Completing is refused `balance_due` while anything is still owed --
+ * "completed" means paid (2026-09-27) -- and only sets `completed` once it is
+ * not. A no-show keeps its slot -- the time was consumed -- keeps the
  * booking fee, owes nothing further, and sends the client nothing (spec §6.12).
  *
  * **Resend:** a new token, a fresh expiry, the previous link dead the moment it
@@ -610,6 +612,8 @@ describe('the photographer cancelling', () => {
 describe('marking a booking completed', () => {
   it('sets completed and stamps completed_at once the shoot has begun', async () => {
     const booking = await insertBooking(prisma, world, { status: 'confirmed', startsAt: WEDNESDAY_0900 });
+    // (2026-09-27: completed means paid) nothing owed, or this would be balance_due.
+    await insertPayment(prisma, booking.id, { status: 'succeeded', amountRwf: 50_000 });
 
     const result = ok(await markCompleted(deps(AFTER_THE_SHOOT), booking.id));
 
@@ -619,6 +623,7 @@ describe('marking a booking completed', () => {
 
   it('allows it at the very instant the shoot starts', async () => {
     const booking = await insertBooking(prisma, world, { status: 'confirmed', startsAt: WEDNESDAY_0900 });
+    await insertPayment(prisma, booking.id, { status: 'succeeded', amountRwf: 50_000 });
 
     expect(ok(await markCompleted(deps(WEDNESDAY_0900), booking.id)).booking.status).toBe('completed');
   });
@@ -639,14 +644,19 @@ describe('marking a booking completed', () => {
     expect(await outbox()).toEqual([]);
   });
 
-  it('still owes the session fee: a completed booking is one the client pays for', async () => {
+  it('refuses balance_due while the session fee is unpaid, and completes once it is settled (2026-09-27: completed means paid)', async () => {
     const booking = await insertBooking(prisma, world, { status: 'confirmed', startsAt: WEDNESDAY_0900 });
     await insertPayment(prisma, booking.id, { status: 'succeeded', amountRwf: 20_000 });
 
+    expect(await markCompleted(deps(AFTER_THE_SHOOT), booking.id)).toStrictEqual({ status: 'balance_due' });
+    expect((await bookingRow(booking.id)).status).toBe('confirmed');
+
+    await insertPayment(prisma, booking.id, { status: 'succeeded', kind: 'session_fee', amountRwf: 30_000 });
     const result = ok(await markCompleted(deps(AFTER_THE_SHOOT), booking.id));
     const full = await adminBooking(result.booking.id);
 
-    expect(bookingTotals(full, full.addons, full.payments)).toMatchObject({ grandTotalRwf: 50_000, outstandingRwf: 30_000 });
+    expect(result.booking.status).toBe('completed');
+    expect(bookingTotals(full, full.addons, full.payments)).toMatchObject({ grandTotalRwf: 50_000, outstandingRwf: 0 });
   });
 
   it.each(['pending_payment', 'completed', 'no_show', 'expired', 'cancelled_by_client', 'cancelled_by_admin'] as const)(
@@ -860,6 +870,8 @@ describe('the actions flags and the actions themselves agree', () => {
 
   it('withholds complete and no-show until the shoot has started, as the actions do', async () => {
     const booking = await insertBooking(prisma, world, { status: 'confirmed', startsAt: WEDNESDAY_0900 });
+    // Paid in full, so time is the only gate this test is proving.
+    await insertPayment(prisma, booking.id, { status: 'succeeded', amountRwf: 50_000 });
     const full = await adminBooking(booking.id);
 
     const before = adminBookingView(full, NOW);
@@ -868,6 +880,19 @@ describe('the actions flags and the actions themselves agree', () => {
     expect([before.actions.canComplete, before.actions.canMarkNoShow]).toEqual([false, false]);
     expect([after.actions.canComplete, after.actions.canMarkNoShow]).toEqual([true, true]);
     expect(await markCompleted(deps(), booking.id)).toStrictEqual({ status: 'not_allowed' });
+    expect(ok(await markCompleted(deps(AFTER_THE_SHOOT), booking.id)).booking.status).toBe('completed');
+  });
+
+  it('withholds canComplete while money is owed, and grants it once paid (2026-09-27: completed means paid)', async () => {
+    const booking = await insertBooking(prisma, world, { status: 'confirmed', startsAt: WEDNESDAY_0900 });
+
+    const unpaid = adminBookingView(await adminBooking(booking.id), AFTER_THE_SHOOT);
+    expect(unpaid.actions.canComplete).toBe(false);
+    expect(await markCompleted(deps(AFTER_THE_SHOOT), booking.id)).toStrictEqual({ status: 'balance_due' });
+
+    await insertPayment(prisma, booking.id, { status: 'succeeded', amountRwf: 50_000 });
+    const paid = adminBookingView(await adminBooking(booking.id), AFTER_THE_SHOOT);
+    expect(paid.actions.canComplete).toBe(true);
     expect(ok(await markCompleted(deps(AFTER_THE_SHOOT), booking.id)).booking.status).toBe('completed');
   });
 });

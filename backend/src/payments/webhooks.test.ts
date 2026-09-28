@@ -1692,4 +1692,63 @@ describe('a succeeded session fee', () => {
     expect(await paymentRow(sessionFee.id)).toMatchObject({ status: 'failed' });
     expect(await outbox()).toEqual([]);
   });
+
+  describe('completes the booking it pays off, once its shoot has begun (item 6, 2026-09-27)', () => {
+    /** A confirmed booking: 50,000 owed, 20,000 booking fee collected, the rest asked for. */
+    async function confirmedAskedFor(startsAt: Date) {
+      const booking = await insertBooking(prisma, world, { status: 'confirmed', startsAt });
+      await insertPayment(prisma, booking.id, { status: 'succeeded' });
+      const sessionFee = await insertPayment(prisma, booking.id, { status: 'pending', kind: 'session_fee', amountRwf: 30_000 });
+      return { booking, sessionFee };
+    }
+
+    async function completion(id: string) {
+      const booking = await prisma.booking.findUniqueOrThrow({ where: { id }, select: { status: true, completedAt: true } });
+      return { status: booking.status, completedAt: booking.completedAt };
+    }
+
+    it('completes it in the same transaction, stamped with the settlement time', async () => {
+      const { booking, sessionFee } = await confirmedAskedFor(new Date(NOW.getTime() - 2 * 60 * 60_000));
+
+      const outcome = await deliver(statusDelivery(sessionFee.ourRef, 'SUCCESSFUL', { amount: '30000' }));
+
+      expect(outcome).toMatchObject({ status: 'applied', note: 'payment_succeeded_booking_completed' });
+      expect(await paymentRow(sessionFee.id)).toMatchObject({ status: 'succeeded' });
+      expect(await completion(booking.id)).toStrictEqual({ status: 'completed', completedAt: NOW });
+    });
+
+    it('changes nothing on a replay of the same delivery', async () => {
+      const { booking, sessionFee } = await confirmedAskedFor(new Date(NOW.getTime() - 2 * 60 * 60_000));
+      const delivery = statusDelivery(sessionFee.ourRef, 'SUCCESSFUL', { amount: '30000' });
+
+      await deliver(delivery);
+      const once = await rowJson('booking', booking.id);
+      const messages = await outbox();
+      const replay = await deliver(delivery, { now: () => new Date(NOW.getTime() + 60 * 60_000) });
+
+      expect(replay.status).toBe('ignored');
+      expect(await rowJson('booking', booking.id)).toStrictEqual(once);
+      expect(await outbox()).toEqual(messages);
+    });
+
+    it('leaves it confirmed when the balance clears before the shoot begins', async () => {
+      const { booking, sessionFee } = await confirmedAskedFor(new Date(NOW.getTime() + 60 * 60_000));
+
+      const outcome = await deliver(statusDelivery(sessionFee.ourRef, 'SUCCESSFUL', { amount: '30000' }));
+
+      expect(outcome).toMatchObject({ status: 'applied', note: 'payment_succeeded' });
+      expect(await completion(booking.id)).toStrictEqual({ status: 'confirmed', completedAt: null });
+    });
+
+    it('leaves it confirmed when money is still owed after the payment', async () => {
+      const booking = await insertBooking(prisma, world, { status: 'confirmed', startsAt: new Date(NOW.getTime() - 2 * 60 * 60_000) });
+      await insertPayment(prisma, booking.id, { status: 'succeeded' });
+      const sessionFee = await insertPayment(prisma, booking.id, { status: 'pending', kind: 'session_fee', amountRwf: 10_000 });
+
+      const outcome = await deliver(statusDelivery(sessionFee.ourRef, 'SUCCESSFUL', { amount: '10000' }));
+
+      expect(outcome).toMatchObject({ status: 'applied', note: 'payment_succeeded' });
+      expect(await completion(booking.id)).toStrictEqual({ status: 'confirmed', completedAt: null });
+    });
+  });
 });

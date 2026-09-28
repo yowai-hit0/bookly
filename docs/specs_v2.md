@@ -137,10 +137,12 @@ Bookly is a public booking website plus a private admin panel for a professional
 
 ### 3.5 Post-shoot: session fee and photo delivery
 
-1. After the shoot date passes, the admin opens the booking and marks the shoot `completed`.
-2. Admin adds any post-shoot add-ons (extra photos, prints). The outstanding session fee recalculates.
-3. Admin triggers "Request session fee". The system emails the client a branded request with the amount due and a payment link.
-4. Client pays. The webhook records the session-fee payment and marks the booking fully paid; the admin receives a payment-received alert.
+1. Once the shoot has begun, the booking is still `confirmed`. The admin adds any post-shoot add-ons (extra photos, prints). The outstanding session fee recalculates.
+2. Admin triggers "Request session fee". The system emails the client a branded request with the amount due and a payment link.
+3. Client pays. The webhook records the session-fee payment and marks the booking fully paid; the admin receives a payment-received alert.
+4. Paid in full, the booking is `completed`: by itself, in the same transaction as the payment that cleared the balance, or by the admin's "Mark completed" when the balance was cleared before the shoot began. "Mark completed" is refused while anything is owed.
+
+> **Changed 2026-09-27 (admin console fixes, item 6).** Post-shoot add-ons now come *before* completion, and "completed" means paid. Add-ons are editable while the booking is `confirmed` and its shoot has begun, and locked once it is `completed`. A booking completed before this change that still owes money keeps its "Request session fee"; no data is migrated. Photo delivery (steps 5–7) still needs `completed`.
 5. Admin uploads the shoot to their own external host (Drive, Dropbox, WeTransfer), pastes the resulting link into the booking, and sets the expiry date — defaulted by the system to **90 days** from today.
 6. Admin triggers "Send photos". The system sends a branded delivery email containing the link and the stated expiry date, and logs the send.
 7. Client opens their booking link or the delivery email and downloads the photos.
@@ -258,7 +260,7 @@ Rules that constrain behaviour rather than storage stay here, in §6.
 | 6.12 | **Client no-show** | The admin marks the booking `no_show`. The slot is not returned to availability — the time was consumed. The **booking fee is forfeited, no session fee is owed, and the booking closes.** No further email is sent beyond the admin's own record. |
 | 6.13 | **Price, package, or fee rate changed after a booking exists** | Bookings are unaffected. Amounts are read from the booking's snapshot columns, including `booking_fee_rate`, never from live rows. Edits apply to new bookings only. |
 | 6.14 | **Service or package deactivated with live bookings** | Deactivation removes it from the public site and keeps every existing booking intact and readable via its snapshots. Hard deletion of a referenced row is blocked. |
-| 6.15 | **Post-shoot add-ons change the amount due** | The session fee recalculates each time the admin edits the add-on set, and locks once a `session_fee` payment reaches `succeeded`. An add-on added after full payment creates a second, separate session-fee request rather than editing the settled one. |
+| 6.15 | **Post-shoot add-ons change the amount due** | The session fee recalculates each time the admin edits the add-on set, and locks once a `session_fee` payment reaches `succeeded`. An add-on added after full payment creates a second, separate session-fee request rather than editing the settled one. Since 2026-09-27 the add-on set is edited while the booking is `confirmed` and its shoot has begun, and locks once it is `completed` (§3.5). |
 | 6.16 | **Refunds** | The system never moves money. It sets `refund_due`, alerts the admin, and exposes a "record refund issued" action taking a reference and date, which moves the payment to `refunded`. Reconciliation against the provider's own records is manual. |
 | 6.17 | **Google Calendar push fails** | The push is asynchronous and never blocks a booking. A failed push is retried with backoff and, after exhausting retries, raises an admin alert; the booking stays `confirmed` and correct on the site. Events edited or deleted inside Google Calendar are overwritten on the next push — Google is a mirror, not an input. |
 | 6.18 | **Payment provider cutover** | Payments keep the `provider` and `provider_ref` they were created with. After cutover, webhooks from both providers are accepted so in-flight MTN-direct payments settle correctly, and refunds are looked up against the provider that took the money. |
