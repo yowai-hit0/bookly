@@ -221,7 +221,11 @@ function composeRefundDue(p: z.infer<typeof refundDue>, ctx: EmailContext): Comp
           { label: tr(ctx, 'email:common.labels.provider'), value: provider },
         ],
       },
-      { type: 'note', text: tr(ctx, 'email:adminAlert.refundDue.howTo', { provider }) },
+      // Cash goes back as cash: there is no provider to refund it through.
+      {
+        type: 'note',
+        text: p.provider === 'cash' ? tr(ctx, 'email:adminAlert.refundDue.howToCash') : tr(ctx, 'email:adminAlert.refundDue.howTo', { provider }),
+      },
       {
         type: 'button',
         label: tr(ctx, 'email:adminAlert.paymentReceived.openCalendar'),

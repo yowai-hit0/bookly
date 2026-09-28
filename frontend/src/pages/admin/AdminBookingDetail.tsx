@@ -67,7 +67,7 @@ type Failure = { code: string } | null
  * Which form is open in a dialog (admin console fixes, item 1, 2026-09-27):
  * every create and edit form on this page opens in one, and one at a time.
  */
-type OpenForm = 'addon' | 'reschedule' | 'cancel' | 'delivery' | null
+type OpenForm = 'addon' | 'reschedule' | 'cancel' | 'delivery' | 'cash' | null
 
 /** Help text under a field or a group of buttons: 13px, muted. */
 const HINT = 'text-muted-foreground text-[0.8125rem] leading-snug'
@@ -527,6 +527,33 @@ export function AdminBookingDetail() {
                 <p className={HINT}>{t('admin:booking.sessionFee.note')}</p>
               </div>
             )}
+            {/* Cash he was handed (item 7): the same rule as asking for it. */}
+            {actions.canRequestSessionFee && (
+              <Button
+                variant="console-outline"
+                size="console"
+                className={cn(BUTTON_WIDTH, 'sm:self-start')}
+                onClick={() => setOpenForm('cash')}
+              >
+                <HandCoins aria-hidden="true" />
+                {t('admin:booking.cash.open')}
+              </Button>
+            )}
+            {actions.canRequestSessionFee &&
+              formDialog(
+                'cash',
+                t('admin:booking.cash.title'),
+                <CashForm
+                  outstandingRwf={money.totals.outstandingRwf}
+                  busy={busy}
+                  onSubmit={async (amountRwf, note) => {
+                    if (await attempt(() => bookingsApi.recordCash(booking.id, amountRwf, note))) {
+                      setOpenForm(null)
+                      setFeeDue(false)
+                    }
+                  }}
+                />,
+              )}
             <div className="flex flex-col gap-2">
               {/* Hidden while no routine action is open, so it leaves no gap behind. */}
               <div className={cn(BUTTONS, 'empty:hidden')}>
@@ -935,19 +962,30 @@ function Payments({
       ) : (
         <ul className="flex flex-col">
           {booking.payments.map((payment) => {
-            const owing = payment.status === 'failed' || payment.status === 'refund_due'
+            const cash = payment.provider === 'cash'
+            // An online request that recorded cash voided (item 7): nothing failed.
+            const replaced = payment.status === 'failed' && payment.failureReason === SUPERSEDED_BY_CASH
+            const owing = (payment.status === 'failed' && !replaced) || payment.status === 'refund_due'
             return (
               <li key={payment.id} className="flex flex-col gap-2 border-b py-4 first:pt-0 last:border-b-0 last:pb-0">
                 <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
                   <span className="min-w-0">
-                    {t(`admin:booking.paymentKinds.${payment.kind}`, { defaultValue: payment.kind })} ·{' '}
+                    {cash
+                      ? t('admin:booking.cash.label')
+                      : t(`admin:booking.paymentKinds.${payment.kind}`, { defaultValue: payment.kind })}{' '}
+                    ·{' '}
                     <span className={cn(DATA, 'whitespace-nowrap')}>{formatMoney(payment.amountRwf)}</span>
                   </span>
                   <span className={cn('flex min-w-0 items-center gap-2 text-sm sm:ml-auto', owing ? 'text-destructive' : 'text-muted-foreground')}>
-                    <Glyph shape={PAYMENT_SHAPES[payment.status]} className={payment.status === 'refund_due' ? 'text-destructive' : undefined} />
+                    <Glyph
+                      shape={replaced ? 'lapsed' : PAYMENT_SHAPES[payment.status]}
+                      className={payment.status === 'refund_due' ? 'text-destructive' : undefined}
+                    />
                     <span className="min-w-0">
                       <span className={owing ? 'font-medium' : undefined}>
-                        {t(`admin:booking.paymentStatus.${payment.status}`, { defaultValue: payment.status })}
+                        {replaced
+                          ? t('admin:booking.cash.replaced')
+                          : t(`admin:booking.paymentStatus.${payment.status}`, { defaultValue: payment.status })}
                       </span>
                       {payment.settledAt !== null && (
                         <span className={cn(LOG, 'text-muted-foreground whitespace-nowrap')}> · {formatDateTime(payment.settledAt)}</span>
@@ -957,13 +995,18 @@ function Payments({
                 </div>
                 <p className={cn(LOG, 'text-muted-foreground')}>
                   {wholePairs(
-                    `${t('admin:booking.paymentRefs', {
-                      provider: payment.provider,
-                      ourRef: payment.ourRef,
-                      providerRef: payment.providerRef ?? '—',
-                    })}${payment.refundReference !== null ? ` · ${t('admin:booking.refundReference', { reference: payment.refundReference })}` : ''}`,
+                    `${
+                      cash
+                        ? t('admin:booking.cash.refs', { ourRef: payment.ourRef })
+                        : t('admin:booking.paymentRefs', {
+                            provider: payment.provider,
+                            ourRef: payment.ourRef,
+                            providerRef: payment.providerRef ?? '—',
+                          })
+                    }${payment.refundReference !== null ? ` · ${t('admin:booking.refundReference', { reference: payment.refundReference })}` : ''}`,
                   )}
                 </p>
+                {payment.note !== null && <p className={cn(META, 'whitespace-pre-line wrap-anywhere')}>{payment.note}</p>}
                 {payment.canRecordRefund && <RefundForm payment={payment} busy={busy} onSubmit={onRefund} />}
               </li>
             )
@@ -971,6 +1014,74 @@ function Payments({
         </ul>
       )}
     </Section>
+  )
+}
+
+/** The `failureReason` of an online request that recorded cash voided (backend payments/cash.ts). */
+const SUPERSEDED_BY_CASH = 'superseded_by_cash'
+
+/** Cash the client handed over (item 7): at most what is owed, and prefilled with it. */
+function CashForm({
+  outstandingRwf,
+  busy,
+  onSubmit,
+}: {
+  outstandingRwf: number
+  busy: boolean
+  onSubmit: (amountRwf: number, note: string | null) => Promise<void>
+}) {
+  const { t } = useTranslation()
+  const fieldId = useId()
+  const [amount, setAmount] = useState(String(outstandingRwf))
+  const [note, setNote] = useState('')
+  const value = Number(amount)
+  const valid = amount.trim() !== '' && Number.isInteger(value) && value >= 1 && value <= outstandingRwf
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!valid) return
+    const trimmed = note.trim()
+    void onSubmit(value, trimmed === '' ? null : trimmed)
+  }
+
+  return (
+    <form onSubmit={submit} noValidate className="flex flex-col gap-5">
+      <div className={FIELD_GROUP}>
+        <Label htmlFor={`${fieldId}amount`}>{t('admin:booking.cash.amount')}</Label>
+        <Input
+          id={`${fieldId}amount`}
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={outstandingRwf}
+          step={1}
+          required
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+          aria-invalid={valid ? undefined : true}
+          aria-describedby={`${fieldId}amountHint`}
+          className={cn(FIELD, 'font-mono tabular-nums sm:w-48')}
+        />
+        <p id={`${fieldId}amountHint`} className={cn(HINT, !valid && 'text-destructive')}>
+          {t('admin:booking.cash.amountHint', { amount: formatMoney(outstandingRwf) })}
+        </p>
+      </div>
+      <div className={FIELD_GROUP}>
+        <Label htmlFor={`${fieldId}note`}>{t('admin:booking.cash.note')}</Label>
+        <Textarea
+          id={`${fieldId}note`}
+          rows={2}
+          maxLength={500}
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          className={TEXTAREA}
+        />
+      </div>
+      <p className={HINT}>{t('admin:booking.cash.explain')}</p>
+      <Button type="submit" size="console" className={cn(BUTTON_WIDTH, 'sm:self-start')} aria-disabled={busy || !valid}>
+        {t('admin:booking.cash.submit')}
+      </Button>
+    </form>
   )
 }
 

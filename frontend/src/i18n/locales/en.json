@@ -611,7 +611,8 @@
         "in_progress": "The client is paying right now. Wait for that to finish.",
         "too_large": "That would make the booking worth more than the system can hold.",
         "no_link": "Save a link to the photos first.",
-        "balance_due": "The client still owes money on this booking. It completes by itself once it is paid in full."
+        "balance_due": "The client still owes money on this booking. It completes by itself once it is paid in full.",
+        "over_outstanding": "That is more than the client owes. Enter the amount you were paid, up to what is still owed."
       },
       "addons": {
         "title": "Add-ons from the shoot",
@@ -669,7 +670,19 @@
         "back": "Back",
         "opensWhenPaid": "Photo delivery opens once this booking is completed: by itself when it is paid in full, or when you mark it completed."
       },
-      "completeOwed": "Mark completed opens once nothing is owed. {{amount}} is still to pay. Paid in full, the booking completes by itself."
+      "completeOwed": "Mark completed opens once nothing is owed. {{amount}} is still to pay. Paid in full, the booking completes by itself.",
+      "cash": {
+        "open": "Record cash payment",
+        "title": "Record a cash payment",
+        "amount": "Amount received (RWF)",
+        "amountHint": "Whole francs, from 1 up to {{amount}}, which is what is still owed.",
+        "note": "Note (optional)",
+        "explain": "The client is not emailed. Any payment link already sent for this money stops asking for it. Paid in full after the shoot, the booking completes by itself.",
+        "submit": "Record the payment",
+        "label": "Cash",
+        "refs": "cash · our ref {{ourRef}}",
+        "replaced": "Replaced by cash"
+      }
     }
   },
   "checkout": {

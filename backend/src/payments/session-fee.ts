@@ -51,7 +51,7 @@ export type SessionFeeResult =
 type Outcome = Exclude<SessionFeeResult, { status: 'ok' }>['status'] | 'ok';
 
 /** Statuses that can still owe money (`bookingTotals`, data-model_v2.md §6.1). */
-const PAYABLE_STATUSES = ['confirmed', 'completed'];
+export const PAYABLE_STATUSES = ['confirmed', 'completed'];
 
 type BookingRow = {
   id: string;
@@ -67,7 +67,7 @@ type BookingRow = {
   ends_at: Date;
 };
 
-type AttemptRow = {
+export type AttemptRow = {
   id: string;
   status: string;
   amount_rwf: number;
@@ -107,36 +107,8 @@ export async function requestSessionFee(deps: SessionFeeDeps, bookingId: string)
     );
     if (outstandingRwf <= 0) return 'nothing_to_pay';
 
-    // The window is the database's, as everywhere money is claimed: an app
-    // clock that drifts must not decide whether a prompt is still live.
-    const attempts = await tx.$queryRaw<AttemptRow[]>`
-      SELECT p.id::text AS id, p.status, p.amount_rwf, p.provider,
-             p.initiated_at > now() - make_interval(secs => ${PAYMENT_ATTEMPT_WINDOW_SECONDS}::double precision) AS recent,
-             p.initiated_at > now() - make_interval(secs => ${CALL_IN_FLIGHT_SECONDS}::double precision) AS in_flight,
-             EXISTS (
-               SELECT 1
-                 FROM outbox o
-                WHERE o.booking_id = p.booking_id
-                  AND o.template = 'session_fee_request'
-                  AND o.payload->>'paymentId' = p.id::text
-             ) AS requested
-        FROM payment p
-       WHERE p.booking_id = ${booking.id}::uuid
-         AND p.kind = 'session_fee'
-       ORDER BY p.initiated_at DESC
-       LIMIT 1
-         FOR UPDATE OF p`;
-    const latest = attempts[0];
-    // Money may be moving: a prompt on the payer's phone, or an attempt whose
-    // provider call has not answered yet (payments/initiate.ts). Asking now
-    // would rotate the token out from under the page they are paying on, so
-    // the ask waits for that attempt to end. An ask of our own blocks nothing:
-    // asking twice is a reminder, and the client has not started anything.
-    const moving =
-      latest !== undefined &&
-      ((latest.recent && latest.status === 'pending') ||
-        (latest.in_flight && latest.status === 'initiated' && !latest.requested));
-    if (moving) return 'in_progress';
+    const latest = await latestSessionFee(tx, booking.id);
+    if (moneyMoving(latest)) return 'in_progress';
 
     // Asking again for the same amount is a reminder, not a second bill: the
     // row the client was already sent is the one the email points at. A row for
@@ -201,4 +173,45 @@ async function openRequest(
   const payment = inserted[0];
   if (payment === undefined) throw new Error('The payment insert returned no row');
   return payment;
+}
+
+/**
+ * The booking's newest session-fee row, locked. The window is the database's,
+ * as everywhere money is claimed: an app clock that drifts must not decide
+ * whether a prompt is still live.
+ */
+export async function latestSessionFee(tx: Prisma.TransactionClient, bookingId: string): Promise<AttemptRow | undefined> {
+  const attempts = await tx.$queryRaw<AttemptRow[]>`
+    SELECT p.id::text AS id, p.status, p.amount_rwf, p.provider,
+           p.initiated_at > now() - make_interval(secs => ${PAYMENT_ATTEMPT_WINDOW_SECONDS}::double precision) AS recent,
+           p.initiated_at > now() - make_interval(secs => ${CALL_IN_FLIGHT_SECONDS}::double precision) AS in_flight,
+           EXISTS (
+             SELECT 1
+               FROM outbox o
+              WHERE o.booking_id = p.booking_id
+                AND o.template = 'session_fee_request'
+                AND o.payload->>'paymentId' = p.id::text
+           ) AS requested
+      FROM payment p
+     WHERE p.booking_id = ${bookingId}::uuid
+       AND p.kind = 'session_fee'
+     ORDER BY p.initiated_at DESC
+     LIMIT 1
+       FOR UPDATE OF p`;
+  return attempts[0];
+}
+
+/**
+ * Money may be moving: a prompt on the payer's phone, or an attempt whose
+ * provider call has not answered yet (payments/initiate.ts). Asking now would
+ * rotate the token out from under the page they are paying on, and recording
+ * cash now could take the same balance twice (item 7), so both wait for that
+ * attempt to end. An ask of our own blocks nothing: asking twice is a
+ * reminder, and the client has not started anything.
+ */
+export function moneyMoving(latest: AttemptRow | undefined): boolean {
+  return (
+    latest !== undefined &&
+    ((latest.recent && latest.status === 'pending') || (latest.in_flight && latest.status === 'initiated' && !latest.requested))
+  );
 }

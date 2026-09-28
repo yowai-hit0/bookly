@@ -179,6 +179,10 @@ describe('every route is behind requireAdmin (spec §2.2)', () => {
       { label: 'POST /bookings/:id/notes', call: (bearer) => post(`${BOOKINGS}/${booking.id}/notes`, { body: 'Hello' }, bearer) },
       { label: 'DELETE /bookings/:id/notes/:noteId', call: (bearer) => del(`${BOOKINGS}/${booking.id}/notes/${UNKNOWN_ID}`, bearer) },
       { label: 'POST /bookings/:id/session-fee', call: (bearer) => postPaid(`${BOOKINGS}/${booking.id}/session-fee`, {}, bearer) },
+      {
+        label: 'POST /bookings/:id/payments/cash',
+        call: (bearer) => post(`${BOOKINGS}/${booking.id}/payments/cash`, { amountRwf: 1_000 }, bearer),
+      },
       // Task 21.
       {
         label: 'PUT /bookings/:id/delivery',
@@ -1009,6 +1013,76 @@ describe('DELETE /bookings/:id/addons/:addonId', () => {
     expect(res.body.booking).toStrictEqual(await renderedBooking(booking.id));
     expect(res.body.booking.money.totals).toMatchObject({ grandTotalRwf: 65_000, collectedRwf: 65_000, outstandingRwf: 0 });
     expect(res.body.booking.addons.every((addon: { canRemove: boolean }) => !addon.canRemove)).toBe(true);
+  });
+});
+
+describe('POST /bookings/:id/payments/cash (item 7, 2026-09-27)', () => {
+  it('records the cash and answers the whole booking, the payment listed as cash with its note', async () => {
+    const { booking } = await confirmedBooking();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/payments/cash`, { amountRwf: 30_000, note: 'Paid at the studio.' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toStrictEqual({ booking: await renderedBooking(booking.id) });
+    expect(res.body.booking.payments.at(-1)).toMatchObject({
+      kind: 'session_fee',
+      provider: 'cash',
+      amountRwf: 30_000,
+      status: 'succeeded',
+      note: 'Paid at the studio.',
+      canRecordRefund: false,
+    });
+    expect(res.body.booking).toMatchObject({ money: { totals: { outstandingRwf: 0 } }, actions: { canRequestSessionFee: false } });
+  });
+
+  it('completes a booking whose shoot has begun once the cash clears it', async () => {
+    const { booking } = await confirmedBooking();
+    await travelTo(AFTER_THE_SHOOT);
+
+    const res = await post(`${BOOKINGS}/${booking.id}/payments/cash`, { amountRwf: 30_000 });
+
+    expect(res.body.booking).toMatchObject({ status: 'completed', lifecycle: { completedAt: AFTER_THE_SHOOT.toISOString() } });
+  });
+
+  it('answers 409 over_outstanding carrying the booking for more than is owed', async () => {
+    const { booking } = await confirmedBooking();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/payments/cash`, { amountRwf: 30_001 });
+
+    expect([res.status, res.body.error]).toEqual([409, 'over_outstanding']);
+    expect(res.body.booking).toStrictEqual(await renderedBooking(booking.id));
+  });
+
+  it('answers 409 in_progress while the client is paying online', async () => {
+    const { booking } = await confirmedBooking();
+    await insertPayment(prisma, booking.id, { status: 'pending', kind: 'session_fee', amountRwf: 30_000, ageSeconds: 10 });
+
+    const res = await post(`${BOOKINGS}/${booking.id}/payments/cash`, { amountRwf: 30_000 });
+
+    expect([res.status, res.body.error]).toEqual([409, 'in_progress']);
+  });
+
+  it.each([
+    ['no amount', {}],
+    ['zero', { amountRwf: 0 }],
+    ['a fraction', { amountRwf: 10.5 }],
+    ['a string', { amountRwf: '30000' }],
+    ['an empty note', { amountRwf: 1_000, note: '' }],
+    ['a note over 500 characters', { amountRwf: 1_000, note: 'x'.repeat(501) }],
+    ['an unknown field', { amountRwf: 1_000, provider: 'mtn_momo_direct' }],
+  ])('refuses %s, and writes nothing', async (_case, body) => {
+    const { booking } = await confirmedBooking();
+
+    const res = await post(`${BOOKINGS}/${booking.id}/payments/cash`, body);
+
+    expect([400, 422]).toContain(res.status);
+    expect(await prisma.payment.count({ where: { bookingId: booking.id, provider: 'cash' } })).toBe(0);
+  });
+
+  it('answers 404 for a booking that does not exist', async () => {
+    const res = await post(`${BOOKINGS}/${UNKNOWN_ID}/payments/cash`, { amountRwf: 1_000 });
+
+    expect([res.status, res.body]).toEqual([404, { error: 'not_found' }]);
   });
 });
 

@@ -19,6 +19,7 @@ import { BOOKING_STAGES } from '../booking/stage.js';
 import { BOOKING_STATUSES } from '../db/statuses.js';
 import type { PaymentProviderId } from '../payments/provider.js';
 import { recordRefund } from '../payments/refund.js';
+import { type CashPaymentResult, recordCashPayment } from '../payments/cash.js';
 import { type SessionFeeResult, requestSessionFee } from '../payments/session-fee.js';
 import { kigaliDate, parseOrReject } from './validation.js';
 
@@ -49,6 +50,9 @@ import { kigaliDate, parseOrReject } from './validation.js';
  *          200 { booking } | 404 | 409 not_allowed | 409 nothing_to_pay |
  *          409 in_progress -- and 404 where no provider is configured, because
  *          a request nobody could pay is not worth sending.
+ *   POST   /bookings/:id/payments/cash  { amountRwf, note? }   (item 7, 2026-09-27)
+ *          200 { booking } | 404 | 409 not_allowed | 409 nothing_to_pay |
+ *          409 over_outstanding | 409 in_progress | 422
  *
  * And the delivery (plan.md Task 21; spec §3.5 steps 5-7, §6.20):
  *
@@ -164,6 +168,16 @@ const noteBody = z.strictObject({
   email: z.boolean().default(true),
 });
 
+/** Cash he was handed (item 7): up to what is owed, which the action checks. */
+const CASH_NOTE_MAX_LENGTH = 500;
+const cashBody = z.strictObject({
+  amountRwf: z.int().min(1).max(2_147_483_647),
+  note: storableText(1, CASH_NOTE_MAX_LENGTH)
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
+});
+
 const refundBody = z.strictObject({
   /** The MoMo or bank reference he is recording (spec §6.16). */
   reference: storableText(1, REFUND_REFERENCE_MAX_LENGTH),
@@ -272,6 +286,15 @@ export function adminBookingsRouter(deps: AdminBookingsDeps): Router {
     });
   }
 
+  router.post('/bookings/:id/payments/cash', async (req, res) => {
+    const id = parseOrReject(rowId, req.params.id, res);
+    if (id === undefined) return;
+    const body = parseOrReject(cashBody, req.body, res);
+    if (body === undefined) return;
+
+    await answer(prisma, now, res, await recordCashPayment({ prisma, now }, id, body), id);
+  });
+
   // --- Delivery (Task 21) ----------------------------------------------------
 
   router.put('/bookings/:id/delivery', async (req, res) => {
@@ -355,7 +378,7 @@ export function adminBookingsRouter(deps: AdminBookingsDeps): Router {
 }
 
 /** Everything an action can answer with: the booking, or the reason it refused. */
-type ActionAnswer = AdminActionResult | RescheduleResult | AddonEditResult | SessionFeeResult | DeliveryResult;
+type ActionAnswer = AdminActionResult | RescheduleResult | AddonEditResult | SessionFeeResult | CashPaymentResult | DeliveryResult;
 
 /** One shape for every action: the booking as it now stands, or why not. */
 async function answer(

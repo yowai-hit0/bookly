@@ -86,6 +86,8 @@ export type AdminPayment = {
   settledAt: string | null
   refundedAt: string | null
   refundReference: string | null
+  /** What the photographer typed with a cash payment (item 7, 2026-09-27). */
+  note: string | null
   canRecordRefund: boolean
 }
 
@@ -242,6 +244,11 @@ export const bookingsApi = {
   },
 
   /** Records a refund the photographer has already sent (spec §6.16). */
+  /** Cash the client handed over, up to what is owed; the client is not emailed (item 7). */
+  recordCash(bookingId: string, amountRwf: number, note: string | null): Promise<{ booking: AdminBooking }> {
+    return post(`/admin/bookings/${bookingId}/payments/cash`, { amountRwf, note })
+  },
+
   recordRefund(paymentId: string, reference: string): Promise<{ booking: AdminBooking }> {
     return post(`/admin/payments/${paymentId}/refund`, { reference })
   },

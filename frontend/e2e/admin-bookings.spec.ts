@@ -73,6 +73,7 @@ function booking(id: string, reference: string, status: string, startsAt: string
         settledAt: '2026-10-01T06:05:00.000Z',
         refundedAt: null,
         refundReference: null,
+        note: null,
         canRecordRefund: false,
       },
     ],
@@ -282,6 +283,7 @@ async function mockApi(page: Page, options: { completed?: boolean } = {}) {
             settledAt: null,
             refundedAt: null,
             refundReference: null,
+            note: null,
             canRecordRefund: false,
           },
         ]

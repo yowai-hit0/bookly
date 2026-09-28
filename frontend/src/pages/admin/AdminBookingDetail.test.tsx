@@ -46,6 +46,7 @@ const BOOKING_FEE: AdminPayment = {
   settledAt: '2026-10-01T06:05:00.000Z',
   refundedAt: null,
   refundReference: null,
+  note: null,
   canRecordRefund: false,
 }
 
@@ -1147,6 +1148,7 @@ describe('requesting the session fee', () => {
           settledAt: null,
           refundedAt: null,
           refundReference: null,
+          note: null,
           canRecordRefund: false,
         },
       ],
@@ -1288,6 +1290,128 @@ describe('"completed" means paid (2026-09-27)', () => {
 
     await user().click(request)
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Go to Request session fee' })).toBeNull())
+  })
+})
+
+describe('recording a cash payment (item 7, 2026-09-27)', () => {
+  /** The request the client was emailed, voided by the cash. */
+  const REPLACED: AdminPayment = {
+    ...BOOKING_FEE,
+    id: 'pay-request',
+    kind: 'session_fee',
+    ourRef: 'c0ffee00-0000-4000-8000-000000000001',
+    providerRef: null,
+    method: null,
+    amountRwf: 30_000,
+    status: 'failed',
+    failureReason: 'superseded_by_cash',
+    settledAt: null,
+  }
+  const CASH: AdminPayment = {
+    ...BOOKING_FEE,
+    id: 'pay-cash',
+    kind: 'session_fee',
+    provider: 'cash',
+    ourRef: 'ca5h0000-0000-4000-8000-000000000002',
+    providerRef: null,
+    method: null,
+    amountRwf: 30_000,
+    settledAt: '2027-01-06T10:00:00.000Z',
+    note: 'Paid at the studio.',
+  }
+  const PAID_IN_CASH: AdminBooking = {
+    ...UNDER_WAY,
+    status: 'completed',
+    stage: 'completed',
+    money: { ...UNDER_WAY.money, totals: { ...UNDER_WAY.money.totals, collectedRwf: 50_000, outstandingRwf: 0 } },
+    payments: [...UNDER_WAY.payments, REPLACED, CASH],
+    actions: { ...UNDER_WAY.actions, canComplete: false, canMarkNoShow: false, canEditAddons: false, canRequestSessionFee: false, canEditDelivery: true },
+  }
+
+  it('offers it only while money is owed', async () => {
+    stubApi({ booking: STARTED })
+    await renderLoaded()
+
+    expect(screen.queryByRole('button', { name: 'Record cash payment' })).toBeNull()
+  })
+
+  it('opens a dialog prefilled with what is owed, posts it, and lists the payment as cash', async () => {
+    const { sent } = stubApi({
+      booking: UNDER_WAY,
+      onPost: (_call, state) => {
+        state.value = PAID_IN_CASH
+        return json({ booking: PAID_IN_CASH })
+      },
+    })
+    await renderLoaded()
+
+    const dialog = await openDialog('Record cash payment')
+    expect(within(dialog).getByRole('heading', { name: 'Record a cash payment' })).toBeInTheDocument()
+    const amount = within(dialog).getByLabelText('Amount received (RWF)')
+    expect(amount).toHaveValue(30_000)
+    expect(amount).toHaveAccessibleDescription('Whole francs, from 1 up to 30,000 RWF, which is what is still owed.')
+    await user().type(within(dialog).getByLabelText('Note (optional)'), '  Paid at the studio.  ')
+    await user().click(within(dialog).getByRole('button', { name: 'Record the payment' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(writes(sent)).toEqual([
+      { method: 'POST', url: `/api/admin/bookings/${BOOKING_ID}/payments/cash`, body: { amountRwf: 30_000, note: 'Paid at the studio.' } },
+    ])
+    const payments = section('Payments')
+    expect(payments).toHaveTextContent('Cash · 30,000 RWF')
+    expect(payments).toHaveTextContent('cash · our ref ca5h0000-0000-4000-8000-000000000002')
+    expect(payments).toHaveTextContent('Paid at the studio.')
+    // The voided request reads as replaced, not as a failure owed attention.
+    expect(payments).toHaveTextContent('Replaced by cash')
+    expect(payments).not.toHaveTextContent('Failed')
+  })
+
+  it('sends part of the balance when he was paid part of it', async () => {
+    const { sent } = stubApi({ booking: UNDER_WAY, onPost: (_call, state) => json({ booking: state.value }) })
+    await renderLoaded()
+
+    const dialog = await openDialog('Record cash payment')
+    const amount = within(dialog).getByLabelText('Amount received (RWF)')
+    await user().clear(amount)
+    await user().type(amount, '10000')
+    await user().click(within(dialog).getByRole('button', { name: 'Record the payment' }))
+
+    await waitFor(() => expect(writes(sent)).toHaveLength(1))
+    expect(writes(sent)[0]?.body).toEqual({ amountRwf: 10_000, note: null })
+  })
+
+  it.each([
+    ['more than is owed', '30001'],
+    ['nothing', '0'],
+    ['a fraction', '10.5'],
+    ['an empty field', ''],
+  ])('refuses %s in the form, and sends nothing', async (_case, typed) => {
+    const { sent } = stubApi({ booking: UNDER_WAY })
+    await renderLoaded()
+
+    const dialog = await openDialog('Record cash payment')
+    const amount = within(dialog).getByLabelText('Amount received (RWF)')
+    await user().clear(amount)
+    if (typed !== '') await user().type(amount, typed)
+    await user().click(within(dialog).getByRole('button', { name: 'Record the payment' }))
+
+    expect(amount).toHaveAttribute('aria-invalid', 'true')
+    expect(within(dialog).getByRole('button', { name: 'Record the payment' })).toHaveAttribute('aria-disabled', 'true')
+    expect(writes(sent)).toEqual([])
+  })
+
+  it.each([
+    ['over_outstanding', 'That is more than the client owes. Enter the amount you were paid, up to what is still owed.'],
+    ['in_progress', 'The client is paying right now. Wait for that to finish.'],
+  ])('shows the %s refusal inside the dialog, which stays open', async (code, words) => {
+    stubApi({ booking: UNDER_WAY, onPost: () => json({ error: code, booking: UNDER_WAY }, 409) })
+    await renderLoaded()
+
+    const dialog = await openDialog('Record cash payment')
+    await user().click(within(dialog).getByRole('button', { name: 'Record the payment' }))
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(words)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 })
 

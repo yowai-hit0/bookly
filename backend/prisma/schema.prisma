@@ -336,8 +336,9 @@ model Payment {
   bookingId String @map("booking_id") @db.Uuid
   /// booking_fee | session_fee
   kind String
-  /// mtn_momo_direct | flutterwave. Frozen at creation so records survive the
-  /// cutover (spec §6.18).
+  /// mtn_momo_direct | flutterwave | cash. Frozen at creation so records
+  /// survive the cutover (spec §6.18). `cash` is money the photographer
+  /// recorded by hand (admin console fixes, item 7, 2026-09-27).
   provider String
   /// OURS, generated before the provider is called. This is MTN's X-Reference-Id
   /// and Flutterwave's tx_ref. It exists from the first instant, so an attempt
@@ -358,6 +359,8 @@ model Payment {
   refundedAt    DateTime? @map("refunded_at") @db.Timestamptz(6)
   /// MoMo/bank reference typed in by the admin (spec §6.16).
   refundReference String?  @map("refund_reference")
+  /// What the photographer typed with a cash payment (1-500 characters).
+  note            String?
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 

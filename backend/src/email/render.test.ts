@@ -1091,3 +1091,19 @@ describe('photo_delivery', () => {
     }
   });
 });
+
+describe('admin_alert refund_due for cash (admin console fixes, item 7)', () => {
+  it('names cash as the provider and says to give it back by hand', () => {
+    const email = renderWith('admin_alert refund_due', { provider: 'cash' });
+
+    expect(email.text).toContain('Cash');
+    expect(email.text).toContain('This was paid in cash: give it back to the client, then record the refund on the booking.');
+    expect(email.text).not.toContain('Refund the client through');
+  });
+
+  it('keeps the provider sentence for money paid online', () => {
+    const email = renderWith('admin_alert refund_due', { provider: 'mtn_momo_direct' });
+
+    expect(email.text).toContain('Refund the client through MTN MoMo, then record the refund on the booking.');
+  });
+});

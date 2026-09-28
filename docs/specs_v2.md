@@ -139,7 +139,7 @@ Bookly is a public booking website plus a private admin panel for a professional
 
 1. Once the shoot has begun, the booking is still `confirmed`. The admin adds any post-shoot add-ons (extra photos, prints). The outstanding session fee recalculates.
 2. Admin triggers "Request session fee". The system emails the client a branded request with the amount due and a payment link.
-3. Client pays. The webhook records the session-fee payment and marks the booking fully paid; the admin receives a payment-received alert.
+3. Client pays. The webhook records the session-fee payment and marks the booking fully paid; the admin receives a payment-received alert. Or the client pays in cash and the admin records it with "Record cash payment" (2026-09-27): any amount up to what is owed, refused while an online payment may be in flight, voiding an open online request so the same money cannot be taken twice, and emailing nobody. Cash is refunded like any other payment.
 4. Paid in full, the booking is `completed`: by itself, in the same transaction as the payment that cleared the balance, or by the admin's "Mark completed" when the balance was cleared before the shoot began. "Mark completed" is refused while anything is owed.
 
 > **Changed 2026-09-27 (admin console fixes, item 6).** Post-shoot add-ons now come *before* completion, and "completed" means paid. Add-ons are editable while the booking is `confirmed` and its shoot has begun, and locked once it is `completed`. A booking completed before this change that still owes money keeps its "Request session fee"; no data is migrated. Photo delivery (steps 5–7) still needs `completed`.

@@ -86,6 +86,8 @@ export type AdminPaymentView = {
   settledAt: string | null;
   refundedAt: string | null;
   refundReference: string | null;
+  /** What the photographer typed with a cash payment (item 7, 2026-09-27). */
+  note: string | null;
   /** Refunding is recording what the photographer paid back by hand (spec §6.16). */
   canRecordRefund: boolean;
 };
@@ -195,6 +197,8 @@ export function adminBookingView(booking: AdminBooking, now: Date): AdminBooking
       // A booking that was confirmed once has a client to send a link to.
       canResendLink: booking.confirmedAt !== null,
       canEditAddons: editableAddons,
+      // The same rule opens "Record cash payment" (item 7): money is owed on
+      // a booking that still stands.
       canRequestSessionFee: totals.outstandingRwf > 0 && (booking.status === 'confirmed' || booking.status === 'completed'),
       canEditDelivery: deliverable,
       canSendDelivery: deliverable && booking.deliveryUrl !== null,
@@ -217,6 +221,7 @@ function adminPaymentView(payment: AdminBooking['payments'][number]): AdminPayme
     settledAt: payment.settledAt?.toISOString() ?? null,
     refundedAt: payment.refundedAt?.toISOString() ?? null,
     refundReference: payment.refundReference,
+    note: payment.note,
     canRecordRefund: payment.status === 'refund_due',
   };
 }

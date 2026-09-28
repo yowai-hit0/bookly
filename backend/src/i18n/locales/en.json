@@ -37,7 +37,8 @@
       },
       "providers": {
         "mtn_momo_direct": "MTN MoMo",
-        "flutterwave": "Flutterwave"
+        "flutterwave": "Flutterwave",
+        "cash": "Cash"
       },
       "notGiven": "Not given"
     },
@@ -170,10 +171,10 @@
           "cancellation": "Cancellation notice to the client",
           "reschedule": "Reschedule notice to the client",
           "access_link_resend": "New booking link to the client",
-        "booking_links": "Booking links the client asked for",
-        "email_change_confirm": "Confirmation link to a new client email",
-        "email_changed_notice": "Notice to an old client email",
-        "client_note": "Your message to the client",
+          "booking_links": "Booking links the client asked for",
+          "email_change_confirm": "Confirmation link to a new client email",
+          "email_changed_notice": "Notice to an old client email",
+          "client_note": "Your message to the client",
           "admin_alert": "Alert to you",
           "gcal_create": "Adding the booking to your Google Calendar",
           "gcal_update": "Updating the booking in your Google Calendar",
@@ -207,7 +208,8 @@
           "session_fee_after_client_cancel": "The client cancelled after paying the session fee, which is refunded.",
           "overpayment": "This booking has been paid more than it is worth, so the difference is owed back."
         },
-        "howTo": "The system does not move money. Refund the client through {{provider}}, then record the refund on the booking."
+        "howTo": "The system does not move money. Refund the client through {{provider}}, then record the refund on the booking.",
+        "howToCash": "The system does not move money. This was paid in cash: give it back to the client, then record the refund on the booking."
       },
       "bookingCancelled": {
         "subject": "Booking cancelled: {{client}}, {{date}} ({{reference}})",

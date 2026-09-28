@@ -58,7 +58,8 @@ export const personName = text(200);
 /** A booking's access token: base64url, at least 96 bits (spec §7 asks for 128). */
 export const accessToken = z.string().regex(/^[A-Za-z0-9_-]{16,256}$/);
 export const paymentKind = z.enum(['booking_fee', 'session_fee']);
-export const paymentProvider = z.enum(['mtn_momo_direct', 'flutterwave']);
+/** `cash` is money the photographer recorded by hand (admin console fixes, item 7). */
+export const paymentProvider = z.enum(['mtn_momo_direct', 'flutterwave', 'cash']);
 
 /** The booking fields most client emails carry. */
 export const bookingBasics = {
