@@ -155,7 +155,9 @@ for (const [timezoneId, localHourAtNow] of [
   ['Pacific/Kiritimati', 12],
 ] as const) {
   test.describe(`with the browser in ${timezoneId}`, () => {
-    test.use({ timezoneId })
+    // Below the 1280x720 fit-to-screen size (2026-09-27), month shows every
+    // event in full; these tests are about Kigali times and days, not layout.
+    test.use({ timezoneId, viewport: { width: 1200, height: 900 } })
 
     test('shows the same Kigali times on the same Kigali days', async ({ page }) => {
       await seedSession(page)
@@ -194,17 +196,52 @@ for (const [timezoneId, localHourAtNow] of [
   })
 }
 
-test('marks the booking that overlaps a block with a visible conflict marker', async ({ page }) => {
-  await seedSession(page)
-  await mockApi(page)
+/**
+ * At 1280x720 and up the calendar fits the screen (admin console fixes, item
+ * 4, 2026-09-27): the page itself never scrolls, month shows every week with
+ * busy days folded into "+N more", and week scrolls only inside its time grid.
+ */
+test.describe('fitted to a 1280x720 screen', () => {
+  test.use({ viewport: { width: 1280, height: 720 } })
 
-  await page.goto('/admin/calendar?view=month&date=2026-10-07')
+  test('never scrolls the page, and folds a busy month day into "+N more"', async ({ page }) => {
+    await seedSession(page)
+    await mockApi(page)
 
-  const marker = page.getByText('Conflicts with a block')
-  await expect(marker).toHaveCount(1)
-  await expect(marker).toBeVisible()
-  await expect(page.locator('[data-kind]').filter({ has: marker })).toContainText('Grace Mukamana')
-  await expect(page.locator('.bookly-event--conflict')).toHaveCount(1)
+    await page.goto('/admin/calendar?view=month&date=2026-10-07')
+    await expect(page.locator('.fc-toolbar-title')).toHaveText('October 2026')
+    await expect(page.locator('.fc-daygrid-day[data-date="2026-10-07"] .fc-daygrid-more-link')).toBeVisible()
+    const scroll = () => page.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight)
+    expect(await scroll()).toBe(0)
+    // Every week of the month is on screen, with nothing to scroll inside it either.
+    const lastWeek = page.locator('.fc-daygrid-day[data-date="2026-10-31"]')
+    await expect(lastWeek).toBeInViewport({ ratio: 1 })
+
+    // A one-line event keeps the conflict in its accessible name.
+    await page.locator('.fc-daygrid-day[data-date="2026-10-07"] .fc-daygrid-more-link').click()
+    await expect(page.locator('.fc-popover .bookly-event--conflict')).toContainText('Conflicts with a block')
+
+    await page.goto('/admin/calendar?view=week&date=2026-10-07')
+    await expect(page.locator('.fc-timegrid-slot').first()).toBeAttached()
+    expect(await scroll()).toBe(0)
+  })
+})
+
+test.describe('with every month event in full (below 1280x720)', () => {
+  test.use({ viewport: { width: 1200, height: 900 } })
+
+  test('marks the booking that overlaps a block with a visible conflict marker', async ({ page }) => {
+    await seedSession(page)
+    await mockApi(page)
+
+    await page.goto('/admin/calendar?view=month&date=2026-10-07')
+
+    const marker = page.getByText('Conflicts with a block')
+    await expect(marker).toHaveCount(1)
+    await expect(marker).toBeVisible()
+    await expect(page.locator('[data-kind]').filter({ has: marker })).toContainText('Grace Mukamana')
+    await expect(page.locator('.bookly-event--conflict')).toHaveCount(1)
+  })
 })
 
 test('switches views and dates with the toolbar, fetching only ranges it does not hold', async ({ page }) => {

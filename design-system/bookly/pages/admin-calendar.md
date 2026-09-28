@@ -55,6 +55,10 @@ Booking events will open the booking (`/admin/bookings/:id`). The behaviour is b
 - ~~Block events are not clickable: default cursor, no hover state.~~ **Superseded** — see the correction above. Blocks are clickable and look it.
 - In month view the events stay small; the hit area is the event box, as large as the row allows.
 
+## Fit to the screen (2026-09-27)
+
+**Changed 2026-09-27 (admin console fixes, item 4, user decision):** on a screen of at least 1280x720 the calendar page itself never scrolls. The page is exactly the height under the 56px top bar, with a tighter rhythm from `lg`, and FullCalendar fills what is left (`height="100%"`, `expandRows`). Month shows every week with no scrolling anywhere: the cells drop their minimum height, busy days fold into "+N more" (`dayMaxEvents`), and a month event is one line (status glyph, start, name; the status word and a conflict stay in its accessible name). Week and day scroll only inside FullCalendar's own time grid and still open at 08:00. Below 1280x720 nothing changed: month grows to its weeks and the page scrolls; the hourly grids keep their fixed 760px and scroll inside it. `TIME_GRID_HEIGHT` and `SCROLL_TIME` are unchanged; the fit mode is read live from a media query (`console/use-fits-screen.ts`).
+
 ## Block time (2026-09-27)
 
 **Changed 2026-09-27 (admin console fixes, item 1, user decision):** "Block time" opens `BlockForm` in a dialog (`admin-console.md` §6.11); the button stays in the header while it is open.

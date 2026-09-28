@@ -762,6 +762,13 @@
     }
 }
 
+/* Fit to the screen (1280x720 and up, admin console fixes item 4): the month
+   stretches or shrinks its weeks to the height it is given, and busy days fold
+   into "+N more", so there is no minimum to push it past that height. */
+.bookly-calendar-fit .fc .fc-dayGridMonth-view .fc-daygrid-day-frame {
+    min-height: 0;
+}
+
 /* Below `lg` and on touch every date link is 44px tall to a thumb. A
    transparent border makes up the height, and the chip (today's violet
    fill) stays the size of the number, on the padding box. */

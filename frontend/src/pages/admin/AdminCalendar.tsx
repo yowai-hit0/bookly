@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils'
 import { BlockForm } from './BlockForm'
 import { PAGE } from './console/classes'
 import { FormDialog } from './console/FormDialog'
+import { useFitsScreen } from './console/use-fits-screen'
 import { MetaItem, PageHeader } from './console/PageHeader'
 
 /**
@@ -66,9 +67,13 @@ const VIEW_OPTIONS: CalendarOptions['views'] = {
 }
 
 /**
- * Month grows to fit its weeks. The hourly grids scroll inside this height and
- * open at 08:00, so the working day is in view while 01:00 stays reachable.
- * Set from the page, because FullCalendar ignores `height` given per view.
+ * On a screen of at least 1280x720 the calendar fills the height left under
+ * the header and the page itself never scrolls (item 4, 2026-09-27): month
+ * shows every week, busy days folding into "+N more", and the hourly grids
+ * scroll inside themselves only. Below that size, month grows to fit its weeks
+ * and the hourly grids scroll inside this fixed height. Either way they open
+ * at 08:00, so the working day is in view while 01:00 stays reachable. Set
+ * from the page, because FullCalendar ignores `height` given per view.
  */
 const TIME_GRID_HEIGHT = 760
 const SCROLL_TIME = '08:00:00'
@@ -86,6 +91,7 @@ export function AdminCalendar() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const calendarRef = useRef<FullCalendar>(null)
+  const fits = useFitsScreen()
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
 
@@ -186,7 +192,15 @@ export function AdminCalendar() {
   }
 
   return (
-    <main className={cn(PAGE, 'max-w-7xl')}>
+    <main
+      className={cn(
+        PAGE,
+        'max-w-7xl',
+        // Exactly the height under the 56px top bar, with a tighter rhythm, so
+        // the calendar below takes the rest and nothing scrolls the page.
+        fits && 'h-[calc(100dvh-3.5rem)] overflow-hidden lg:gap-6 lg:py-6',
+      )}
+    >
       <PageHeader
         eyebrow={t('admin:nav.label')}
         eyebrowIcon={CalendarDays}
@@ -219,7 +233,7 @@ export function AdminCalendar() {
 
       {/* The loading line and the failure sit close above the calendar they
           are about, not a section's gap away from it. */}
-      <div className="flex min-w-0 flex-col gap-4" aria-busy={loading}>
+      <div className={cn('flex min-w-0 flex-col gap-4', fits && 'bookly-calendar-fit min-h-0 flex-1')} aria-busy={loading}>
         {/* The grid is the real layout from the first paint; only the events
             are awaited. A visible line here pushed the grid down on every range
             load, so the wait is announced, not shown (item 2, 2026-09-27). */}
@@ -258,7 +272,9 @@ export function AdminCalendar() {
           allDayText={t('admin:calendar.allDay')}
           firstDay={1}
           fixedWeekCount={false}
-          height={viewType === FULLCALENDAR_VIEW.month ? 'auto' : TIME_GRID_HEIGHT}
+          height={fits ? '100%' : viewType === FULLCALENDAR_VIEW.month ? 'auto' : TIME_GRID_HEIGHT}
+          expandRows={fits}
+          dayMaxEvents={fits}
           scrollTime={SCROLL_TIME}
           navLinks
           eventDisplay="block"
@@ -269,7 +285,7 @@ export function AdminCalendar() {
           loading={setLoading}
           datesSet={onDatesSet}
           eventClick={onEventClick}
-          eventContent={renderEventContent}
+          eventContent={fits ? renderFittedEventContent : renderEventContent}
         />
       </div>
     </main>
@@ -308,6 +324,39 @@ const PHONE_MONTH_TIME = 'max-sm:text-[0.6875rem] max-[22.5rem]:text-[0.625rem]'
  * edge and the conflict outline -- is styled by the `.bookly-event` rules in
  * `index.css`.
  */
+/**
+ * A month event when the calendar fits the screen (item 4): one line -- the
+ * status glyph, the start and the name -- so a day of a 1280x720 month holds
+ * two before folding into "+N more". The status word and a conflict stay in
+ * the accessible name; the week and day views keep their full events.
+ */
+function renderFittedEventContent(arg: EventContentArg) {
+  if (viewOf(arg.view.type) !== 'month') return renderEventContent(arg)
+  return <CompactEvent entry={arg.event.extendedProps.entry as CalendarEntry} timeText={arg.timeText} />
+}
+
+function CompactEvent({ entry, timeText }: { entry: CalendarEntry; timeText: string }) {
+  const { t } = useTranslation()
+  const status = entry.kind === 'booking' ? entry.booking.status : 'block'
+  const time = timeText !== '' ? timeText : entry.kind === 'block' && entry.block.isAllDay ? t('admin:calendar.allDay') : ''
+  return (
+    <div className="flex min-w-0 items-center gap-1 overflow-hidden px-1 py-0.5 text-xs leading-4" data-kind={entry.kind} data-status={status}>
+      {status !== 'block' && <StatusGlyph status={status} className="size-3.5" />}
+      {time !== '' && <span className="shrink-0 font-mono tabular-nums">{time}</span>}
+      <span className="min-w-0 truncate font-medium">
+        {entry.kind === 'booking' ? entry.booking.contactName : t(`admin:calendar.status.${status}`)}
+      </span>
+      {entry.kind === 'booking' && <span className="sr-only">{t(`admin:calendar.status.${status}`)}</span>}
+      {entry.kind === 'booking' && entry.booking.conflictsWithBlock && (
+        <span className="text-destructive ml-auto inline-flex shrink-0">
+          <TriangleAlert aria-hidden="true" className="size-3.5" />
+          <span className="sr-only">{t('admin:calendar.conflict')}</span>
+        </span>
+      )}
+    </div>
+  )
+}
+
 function EventContent({ entry, timeText, view }: { entry: CalendarEntry; timeText: string; view: CalendarView }) {
   const { t } = useTranslation()
   const status = entry.kind === 'booking' ? entry.booking.status : 'block'
