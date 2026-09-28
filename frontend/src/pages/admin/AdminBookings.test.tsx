@@ -468,6 +468,18 @@ describe('numbered pages', () => {
     expect(listCalls(mock).at(-1)).toBe(`${BOOKINGS_API}?stage=confirmed`)
   })
 
+  it('corrects the URL to the last real page when it names one past the end', async () => {
+    const mock = stubFetch((url) => {
+      const asked = Number(new URL(url, 'http://x').searchParams.get('page') ?? '1')
+      return json({ bookings: [CONFIRMED], total: 26, page: Math.min(asked, 2), pageSize: 25, pageCount: 2 })
+    })
+    const router = renderAt('/admin/bookings?page=9')
+
+    await waitFor(() => expect(router.state.location.search).toBe('?page=2'))
+    expect(await screen.findByRole('navigation', { name: 'Pages' })).toHaveTextContent('Showing 26–26 of 26')
+    expect(listCalls(mock)).toEqual([`${BOOKINGS_API}?page=9`, `${BOOKINGS_API}?page=2`])
+  })
+
   it('is there on a single page, with both arrows disabled', async () => {
     stubFetch()
     renderAt()

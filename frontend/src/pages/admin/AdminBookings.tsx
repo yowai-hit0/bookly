@@ -79,6 +79,20 @@ export function AdminBookings() {
       })
       .then((answer) => {
         if (cancelled) return
+        // A page past the end (a bookmarked link, a filter that narrowed) comes
+        // back as the last real page: the URL is corrected to match, in place.
+        if (answer.page !== pageAsked) {
+          setParams(
+            (current) => {
+              const next = new URLSearchParams(current)
+              if (answer.page <= 1) next.delete('page')
+              else next.set('page', String(answer.page))
+              return next
+            },
+            { replace: true },
+          )
+          return
+        }
         setLoaded({ key, rows: answer.bookings, total: answer.total, page: answer.page, pageSize: answer.pageSize, pageCount: answer.pageCount })
       })
       .catch((error: unknown) => {
