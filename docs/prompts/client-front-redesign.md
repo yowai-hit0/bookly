@@ -555,3 +555,5 @@ the attribution line given in your system instructions.
   - every test changed and why;
   - the answers to the checkpoint questions;
   - anything deferred or uncertain.
+
+french translation to come
