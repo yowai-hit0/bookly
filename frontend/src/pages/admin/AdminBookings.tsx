@@ -149,8 +149,20 @@ export function AdminBookings() {
     // Tall enough to hold the pager at the bottom of the screen even when the
     // list is short; the pager itself sticks there when the list is long.
     <main className={cn(PAGE, 'max-w-6xl pb-0 lg:min-h-[calc(100dvh-3.5rem)] lg:pb-0')}>
-      <PageHeader eyebrow={t('admin:nav.label')} eyebrowIcon={ClipboardList} title={t('admin:bookings.title')} />
-
+      {/* <PageHeader eyebrow={t('admin:nav.label')} eyebrowIcon={ClipboardList} title={t('admin:bookings.title')} /> */}
+      <PageHeader
+        eyebrow={t('admin:nav.label')}
+        eyebrowIcon={ClipboardList}
+        title={t('admin:bookings.title')}
+        actions={
+          filtering && (
+            <Button variant="ghost" size="console-sm" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
+              <X aria-hidden="true" />
+              {t('admin:bookings.filters.clear')}
+            </Button>
+          )
+        }
+      />
       <section className="flex flex-col gap-4" aria-label={t('admin:bookings.filters.label')}>
         <Toolbar>
           <ToolbarCell className="max-lg:py-2">
@@ -194,14 +206,14 @@ export function AdminBookings() {
               </Button>
             </form>
           </ToolbarCell>
-          {filtering && (
+          {/* {filtering && (
             <ToolbarCell className="max-lg:py-2">
               <Button variant="ghost" size="console-sm" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
                 <X aria-hidden="true" />
                 {t('admin:bookings.filters.clear')}
               </Button>
             </ToolbarCell>
-          )}
+          )} */}
         </Toolbar>
       </section>
 

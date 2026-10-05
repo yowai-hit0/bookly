@@ -19,10 +19,10 @@ export type PhotographerContact = {
 }
 
 export const PHOTOGRAPHER_CONTACT: PhotographerContact = {
-  name: 'Studio name',
-  phone: '+250 700 000 000',
-  whatsapp: '+250 700 000 000',
-  email: 'hello@example.com',
+  name: 'demo studio name',
+  phone: '+250 781 936 999',
+  whatsapp: '+250 781 936 999',
+  email: 'ybarasingiz@gmail.com',
 }
 
 export type ContactLink = { kind: 'phone' | 'whatsapp' | 'email'; value: string; href: string }
