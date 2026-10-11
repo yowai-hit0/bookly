@@ -15,7 +15,13 @@ export default defineConfig({
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Developers', link: '/developers/' },
-      { text: 'API', link: '/api/' },
+      {
+        text: 'API',
+        items: [
+          { text: 'Reference', link: '/api/' },
+          { text: 'Conventions', link: '/api/conventions' },
+        ],
+      },
     ],
     sidebar: {
       '/developers/': [

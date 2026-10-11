@@ -1,31 +1,29 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+// Embeds the standalone Redoc reference (built to /api-reference.html by
+// scripts/bundle-openapi.mjs) in a full-height frame. Redoc renders in its own
+// document, so its styles never fight VitePress and it keeps its own operation
+// list, search and deep links. The page uses VitePress's `page` layout, so this
+// frame gets the full width below the top nav.
+import { withBase } from 'vitepress'
 
-// Mounts the Scalar API reference over the bundled spec. Client-only: it reads
-// `/openapi.json` from the site's static assets at runtime. The "send request"
-// button is hidden on purpose — the docs must never fire calls at the live API,
-// where a payment attempt would prompt a real phone and a booking would hold a
-// real slot.
-const el = ref<HTMLElement | null>(null)
-
-onMounted(async () => {
-  const { createApiReference } = await import('@scalar/api-reference')
-  createApiReference(el.value!, {
-    url: '/openapi.json',
-    hideTestRequestButton: true,
-    hideDownloadButton: false,
-    layout: 'modern',
-  })
-})
+const src = withBase('/api-reference.html')
 </script>
 
 <template>
-  <div ref="el" class="bookly-api-reference" />
+  <iframe
+    :src="src"
+    class="api-reference-frame"
+    title="Bookly API reference"
+    loading="lazy"
+  />
 </template>
 
-<style>
-/* Let the reference use the full width of the page. */
-.bookly-api-reference {
-  margin: 0 -24px;
+<style scoped>
+.api-reference-frame {
+  display: block;
+  border: 0;
+  width: 100%;
+  /* Fill the viewport below the top nav. */
+  height: calc(100vh - var(--vp-nav-height, 64px));
 }
 </style>

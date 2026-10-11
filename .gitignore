@@ -35,3 +35,4 @@ Thumbs.db
 docs-site/.vitepress/dist/
 docs-site/.vitepress/cache/
 docs-site/public/openapi.json
+docs-site/public/api-reference.html
