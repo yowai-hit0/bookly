@@ -30,3 +30,8 @@ Thumbs.db
 
 # development email sink (backend MAIL_OUTPUT_DIR): holds live access links
 .mail/
+
+# docs-site build artifacts
+docs-site/.vitepress/dist/
+docs-site/.vitepress/cache/
+docs-site/public/openapi.json
