@@ -30,7 +30,9 @@ type ValidateFunction = (data: unknown) => boolean;
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROUTES_DIR = join(HERE, '..', 'routes');
-const SPEC_PATH = join(HERE, '..', '..', 'openapi', 'openapi.yaml');
+export const SPEC_PATH = join(HERE, '..', '..', 'openapi', 'openapi.yaml');
+/** The bundled copy the docs site vendors, so it can build without this folder. */
+export const VENDORED_SPEC_PATH = join(HERE, '..', '..', '..', 'docs-site', 'openapi.json');
 
 export type SpecOperation = {
   method: string;
@@ -51,6 +53,13 @@ export async function loadSpec(): Promise<DereferencedSpec> {
     cached = (await SwaggerParser.validate(SPEC_PATH)) as unknown as DereferencedSpec;
   }
   return cached;
+}
+
+/** A spec file fully dereferenced, for comparing two specs structurally. A
+ *  fresh parse each call (no shared cache), so the source and the vendored copy
+ *  are resolved the same way. */
+export async function dereferenceSpec(path: string): Promise<unknown> {
+  return SwaggerParser.dereference(path);
 }
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;

@@ -10,7 +10,7 @@ export default defineConfig({
   cleanUrls: true,
   lastUpdated: true,
   // The generated spec lives in public/ but is not a page.
-  srcExclude: ['**/GLOSSARY.md'],
+  srcExclude: ['**/GLOSSARY.md', '**/README.md'],
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },

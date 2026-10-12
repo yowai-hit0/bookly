@@ -16,24 +16,52 @@ npm run dev        # bundles the OpenAPI spec, then serves the site
 
 | Script | What it does |
 |---|---|
-| `npm run dev` | Bundle the spec and run the dev server. |
-| `npm run build` | Bundle the spec and build the static site to `.vitepress/dist/`. |
+| `npm run dev` | Render the reference from the local spec, then run the dev server. |
+| `npm run build` | Render the reference, then build the static site to `.vitepress/dist/`. |
 | `npm run preview` | Serve the built site. |
-| `npm run bundle-openapi` | Bundle `../backend/openapi` into `public/openapi.json`. |
-| `npm run api:lint` | Lint the backend OpenAPI spec with Redocly. |
+| `npm run sync-spec` | Regenerate the vendored `openapi.json` from `../backend/openapi` (run on API changes). |
+| `npm run bundle-openapi` | Render `public/api-reference.html` + `public/openapi.json` from the local `openapi.json`. |
+| `npm run api:lint` | Lint the vendored `openapi.json` with Redocly. |
+
+## Deploy
+
+The site is self-contained: it builds from its own files (`openapi.json` is
+vendored), so **the `backend/` folder is not needed at deploy time** and the
+docs can ship from `docs-site/` alone.
+
+On Vercel, Netlify or Cloudflare Pages:
+
+| Setting | Value |
+|---|---|
+| Root directory / base directory | `docs-site` |
+| Install command | `npm ci` |
+| Build command | `npm run build` |
+| Output directory | `.vitepress/dist` |
+
+Deploying under a sub-path (e.g. GitHub Pages project sites) needs `base` set in
+`.vitepress/config.ts`. After the API changes, run `npm run sync-spec` and
+commit the updated `openapi.json` so the next deploy picks it up.
 
 ## How the API reference works
 
 The source of truth is the hand-written spec at
-[`../backend/openapi/openapi.yaml`](../backend/openapi/openapi.yaml), kept honest
-by a backend test (`src/openapi.test.ts`). `scripts/bundle-openapi.mjs` bundles
-its split files into `public/openapi.json`, and `api/index.md` renders that with
-[Scalar](https://github.com/scalar/scalar). The "send request" button is turned
-off on purpose: the docs must never fire calls at the live API, where a payment
-attempt would prompt a real phone and a booking would hold a real slot.
+`../backend/openapi/openapi.yaml`, kept honest by a backend test
+(`src/openapi.test.ts`). This site does **not** read it at build time — instead
+it vendors a bundled copy, [`openapi.json`](openapi.json), so it can build and
+deploy on its own without the `backend/` folder present.
 
-`public/openapi.json` is generated — it is git-ignored and rebuilt on every
-`dev`/`build`.
+- `npm run sync-spec` regenerates `openapi.json` from the backend source. It is
+  the only script that reaches into `../backend`; run it whenever the API
+  changes. The backend test fails if the committed copy falls behind, so the two
+  cannot silently drift.
+- `scripts/bundle-openapi.mjs` (run by `dev`/`build`) reads the local
+  `openapi.json`, renders the standalone [Redoc](https://github.com/Redocly/redoc)
+  page to `public/api-reference.html`, and copies the spec to
+  `public/openapi.json` for download. `api/index.md` embeds the Redoc page in a
+  full-width frame.
+
+Everything under `public/` is generated and git-ignored; `openapi.json` at the
+site root is the one committed, vendored file.
 
 ## Structure
 
