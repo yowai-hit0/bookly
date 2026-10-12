@@ -15,7 +15,7 @@ link. There is exactly one admin. Prices are in RWF; times are Africa/Kigali.
 |---|---|---|
 | [`backend/`](backend/) | Express 5 + Prisma 7 API (`/api/*`), PostgreSQL | Render |
 | [`frontend/`](frontend/) | React + Vite single-page app | Vercel |
-| [`docs-site/`](docs-site/) | VitePress documentation site, incl. the API reference | — |
+| [`docs-site/`](docs-site/) | VitePress documentation site, incl. the API reference | Cloudflare |
 
 They deploy independently to separate domains; in development Vite proxies
 `/api` to the backend so the inner loop is one command per app. There is no
