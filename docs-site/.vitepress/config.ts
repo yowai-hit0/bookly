@@ -1,9 +1,8 @@
 import { defineConfig } from 'vitepress'
 
-// The documentation site. This round ships the API reference and the developer
-// guide; the photographer guide, client help and their French versions are a
-// planned follow-up and are intentionally not linked yet, so the dead-link
-// check stays green.
+// The documentation site: client help, a photographer guide (payments and
+// security so far), the developer guide and the API reference. French versions
+// and the rest of the user guides are a planned follow-up.
 export default defineConfig({
   title: 'Bookly',
   description: 'Documentation for the Bookly booking platform.',
@@ -14,6 +13,8 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },
+      { text: 'Clients', link: '/help/' },
+      { text: 'Photographer', link: '/guide/' },
       { text: 'Developers', link: '/developers/' },
       {
         text: 'API',
@@ -24,6 +25,26 @@ export default defineConfig({
       },
     ],
     sidebar: {
+      '/help/': [
+        {
+          text: 'Help for clients',
+          items: [
+            { text: 'Overview', link: '/help/' },
+            { text: 'Paying for your booking', link: '/help/paying' },
+            { text: 'Privacy and payment safety', link: '/help/privacy-and-safety' },
+          ],
+        },
+      ],
+      '/guide/': [
+        {
+          text: 'Photographer guide',
+          items: [
+            { text: 'Overview', link: '/guide/' },
+            { text: 'Payments, cash and refunds', link: '/guide/payments' },
+            { text: 'Security and responsibilities', link: '/guide/security' },
+          ],
+        },
+      ],
       '/developers/': [
         {
           text: 'Developer guide',

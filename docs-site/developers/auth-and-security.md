@@ -75,3 +75,9 @@ constant-time.
 Secrets live only in environment variables; `src/env.ts` enforces the ≥
 32-character floor on `SESSION_SECRET` — the only guard on the HMAC key length,
 so do not relax it.
+
+---
+
+*Not a developer? The user-facing side: clients see
+[Privacy and payment safety](/help/privacy-and-safety); the photographer sees
+[Security and responsibilities](/guide/security).*

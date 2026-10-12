@@ -87,3 +87,9 @@ settlement are indistinguishable and equally idempotent.
   to what is owed. It is refused while an online payment may be in flight, and it
   voids any open online request so the same money cannot be collected twice.
   Cash is refunded like any other payment.
+
+---
+
+*Not a developer? The same flow for the people using it: clients see
+[Paying for your booking](/help/paying); the photographer sees
+[Payments, cash and refunds](/guide/payments).*

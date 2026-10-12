@@ -9,17 +9,21 @@ hero:
       text: API Reference
       link: /api/
     - theme: alt
-      text: API Conventions
-      link: /api/conventions
+      text: Developer guide
+      link: /developers/
 features:
+  - title: For clients
+    details: How to pay the booking fee by Mobile Money, use your private booking link, pay the session fee after the shoot, and what happens to your data and your payment details.
+    link: /help/
+    linkText: Client help
+  - title: For the photographer
+    details: Running payments — fees, recording cash, refunds and what each payment state means — and keeping the admin panel secure, with your data-protection responsibilities.
+    link: /guide/
+    linkText: Photographer guide
   - title: For developers
-    details: The complete HTTP API — public booking, client capability links, payments and webhooks, and the admin panel — with an interactive reference generated from an OpenAPI spec that a test keeps in step with the code.
-    link: /api/
-    linkText: Open the reference
-  - title: Developer guide
-    details: How Bookly is built — architecture, local setup, the data model and the one constraint it rests on, the booking lifecycle, payments and webhooks, the outbox, auth, and testing. Written from the code.
+    details: The complete HTTP API with an interactive reference kept in step with the code by a test, plus a developer guide — architecture, data model, booking lifecycle, payments and webhooks, the outbox, auth and testing.
     link: /developers/
     linkText: Read the guide
   - title: Coming next
-    details: A photographer's guide and a client help centre, in English and French, are planned follow-ups to this documentation release.
+    details: The rest of the photographer and client guides, and French versions, are planned follow-ups to this release.
 ---
