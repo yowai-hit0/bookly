@@ -3,7 +3,7 @@ layout: home
 hero:
   name: Bookly
   text: Documentation
-  tagline: The booking platform for a photographer in Kigali — book, pay, and run the shoot from one calendar.
+  tagline: The booking platform for a photographer in Kigali — book and pay all from one place.
   actions:
     - theme: brand
       text: API Reference
