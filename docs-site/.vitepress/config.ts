@@ -1,4 +1,19 @@
+import { execFileSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitepress'
+
+// Safety net: the Redoc page and the raw spec are generated into public/ by
+// `npm run bundle-openapi` (which `npm run dev`/`build` run first). If a host's
+// build command is just `vitepress build` and skips that step, those files are
+// absent and the /api page 404s. Config is imported before the build copies
+// public/, so regenerate them here when they're missing — a no-op in the normal
+// flow, where bundle-openapi already produced them.
+const siteRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
+if (!existsSync(join(siteRoot, 'public', 'api-reference.html'))) {
+  execFileSync('node', [join(siteRoot, 'scripts', 'bundle-openapi.mjs')], { stdio: 'inherit', cwd: siteRoot })
+}
 
 // The documentation site: client help, a photographer guide (payments and
 // security so far), the developer guide and the API reference. French versions
